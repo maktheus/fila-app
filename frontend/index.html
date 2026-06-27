@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel do Operador — Fila Virtual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+
+  :root {
+    --mutum-red:#ED2C27;
+    --mutum-red-deep:#EC2B26;
+    --mutum-coral:#EE736E;
+    --mutum-coral-soft:#F5A5A1;
+    --mutum-blush:#FBE3E1;
+    --mutum-cream:#F0EFEB;
+    --mutum-cream-2:#E8E6DF;
+    --mutum-bone:#DBD4C9;
+    --mutum-sand:#C9C2B5;
+    --mutum-stone:#8C857A;
+    --mutum-slate:#4D4943;
+    --mutum-ink:#191919;
+    --mutum-ink-2:#2A2826;
+    --mutum-black:#0B0B0B;
+    --mutum-forest:#1F5D3A;
+    --mutum-leaf:#3F8A5B;
+    --mutum-river:#2D6A8C;
+    --mutum-clay:#C26B3A;
+    --mutum-amber:#E8A33D;
+
+    --bg:var(--mutum-ink);
+    --bg-2:#232220;
+    --bg-3:#2A2826;
+    --surface:#1F1E1C;
+    --fg-1:var(--mutum-bone);
+    --fg-2:#B5AFA4;
+    --fg-3:#877F73;
+    --fg-inverse:var(--mutum-ink);
+    --border:#34322E;
+    --border-strong:#4A4742;
+    --primary:var(--mutum-coral);
+    --primary-hover:#F08B86;
+    --primary-press:#D85852;
+    --on-primary:var(--mutum-ink);
+    --shadow-sm:0 1px 2px rgba(0,0,0,0.4);
+    --shadow-md:0 6px 18px rgba(0,0,0,0.4),0 2px 4px rgba(0,0,0,0.3);
+    --shadow-lg:0 18px 40px rgba(0,0,0,0.5),0 4px 8px rgba(0,0,0,0.3);
+    --shadow-red:0 8px 24px rgba(238,115,110,0.25);
+
+    --font-display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif;
+    --font-body:"Manrope",ui-sans-serif,system-ui,sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,monospace;
+
+    --ease-out:cubic-bezier(0.22,1,0.36,1);
+    --ease-in-out:cubic-bezier(0.65,0,0.35,1);
+    --ease-spring:cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  html,body{height:100%;background:var(--bg);color:var(--fg-1);font-family:var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+  @keyframes pulseDot{0%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.6)}100%{opacity:1;transform:scale(1)}}
+  @keyframes rowIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes heroPop{0%{opacity:0;transform:scale(.96)}100%{opacity:1;transform:scale(1)}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes toastOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(10px)}}
+
+  .qscroll::-webkit-scrollbar{width:8px}
+  .qscroll::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:999px}
+  .qscroll::-webkit-scrollbar-track{background:transparent}
+
+  button{font-family:var(--font-body);cursor:pointer}
+  button:focus-visible{outline:2px solid color-mix(in oklch,var(--mutum-coral) 50%,transparent);outline-offset:2px;border-radius:6px}
+
+  .shell{max-width:1320px;margin:0 auto;padding:22px 32px 44px}
+
+  .header{display:flex;align-items:center;gap:18px;padding-bottom:22px;border-bottom:1px solid var(--border)}
+  .header-brand{display:flex;align-items:center;gap:11px}
+  .header-brand-sub{font-family:var(--font-display);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:var(--fg-3)}
+  .header-brand-title{font-family:var(--font-display);font-weight:600;font-size:17px;letter-spacing:-0.01em;color:var(--fg-1)}
+  .venue-pill{display:flex;align-items:center;gap:8px;padding:6px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--border)}
+  .venue-pill span{font-size:13px;font-weight:600;color:var(--fg-1)}
+  .live-badge{display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px}
+  .live-badge.connected{background:color-mix(in oklch,var(--mutum-leaf) 18%,transparent);border:1px solid color-mix(in oklch,var(--mutum-leaf) 45%,transparent)}
+  .live-badge.disconnected{background:color-mix(in oklch,var(--mutum-amber) 18%,transparent);border:1px solid color-mix(in oklch,var(--mutum-amber) 45%,transparent)}
+  .live-dot{width:7px;height:7px;border-radius:999px}
+  .live-badge.connected .live-dot{background:var(--mutum-leaf);animation:pulseDot 1.6s infinite}
+  .live-badge.disconnected .live-dot{background:var(--mutum-amber)}
+  .live-text{font-size:11px;font-weight:700;letter-spacing:0.06em}
+  .live-badge.connected .live-text{color:var(--mutum-leaf)}
+  .live-badge.disconnected .live-text{color:var(--mutum-amber)}
+  .header-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+  .link-client{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--fg-2);text-decoration:none;padding:8px 12px;border-radius:9px;border:1px solid var(--border);transition:border-color 140ms,color 140ms}
+  .link-client:hover{border-color:var(--border-strong);color:var(--fg-1)}
+  .clock{font-family:var(--font-mono);font-size:14px;color:var(--fg-2);min-width:74px;text-align:right}
+  .operator{display:flex;align-items:center;gap:9px}
+  .operator-avatar{width:34px;height:34px;border-radius:999px;background:var(--primary);color:var(--on-primary);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:14px}
+  .operator-name{font-size:13px;font-weight:700;color:var(--fg-1)}
+  .operator-role{font-size:11px;color:var(--fg-3)}
+
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:22px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px}
+  .kpi-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--fg-3)}
+  .kpi-value{font-family:var(--font-display);font-weight:700;font-size:34px;line-height:1;letter-spacing:-0.02em;margin-top:8px}
+  .kpi-sub{font-size:12px;color:var(--fg-3);margin-top:5px}
+
+  .main-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(330px,1fr);gap:20px;margin-top:20px;align-items:start}
+
+  .queue-section{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+  .queue-header{display:flex;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid var(--border)}
+  .queue-title{font-family:var(--font-display);font-weight:600;font-size:18px;letter-spacing:-0.01em;margin:0;color:var(--fg-1)}
+  .queue-count{font-size:12px;font-weight:700;color:var(--fg-2);background:var(--bg-3);padding:3px 10px;border-radius:999px}
+  .btn-call-next{margin-left:auto;appearance:none;border:none;display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:11px;background:var(--primary);color:var(--on-primary);font-weight:700;font-size:14px;box-shadow:var(--shadow-red);transition:transform 100ms var(--ease-out),background 140ms}
+  .btn-call-next:hover{background:var(--primary-hover)}
+  .btn-call-next:active{transform:scale(0.98)}
+  .btn-call-next:disabled{opacity:.5;cursor:not-allowed}
+
+  .tabs{display:flex;gap:4px;padding:12px 16px 0}
+  .tab{appearance:none;border:none;border-radius:9px;padding:9px 16px;font-weight:700;font-size:13px;transition:all 140ms}
+  .tab.active{background:var(--bg-3);color:var(--fg-1)}
+  .tab:not(.active){background:transparent;color:var(--fg-3)}
+  .tab:not(.active):hover{color:var(--fg-2)}
+
+  .queue-list{padding:14px 16px 18px;max-height:540px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+  .queue-row{display:grid;grid-template-columns:64px minmax(0,1fr) auto;align-items:center;gap:14px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--bg-2);animation:rowIn 220ms var(--ease-out)}
+  .queue-row.calling{border-color:var(--primary);background:color-mix(in oklch,var(--primary) 10%,var(--surface))}
+  .queue-row.done{opacity:0.5}
+  .queue-row.absent{opacity:0.62}
+  .row-code{font-family:var(--font-mono);font-weight:500;font-size:18px;letter-spacing:-0.01em}
+  .row-name{font-size:14px;font-weight:700;color:var(--fg-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row-source{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;text-transform:uppercase;letter-spacing:0.04em}
+  .row-source.qr,.row-source.senha{background:var(--bg-3);color:var(--fg-2)}
+  .row-source.passou{background:color-mix(in oklch,var(--primary) 16%,transparent);color:var(--primary)}
+  .row-meta{font-size:12px;margin-top:3px}
+  .row-actions{display:flex;align-items:center;gap:7px;justify-self:end}
+
+  .btn-action{appearance:none;border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;white-space:nowrap;transition:background 140ms,filter 140ms,color 140ms}
+  .btn-action:disabled{opacity:.5;cursor:not-allowed}
+  .btn-action.call{border:none;background:var(--primary);color:var(--on-primary)}
+  .btn-action.call:hover:not(:disabled){background:var(--primary-hover)}
+  .btn-action.absent-btn{background:transparent;border:1px solid var(--border-strong);color:var(--fg-2)}
+  .btn-action.absent-btn:hover:not(:disabled){color:var(--fg-1)}
+  .btn-action.finish{border:none;background:var(--mutum-leaf);color:#fff}
+  .btn-action.finish:hover:not(:disabled){filter:brightness(1.08)}
+  .btn-action.recall{background:transparent;border:1px solid var(--border-strong);color:var(--fg-2)}
+  .btn-action.recall:hover:not(:disabled){color:var(--fg-1)}
+
+  .done-tag{font-size:12px;font-weight:700;padding:6px 11px;border-radius:999px;white-space:nowrap}
+  .done-tag.served{color:var(--mutum-leaf);background:color-mix(in oklch,var(--mutum-leaf) 16%,transparent)}
+  .done-tag.absent-tag{color:var(--mutum-amber);background:color-mix(in oklch,var(--mutum-amber) 16%,transparent)}
+
+  .queue-empty{text-align:center;padding:40px 20px;color:var(--fg-3);font-size:14px}
+
+  .right-col{display:flex;flex-direction:column;gap:16px}
+
+  .hero-card{background:color-mix(in oklch,var(--primary) 14%,var(--surface));border:1px solid color-mix(in oklch,var(--primary) 45%,transparent);border-radius:16px;padding:22px;animation:heroPop 280ms var(--ease-out)}
+  .hero-label{display:flex;align-items:center;gap:8px}
+  .hero-dot{width:7px;height:7px;border-radius:999px;background:var(--primary);animation:pulseDot 1.4s infinite}
+  .hero-label-text{font-family:var(--font-display);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:var(--primary)}
+  .hero-body{display:flex;align-items:flex-end;justify-content:space-between;margin-top:10px}
+  .hero-code{font-family:var(--font-display);font-weight:700;font-size:54px;line-height:0.95;letter-spacing:-0.03em;color:var(--primary)}
+  .hero-counter{font-family:var(--font-display);font-weight:700;font-size:20px;color:var(--fg-1)}
+  .hero-name{font-size:12px;color:var(--fg-2)}
+  .hero-actions{display:flex;gap:8px;margin-top:18px}
+  .btn-hero-finish{flex:1;appearance:none;border:none;border-radius:11px;padding:13px;background:var(--mutum-leaf);color:#fff;font-weight:700;font-size:14px;transition:filter 140ms}
+  .btn-hero-finish:hover:not(:disabled){filter:brightness(1.08)}
+  .btn-hero-finish:disabled{opacity:.5;cursor:not-allowed}
+  .btn-hero-recall{appearance:none;background:transparent;border:1px solid var(--border-strong);border-radius:11px;padding:13px 16px;color:var(--fg-1);font-weight:700;font-size:14px;transition:background 140ms}
+  .btn-hero-recall:hover:not(:disabled){background:var(--bg-3)}
+  .btn-hero-recall:disabled{opacity:.5;cursor:not-allowed}
+
+  .hero-empty{background:var(--surface);border:1px dashed var(--border-strong);border-radius:16px;padding:26px 22px;text-align:center}
+  .hero-empty-title{font-family:var(--font-display);font-weight:600;font-size:16px;color:var(--fg-2)}
+  .hero-empty-sub{font-size:13px;color:var(--fg-3);margin-top:4px}
+
+  .counters-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 20px}
+  .counters-title{font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--fg-1);margin-bottom:14px}
+  .counters-list{display:flex;flex-direction:column;gap:9px}
+  .counter-row{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:11px;background:var(--bg-2);border:1px solid var(--border)}
+  .counter-dot{width:9px;height:9px;border-radius:999px;flex:0 0 auto}
+  .counter-name{font-size:14px;font-weight:700;color:var(--fg-1)}
+  .counter-code{margin-left:auto;font-family:var(--font-mono);font-size:14px}
+  .counter-status{font-size:12px;font-weight:600;min-width:54px;text-align:right}
+
+  .activity-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 20px}
+  .activity-title{font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--fg-1);margin-bottom:14px}
+  .activity-list{display:flex;flex-direction:column;gap:13px}
+  .activity-item{display:flex;gap:11px;align-items:flex-start}
+  .activity-dot{width:7px;height:7px;border-radius:999px;margin-top:5px;flex:0 0 auto}
+  .activity-text{font-size:13px;color:var(--fg-1)}
+  .activity-time{font-family:var(--font-mono);font-size:11px;color:var(--fg-3);margin-top:1px}
+
+  .toast-container{position:fixed;left:0;right:0;bottom:28px;display:flex;justify-content:center;z-index:50;pointer-events:none}
+  .toast{background:var(--mutum-ink-2);color:var(--mutum-cream);padding:13px 20px;border-radius:13px;font-size:14px;font-weight:600;box-shadow:var(--shadow-lg);border:1px solid var(--border-strong);animation:toastIn 240ms var(--ease-out)}
+
+  @media(max-width:1024px){
+    .kpis{grid-template-columns:repeat(3,1fr)}
+    .main-grid{grid-template-columns:1fr}
+  }
+  @media(max-width:640px){
+    .shell{padding:16px}
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .header{flex-wrap:wrap;gap:12px}
+    .header-right{width:100%;justify-content:flex-end}
+  }
+</style>
+</head>
+<body>
+<div class="shell" id="app"></div>
+
+<script>
+(function() {
+  // ---- CONFIG ----
+  // Set API_BASE to your backend URL. When served by Docker/Nginx, leave empty (same origin).
+  // For GitHub Pages, point to your backend's public URL.
+  const API_BASE = window.FILA_API_BASE || '';
+  const WS_BASE = window.FILA_WS_BASE || '';
+
+  // ---- STATE ----
+  let serverState = null;
+  let connected = false;
+  let filter = 'waiting';
+  let toast = null;
+  let toastTimeout = null;
+  let ws = null;
+  let reconnectDelay = 1000;
+
+  // ---- HELPERS ----
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function clockNow() { const d = new Date(); return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+  function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  const SOURCE_LABELS = { qr: 'QR code', senha: 'Senha balcão', passou: 'Passou a vez' };
+
+  function flash(msg) {
+    if (toastTimeout) clearTimeout(toastTimeout);
+    toast = msg;
+    render();
+    toastTimeout = setTimeout(() => { toast = null; render(); }, 3200);
+  }
+
+  // ---- BIRD SVG ----
+  const BIRD_SVG = '<svg width="26" height="33" viewBox="0 0 384 483" fill="none"><path d="M161.518 248.013C200.113 248.013 231.4 279.25 231.4 317.783C231.4 356.317 200.113 387.554 161.518 387.554C161.067 387.554 160.616 387.549 160.167 387.54L160.175 387.554L45.8376 390.119C43.5125 390.171 42.0147 387.673 43.157 385.647L98.8816 286.81C110.31 263.817 134.066 248.013 161.518 248.013Z" fill="#EE736E"/><path fill-rule="evenodd" clip-rule="evenodd" d="M291.873 274.848C273.505 287.685 239.084 278.927 239.084 278.927C239.084 278.927 252.903 309.733 240.806 345.96C228.709 382.187 215.272 378.162 216.615 384.871C217.959 391.58 287.84 386.213 317.407 351.327C346.975 316.441 361.757 253.379 348.316 245.329C334.875 237.279 305.312 265.456 291.873 274.848Z" fill="#EE736E"/><path d="M262.31 170.191C265.576 170.191 268.764 170.524 271.843 171.157C262.44 173.982 255.59 182.692 255.59 193.001C255.59 205.598 265.819 215.811 278.437 215.811C291.054 215.81 301.282 205.598 301.282 193.001C301.282 192.219 301.242 191.446 301.165 190.685C306.325 198.221 309.346 207.334 309.346 217.152C309.346 243.088 288.287 264.113 262.31 264.113C236.333 264.113 215.274 243.088 215.274 217.152C215.274 191.217 236.333 170.191 262.31 170.191Z" fill="#EC2B26"/><path fill-rule="evenodd" clip-rule="evenodd" d="M35.1926 403.655H142.704C142.704 403.655 125.233 447.933 82.2287 470.742C39.2243 493.551 3.96593 478.792 0.251526 472.084C-3.46286 465.375 35.1926 403.655 35.1926 403.655Z" fill="#EC2B26"/><path d="M235.432 123.23C171.858 132.81 142.545 218.285 136.98 236.54C136.521 238.047 137.943 239.372 139.46 238.952C145.266 237.345 157.13 234.403 165.55 234.594C173.923 234.784 185.7 238.227 191.541 240.105C193.069 240.596 194.626 239.198 194.329 237.62C191.285 221.433 183.657 157.095 252.903 150.064C324.184 142.827 325.952 214.751 325.583 229.353C325.549 230.665 326.727 231.681 328.02 231.453C333.298 230.524 345.613 228.455 353.694 227.886C362.318 227.278 376.664 229.469 381.561 230.28C382.541 230.442 383.474 229.863 383.641 228.883C384.316 224.91 384.943 214.098 376.54 198.368C367.165 180.818 350.638 176.53 346.56 175.72C345.972 175.604 345.457 175.277 345.126 174.777C340.361 167.576 301.97 113.203 235.432 123.23Z" fill="#ED2C27"/><path d="M160.975 407.423L150.862 427.617C150.199 428.941 151.155 430.502 152.636 430.512L336.894 431.826C337.331 431.83 337.762 431.689 338.103 431.416C348.27 423.284 346.793 408.953 336.224 404.996C334.81 404.467 220.87 405.43 162.704 406.32C161.958 406.331 161.309 406.757 160.975 407.423Z" fill="#ED2C27"/><path d="M293.271 52.4925C317.149 72.7298 316.879 117.623 309.904 120.191C302.929 122.759 295.799 105.629 287.213 98.481C278.627 91.3328 251.07 75.4076 229.317 56.044C207.565 36.6804 218.26 10.6154 226.326 0.00337097C238.692 9.06758 269.394 32.2553 293.271 52.4925Z" fill="#ED2C27"/><path d="M205.537 54.803C236.347 60.3236 258.644 99.2882 253.9 105.01C249.156 110.732 234.391 99.4946 223.378 97.6208C212.364 95.7471 180.537 95.8026 152.004 89.9713C123.471 84.14 119.64 56.2278 121.291 43.0006C136.536 44.6345 174.728 49.2824 205.537 54.803Z" fill="#ED2C27"/><path d="M125.36 102.074C154.633 90.9935 193.773 112.983 192.639 120.329C191.506 127.675 173.066 125.612 162.653 129.658C152.239 133.705 124.955 150.093 97.4762 159.738C69.997 169.383 52.3793 147.397 47.0054 135.198C60.9266 128.773 96.0873 113.154 125.36 102.074Z" fill="#ED2C27"/><path d="M85.9338 187.43C104.189 162.005 148.959 158.67 152.079 165.417C155.199 172.163 138.696 180.646 132.26 189.777C125.824 198.909 112.162 227.655 94.6066 250.892C77.0513 274.128 50.2121 265.56 38.9869 258.371C47.0294 245.317 67.6782 212.854 85.9338 187.43Z" fill="#ED2C27"/></svg>';
+
+  // ---- API CALLS ----
+  async function api(method, path, body) {
+    try {
+      const res = await fetch(API_BASE + path, {
+        method,
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const data = await res.json();
+      if (!res.ok) { flash(data.error || 'Erro no servidor.'); return null; }
+      if (data.message) flash(data.message);
+      return data;
+    } catch (e) {
+      flash('Sem conexão com o servidor.');
+      return null;
+    }
+  }
+
+  function callNext() { api('POST', '/api/tickets/call-next'); }
+  function callId(id) { api('POST', '/api/tickets/' + id + '/call'); }
+  function finishId(id) { api('POST', '/api/tickets/' + id + '/finish'); }
+  function recallId(id) { api('POST', '/api/tickets/' + id + '/recall'); }
+  function absentId(id) { api('POST', '/api/tickets/' + id + '/absent'); }
+
+  // ---- WEBSOCKET ----
+  function connectWs() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = WS_BASE || (proto + '//' + location.host);
+    ws = new WebSocket(wsUrl + '/ws');
+
+    ws.onopen = () => {
+      connected = true;
+      reconnectDelay = 1000;
+      render();
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'state') {
+          serverState = msg.data;
+          render();
+        }
+      } catch {}
+    };
+
+    ws.onclose = () => {
+      connected = false;
+      render();
+      setTimeout(connectWs, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, 15000);
+    };
+
+    ws.onerror = () => ws.close();
+  }
+
+  // ---- RENDER ----
+  function render() {
+    const app = document.getElementById('app');
+    if (!serverState) {
+      app.innerHTML = renderHeader('Fila Virtual', '...', false) +
+        '<div style="text-align:center;padding:80px 20px;color:var(--fg-3);font-size:16px">Conectando ao servidor...</div>';
+      return;
+    }
+
+    const s = serverState;
+    const waiting = s.tickets.filter(t => t.status === 'waiting');
+    const calling = s.tickets.filter(t => t.status === 'calling');
+
+    const kpis = [
+      { label: 'Na fila', value: s.kpis.waiting, sub: 'aguardando agora', color: 'var(--fg-1)' },
+      { label: 'Chamando', value: s.kpis.calling, sub: 'em atendimento', color: 'var(--primary)' },
+      { label: 'Espera média', value: '~' + s.kpis.avgWait + ' min', sub: 'estimada', color: 'var(--fg-1)' },
+      { label: 'Atendidos hoje', value: s.kpis.servedToday, sub: 'desde 08:00', color: 'var(--fg-1)' },
+      { label: 'Ausências', value: s.kpis.absent, sub: 'não compareceram', color: 'var(--mutum-amber)' },
+    ];
+
+    let list;
+    if (filter === 'waiting') list = [...calling, ...waiting];
+    else if (filter === 'done') list = s.tickets.filter(t => t.status === 'served' || t.status === 'absent').slice().reverse();
+    else list = [...calling, ...waiting, ...s.tickets.filter(t => t.status === 'served' || t.status === 'absent').slice().reverse()];
+
+    app.innerHTML = renderHeader(s.venue, s.operator, connected) +
+      renderKpis(kpis) +
+      '<div class="main-grid">' +
+        renderQueue(list, s.kpis.waiting) +
+        '<div class="right-col">' +
+          renderHero(s.hero) +
+          renderCounters(s.counters) +
+          renderActivity(s.log) +
+        '</div>' +
+      '</div>' +
+      renderToast();
+
+    bindEvents();
+  }
+
+  function renderHeader(venue, operator, isConnected) {
+    const opInitial = (operator || 'E').trim().charAt(0).toUpperCase();
+    return '<header class="header">' +
+      '<div class="header-brand">' + BIRD_SVG +
+        '<div style="line-height:1.1">' +
+          '<div class="header-brand-sub">Fila virtual</div>' +
+          '<div class="header-brand-title">Painel do operador</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="venue-pill">' +
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--fg-3)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>' +
+        '<span>' + esc(venue) + '</span>' +
+      '</div>' +
+      '<div class="live-badge ' + (isConnected ? 'connected' : 'disconnected') + '">' +
+        '<span class="live-dot"></span>' +
+        '<span class="live-text">' + (isConnected ? 'ao vivo' : 'offline') + '</span>' +
+      '</div>' +
+      '<div class="header-right">' +
+        '<a href="#" class="link-client">App do cliente →</a>' +
+        '<div class="clock">' + esc(clockNow()) + '</div>' +
+        '<div class="operator">' +
+          '<div class="operator-avatar">' + esc(opInitial) + '</div>' +
+          '<div style="line-height:1.15">' +
+            '<div class="operator-name">' + esc(operator) + '</div>' +
+            '<div class="operator-role">Operador</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</header>';
+  }
+
+  function renderKpis(kpis) {
+    return '<div class="kpis">' + kpis.map(k =>
+      '<div class="kpi">' +
+        '<div class="kpi-label">' + esc(k.label) + '</div>' +
+        '<div class="kpi-value" style="color:' + k.color + '">' + esc(String(k.value)) + '</div>' +
+        '<div class="kpi-sub">' + esc(k.sub) + '</div>' +
+      '</div>'
+    ).join('') + '</div>';
+  }
+
+  function renderQueue(list, waitingCount) {
+    const rows = list.length ? list.map(renderRow).join('') : '<div class="queue-empty">Nada por aqui agora.</div>';
+    return '<section class="queue-section">' +
+      '<div class="queue-header">' +
+        '<h2 class="queue-title">Fila ao vivo</h2>' +
+        '<span class="queue-count">' + waitingCount + ' aguardando</span>' +
+        '<button class="btn-call-next" data-action="callNext">' +
+          '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"></path></svg>' +
+          'Chamar próximo' +
+        '</button>' +
+      '</div>' +
+      '<div class="tabs">' +
+        '<button class="tab' + (filter === 'waiting' ? ' active' : '') + '" data-filter="waiting">Na fila</button>' +
+        '<button class="tab' + (filter === 'done' ? ' active' : '') + '" data-filter="done">Atendidos</button>' +
+        '<button class="tab' + (filter === 'all' ? ' active' : '') + '" data-filter="all">Todos</button>' +
+      '</div>' +
+      '<div class="queue-list qscroll">' + rows + '</div>' +
+    '</section>';
+  }
+
+  function renderRow(t) {
+    let rowClass = 'queue-row', codeColor = 'var(--fg-1)', metaText = '', metaColor = 'var(--fg-3)', actions = '';
+    if (t.status === 'calling') {
+      rowClass += ' calling'; codeColor = 'var(--primary)';
+      metaText = 'Balcão ' + t.counter + ' · em atendimento'; metaColor = 'var(--primary)';
+      actions = '<button class="btn-action finish" data-action="finish" data-id="' + t.id + '">Concluir</button>' +
+                '<button class="btn-action recall" data-action="recall" data-id="' + t.id + '">Rechamar</button>';
+    } else if (t.status === 'waiting') {
+      metaText = 'esperando há ' + t.waitMin + ' min';
+      actions = '<button class="btn-action call" data-action="call" data-id="' + t.id + '">Chamar</button>' +
+                '<button class="btn-action absent-btn" data-action="absent" data-id="' + t.id + '">Ausente</button>';
+    } else if (t.status === 'served') {
+      rowClass += ' done'; codeColor = 'var(--fg-3)';
+      metaText = 'atendida · Balcão ' + t.counter;
+      actions = '<span class="done-tag served">Atendida</span>';
+    } else {
+      rowClass += ' absent'; codeColor = 'var(--fg-3)';
+      metaText = 'não compareceu'; metaColor = 'var(--mutum-amber)';
+      actions = '<span class="done-tag absent-tag">Ausente</span>';
+    }
+    return '<div class="' + rowClass + '">' +
+      '<div class="row-code" style="color:' + codeColor + '">' + esc(t.code) + '</div>' +
+      '<div style="min-width:0">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span class="row-name">' + esc(t.name) + '</span>' +
+          '<span class="row-source ' + t.source + '">' + esc(SOURCE_LABELS[t.source] || t.source) + '</span>' +
+        '</div>' +
+        '<div class="row-meta" style="color:' + metaColor + '">' + esc(metaText) + '</div>' +
+      '</div>' +
+      '<div class="row-actions">' + actions + '</div>' +
+    '</div>';
+  }
+
+  function renderHero(hero) {
+    if (!hero) {
+      return '<div class="hero-empty">' +
+        '<div class="hero-empty-title">Nenhuma senha em atendimento</div>' +
+        '<div class="hero-empty-sub">Chame a próxima pessoa da fila.</div>' +
+      '</div>';
+    }
+    return '<div class="hero-card">' +
+      '<div class="hero-label"><span class="hero-dot"></span><span class="hero-label-text">Chamando agora</span></div>' +
+      '<div class="hero-body">' +
+        '<div class="hero-code">' + esc(hero.code) + '</div>' +
+        '<div style="text-align:right;line-height:1.2;padding-bottom:6px">' +
+          '<div class="hero-counter">Balcão ' + hero.counter + '</div>' +
+          '<div class="hero-name">' + esc(hero.name) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="hero-actions">' +
+        '<button class="btn-hero-finish" data-action="finish" data-id="' + hero.id + '">Concluir atendimento</button>' +
+        '<button class="btn-hero-recall" data-action="recall" data-id="' + hero.id + '">Rechamar</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderCounters(counters) {
+    return '<div class="counters-card">' +
+      '<div class="counters-title">Balcões</div>' +
+      '<div class="counters-list">' + counters.map(c => {
+        const dotColor = c.busy ? 'var(--primary)' : 'var(--mutum-leaf)';
+        const codeColor = c.busy ? 'var(--primary)' : 'var(--fg-3)';
+        const statusColor = c.busy ? 'var(--primary)' : 'var(--mutum-leaf)';
+        const statusText = c.busy ? 'ocupado' : 'livre';
+        const codeText = c.ticketCode || '—';
+        return '<div class="counter-row">' +
+          '<div class="counter-dot" style="background:' + dotColor + '"></div>' +
+          '<span class="counter-name">' + esc(c.name) + '</span>' +
+          '<span class="counter-code" style="color:' + codeColor + '">' + esc(codeText) + '</span>' +
+          '<span class="counter-status" style="color:' + statusColor + '">' + esc(statusText) + '</span>' +
+        '</div>';
+      }).join('') + '</div>' +
+    '</div>';
+  }
+
+  function renderActivity(log) {
+    return '<div class="activity-card">' +
+      '<div class="activity-title">Atividade recente</div>' +
+      '<div class="activity-list">' + log.map((e, i) => {
+        const dotColor = i === 0 ? 'var(--primary)' : 'var(--border-strong)';
+        return '<div class="activity-item">' +
+          '<span class="activity-dot" style="background:' + dotColor + '"></span>' +
+          '<div style="flex:1;line-height:1.3">' +
+            '<div class="activity-text">' + esc(e.text) + '</div>' +
+            '<div class="activity-time">' + esc(e.t) + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('') + '</div>' +
+    '</div>';
+  }
+
+  function renderToast() {
+    if (!toast) return '';
+    return '<div class="toast-container"><div class="toast">' + esc(toast) + '</div></div>';
+  }
+
+  function bindEvents() {
+    document.querySelectorAll('[data-action]').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const action = this.dataset.action;
+        const id = this.dataset.id ? parseInt(this.dataset.id, 10) : null;
+        switch (action) {
+          case 'callNext': callNext(); break;
+          case 'call': callId(id); break;
+          case 'finish': finishId(id); break;
+          case 'recall': recallId(id); break;
+          case 'absent': absentId(id); break;
+        }
+      });
+    });
+    document.querySelectorAll('[data-filter]').forEach(btn => {
+      btn.addEventListener('click', function() {
+        filter = this.dataset.filter;
+        render();
+      });
+    });
+  }
+
+  // ---- BOOT ----
+  connectWs();
+  render();
+  setInterval(() => {
+    const el = document.querySelector('.clock');
+    if (el) el.textContent = clockNow();
+  }, 1000);
+})();
+</script>
+</body>
+</html>
