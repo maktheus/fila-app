@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Análise de Mercado — Fila Virtual</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #ED2C27;
+    --coral: #EE736E;
+    --green: #1F5D3A;
+    --green-l: #3F8A5B;
+    --amber: #E8A33D;
+    --blue: #2D6A8C;
+    --ink: #191919;
+    --slate: #4D4943;
+    --stone: #8C857A;
+    --cream: #F0EFEB;
+    --bone: #DBD4C9;
+    --white: #FFFFFF;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--white);
+    color: var(--ink);
+    font-size: 11pt;
+    line-height: 1.6;
+  }
+
+  /* ---- PAGE LAYOUT ---- */
+  .page {
+    max-width: 210mm;
+    margin: 0 auto;
+    background: white;
+  }
+
+  /* ---- COVER ---- */
+  .cover {
+    background: var(--ink);
+    color: white;
+    padding: 64px 56px 56px;
+    min-height: 297mm;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -120px; right: -80px;
+    width: 480px; height: 480px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(238,115,110,0.18) 0%, transparent 70%);
+  }
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -60px; left: -40px;
+    width: 360px; height: 360px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(31,93,58,0.22) 0%, transparent 70%);
+  }
+  .cover-eyebrow {
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--coral);
+    margin-bottom: 32px;
+  }
+  .cover-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 42pt;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: white;
+    margin-bottom: 20px;
+  }
+  .cover-sub {
+    font-size: 14pt;
+    color: rgba(255,255,255,0.55);
+    font-weight: 300;
+    max-width: 460px;
+    line-height: 1.5;
+  }
+  .cover-divider {
+    width: 48px;
+    height: 3px;
+    background: var(--coral);
+    margin: 32px 0;
+    border-radius: 99px;
+  }
+  .cover-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+    margin-top: auto;
+    padding-top: 48px;
+    position: relative;
+    z-index: 1;
+  }
+  .cover-meta-item label {
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .cover-meta-item span {
+    font-size: 11pt;
+    font-weight: 600;
+    color: white;
+  }
+  .cover-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(238,115,110,0.18);
+    border: 1px solid rgba(238,115,110,0.4);
+    border-radius: 999px;
+    padding: 6px 16px;
+    font-size: 9pt;
+    font-weight: 700;
+    color: var(--coral);
+    margin-top: 28px;
+    position: relative;
+    z-index: 1;
+  }
+  .dot-live { width: 7px; height: 7px; border-radius: 50%; background: var(--coral); }
+
+  /* ---- SECTIONS ---- */
+  .section {
+    padding: 56px;
+    page-break-inside: avoid;
+  }
+  .section + .section {
+    border-top: 1px solid var(--bone);
+  }
+
+  .section-eyebrow {
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--coral);
+    margin-bottom: 10px;
+  }
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 24pt;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    line-height: 1.15;
+    margin-bottom: 24px;
+  }
+  .section-lead {
+    font-size: 12pt;
+    color: var(--slate);
+    line-height: 1.65;
+    max-width: 640px;
+    margin-bottom: 32px;
+    font-weight: 400;
+  }
+
+  /* ---- CARDS ---- */
+  .cards {
+    display: grid;
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .cards-2 { grid-template-columns: 1fr 1fr; }
+  .cards-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .cards-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  .card {
+    background: var(--cream);
+    border-radius: 14px;
+    padding: 22px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-accent {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 3px;
+  }
+  .card h3 {
+    font-size: 11pt;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .card p, .card li {
+    font-size: 9.5pt;
+    color: var(--slate);
+    line-height: 1.55;
+  }
+  .card ul { padding-left: 16px; }
+  .card li { margin-bottom: 4px; }
+
+  .stat-card {
+    background: var(--ink);
+    color: white;
+    border-radius: 14px;
+    padding: 22px 20px;
+    text-align: center;
+  }
+  .stat-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 28pt;
+    font-weight: 700;
+    color: var(--coral);
+    line-height: 1;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .stat-label {
+    font-size: 8.5pt;
+    color: rgba(255,255,255,0.55);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* ---- COMPETITOR TABLE ---- */
+  .comp-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 24px;
+    font-size: 9.5pt;
+  }
+  .comp-table thead tr {
+    background: var(--ink);
+    color: white;
+  }
+  .comp-table th {
+    padding: 12px 14px;
+    font-weight: 700;
+    font-size: 8pt;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: left;
+  }
+  .comp-table th:first-child { border-radius: 10px 0 0 0; }
+  .comp-table th:last-child { border-radius: 0 10px 0 0; }
+  .comp-table tbody tr {
+    border-bottom: 1px solid var(--bone);
+    transition: background 120ms;
+  }
+  .comp-table tbody tr:nth-child(even) { background: var(--cream); }
+  .comp-table td {
+    padding: 11px 14px;
+    color: var(--slate);
+    vertical-align: middle;
+  }
+  .comp-table td:first-child { font-weight: 700; color: var(--ink); }
+  .comp-table tfoot td {
+    padding: 14px;
+    background: rgba(238,115,110,0.12);
+    font-weight: 700;
+    color: var(--red);
+    border-radius: 0 0 10px 10px;
+    font-size: 9pt;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 8pt;
+    font-weight: 700;
+  }
+  .badge-green { background: rgba(31,93,58,0.12); color: var(--green); }
+  .badge-amber { background: rgba(232,163,61,0.18); color: #A87020; }
+  .badge-red   { background: rgba(237,44,39,0.12); color: var(--red); }
+  .badge-blue  { background: rgba(45,106,140,0.12); color: var(--blue); }
+
+  /* ---- SWOT ---- */
+  .swot {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .swot-cell {
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .swot-cell h3 {
+    font-size: 9pt;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .swot-cell ul { list-style: none; padding: 0; }
+  .swot-cell li {
+    font-size: 9.5pt;
+    padding: 5px 0;
+    padding-left: 18px;
+    position: relative;
+    color: inherit;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+  }
+  .swot-cell li:last-child { border-bottom: none; }
+  .swot-cell li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    font-weight: 700;
+    font-size: 9pt;
+  }
+  .swot-s { background: rgba(31,93,58,0.1); color: var(--green); }
+  .swot-w { background: rgba(237,44,39,0.09); color: #B02020; }
+  .swot-o { background: rgba(45,106,140,0.1); color: var(--blue); }
+  .swot-t { background: rgba(232,163,61,0.13); color: #916018; }
+
+  /* ---- ROADMAP ---- */
+  .roadmap {
+    margin-top: 24px;
+    position: relative;
+  }
+  .roadmap::before {
+    content: '';
+    position: absolute;
+    left: 20px; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--bone);
+  }
+  .rm-item {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 28px;
+    position: relative;
+  }
+  .rm-dot {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex: 0 0 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 11pt;
+    position: relative;
+    z-index: 1;
+  }
+  .rm-dot-1 { background: var(--red); color: white; }
+  .rm-dot-2 { background: var(--coral); color: white; }
+  .rm-dot-3 { background: var(--blue); color: white; }
+  .rm-dot-4 { background: var(--green); color: white; }
+  .rm-content h3 {
+    font-size: 11pt;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .rm-period {
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .rm-content p, .rm-content li {
+    font-size: 9.5pt;
+    color: var(--slate);
+    line-height: 1.55;
+  }
+  .rm-content ul { padding-left: 16px; }
+
+  /* ---- PRICING ---- */
+  .pricing {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .price-card {
+    border-radius: 14px;
+    padding: 24px 20px;
+    border: 2px solid var(--bone);
+    position: relative;
+  }
+  .price-card.featured {
+    border-color: var(--coral);
+    background: rgba(238,115,110,0.06);
+  }
+  .price-badge {
+    position: absolute;
+    top: -12px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--coral);
+    color: white;
+    font-size: 7.5pt;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 14px;
+    border-radius: 999px;
+  }
+  .price-plan {
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--stone);
+    margin-bottom: 8px;
+  }
+  .price-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 26pt;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .price-val span { font-size: 11pt; font-weight: 400; color: var(--stone); }
+  .price-period {
+    font-size: 8.5pt;
+    color: var(--stone);
+    margin-top: 4px;
+    margin-bottom: 16px;
+  }
+  .price-features {
+    list-style: none;
+    padding: 0;
+    border-top: 1px solid var(--bone);
+    padding-top: 14px;
+    margin-top: 14px;
+  }
+  .price-features li {
+    font-size: 9pt;
+    color: var(--slate);
+    padding: 4px 0;
+    padding-left: 16px;
+    position: relative;
+  }
+  .price-features li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--green-l);
+    font-weight: 700;
+  }
+
+  /* ---- CHANNELS ---- */
+  .channels {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-top: 24px;
+  }
+  .channel-card {
+    background: var(--cream);
+    border-radius: 12px;
+    padding: 18px 16px;
+  }
+  .channel-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18pt;
+  }
+  .channel-card h4 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 5px;
+  }
+  .channel-card p {
+    font-size: 8.5pt;
+    color: var(--stone);
+    line-height: 1.5;
+  }
+
+  /* ---- TARGETS ---- */
+  .target-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 24px;
+  }
+  .target-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: var(--cream);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .target-icon {
+    width: 44px; height: 44px;
+    flex: 0 0 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20pt;
+  }
+  .target-item h4 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .target-item p {
+    font-size: 8.5pt;
+    color: var(--stone);
+    line-height: 1.5;
+  }
+  .target-item .size {
+    font-size: 8pt;
+    font-weight: 700;
+    color: var(--blue);
+    background: rgba(45,106,140,0.1);
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-top: 5px;
+    display: inline-block;
+  }
+
+  /* ---- KPI SECTION ---- */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-top: 24px;
+  }
+  .kpi-box {
+    background: var(--ink);
+    color: white;
+    border-radius: 12px;
+    padding: 18px 16px;
+  }
+  .kpi-box .val {
+    font-family: 'Playfair Display', serif;
+    font-size: 24pt;
+    font-weight: 700;
+    color: var(--coral);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .kpi-box .lbl {
+    font-size: 8pt;
+    color: rgba(255,255,255,0.5);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .kpi-box .sub {
+    font-size: 8.5pt;
+    color: rgba(255,255,255,0.35);
+    margin-top: 3px;
+  }
+
+  /* ---- FOOTER ---- */
+  .footer {
+    background: var(--ink);
+    color: rgba(255,255,255,0.4);
+    padding: 28px 56px;
+    font-size: 8.5pt;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .footer strong { color: var(--coral); }
+
+  /* ---- DIVIDER ---- */
+  .hdivider {
+    height: 1px;
+    background: var(--bone);
+    margin: 28px 0;
+  }
+
+  /* ---- HIGHLIGHT BOX ---- */
+  .highlight {
+    background: rgba(238,115,110,0.1);
+    border-left: 3px solid var(--coral);
+    border-radius: 0 12px 12px 0;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 10pt;
+    color: var(--slate);
+    line-height: 1.6;
+  }
+  .highlight strong { color: var(--red); }
+
+  /* ---- PRINT ---- */
+  @media print {
+    body { font-size: 10pt; }
+    .cover { min-height: auto; padding-bottom: 80px; }
+    .page { max-width: 100%; }
+    .section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ==================== CAPA ==================== -->
+<div class="cover">
+  <div class="cover-eyebrow">Confidencial · Uso Interno</div>
+  <div class="cover-title">Análise<br>de Mercado<br>Fila Virtual</div>
+  <div class="cover-sub">Posicionamento competitivo, oportunidades de crescimento e plano de ação para os próximos 12 meses.</div>
+  <div class="cover-divider"></div>
+  <div class="cover-badge">
+    <div class="dot-live"></div>
+    Sistema de Fila Virtual com Painel do Operador em Tempo Real
+  </div>
+  <div class="cover-meta">
+    <div class="cover-meta-item">
+      <label>Elaborado por</label>
+      <span>Gerência de Marketing &amp; Vendas</span>
+    </div>
+    <div class="cover-meta-item">
+      <label>Data</label>
+      <span>Julho de 2026</span>
+    </div>
+    <div class="cover-meta-item">
+      <label>Versão</label>
+      <span>v1.0 — Estratégico</span>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 1. VISÃO GERAL DO PRODUTO ==================== -->
+<div class="section">
+  <div class="section-eyebrow">01 — Produto</div>
+  <div class="section-title">O que é e para quem serve</div>
+  <div class="section-lead">
+    A Fila Virtual é uma solução SaaS de gestão de filas em tempo real. Clientes entram na fila via QR Code, enquanto operadores gerenciam atendimentos no painel web com atualizações via WebSocket — sem aplicativo, sem totem físico.
+  </div>
+
+  <div class="cards cards-3">
+    <div class="card">
+      <div class="card-accent" style="background:var(--coral)"></div>
+      <h3>Painel do Operador</h3>
+      <p>Interface web em tempo real com KPIs (fila, atendimento, espera média), controle de balcões e log de atividade. Tudo via browser, sem instalar nada.</p>
+    </div>
+    <div class="card">
+      <div class="card-accent" style="background:var(--blue)"></div>
+      <h3>Entrada via QR Code</h3>
+      <p>Clientes acessam pelo celular — sem download. Suporta entrada por QR Code, balcão físico e passagem de vez. Experiência zero fricção.</p>
+    </div>
+    <div class="card">
+      <div class="card-accent" style="background:var(--green)"></div>
+      <h3>Infraestrutura Moderna</h3>
+      <p>Backend Node.js + Express, WebSocket nativo, Docker, Nginx. Deploy via GitHub Actions. Arquitetura escalável e de baixo custo operacional.</p>
+    </div>
+  </div>
+
+  <div class="highlight">
+    <strong>Diferencial-chave:</strong> A solução não exige totem de senha físico (custo típico R$ 2.000–8.000 por unidade) nem aplicativo do cliente na App Store. Barreira de adoção próxima de zero.
+  </div>
+</div>
+
+<!-- ==================== 2. MERCADO ==================== -->
+<div class="section">
+  <div class="section-eyebrow">02 — Mercado</div>
+  <div class="section-title">Tamanho e oportunidade no Brasil</div>
+  <div class="section-lead">
+    O mercado brasileiro de gestão de filas movimenta bilhões por ano em perdas de produtividade. Pós-pandemia, a digitalização acelerou a substituição de sistemas físicos por soluções em nuvem.
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-box">
+      <div class="val">R$ 1,2B</div>
+      <div class="lbl">Mercado Endereçável</div>
+      <div class="sub">SAM Brasil 2026 (filas digitais)</div>
+    </div>
+    <div class="kpi-box">
+      <div class="val">340 mi</div>
+      <div class="lbl">Atendimentos / Dia</div>
+      <div class="sub">Estimativa em filas no Brasil</div>
+    </div>
+    <div class="kpi-box">
+      <div class="val">18%</div>
+      <div class="lbl">CAGR do setor</div>
+      <div class="sub">Crescimento anual 2023–2028</div>
+    </div>
+    <div class="kpi-box">
+      <div class="val">12 min</div>
+      <div class="lbl">Espera Média</div>
+      <div class="sub">Custo de produtividade por pessoa</div>
+    </div>
+  </div>
+
+  <div class="hdivider"></div>
+
+  <h3 style="font-size:13pt;font-weight:700;color:var(--ink);margin-bottom:16px">Segmentos com maior dor</h3>
+  <div class="target-list">
+    <div class="target-item">
+      <div class="target-icon" style="background:rgba(237,44,39,0.1)">🏥</div>
+      <div>
+        <h4>Clínicas e UBSs</h4>
+        <p>Alta rotatividade, pacientes ansiosos, múltiplas especialidades. Redução de aglomeração é obrigação após 2020.</p>
+        <span class="size">~380 mil unidades no Brasil</span>
+      </div>
+    </div>
+    <div class="target-item">
+      <div class="target-icon" style="background:rgba(45,106,140,0.1)">🏦</div>
+      <div>
+        <h4>Bancos e Fintechs</h4>
+        <p>Agências físicas com alto volume. Sujeitas a regulação de tempo de atendimento (Lei das Filas, vários estados).</p>
+        <span class="size">~21 mil agências bancárias</span>
+      </div>
+    </div>
+    <div class="target-item">
+      <div class="target-icon" style="background:rgba(31,93,58,0.1)">🏛️</div>
+      <div>
+        <h4>Órgãos Públicos</h4>
+        <p>Detran, INSS, Cartórios, Poupatempo — demanda reprimida crônica e transformação digital em curso.</p>
+        <span class="size">Contratação via licitação pública</span>
+      </div>
+    </div>
+    <div class="target-item">
+      <div class="target-icon" style="background:rgba(232,163,61,0.13)">💊</div>
+      <div>
+        <h4>Farmácias e Varejo</h4>
+        <p>Redes como Raia Drogasil, DPSP e Grupo Pague Menos operam serviço farmacêutico com fila diferenciada.</p>
+        <span class="size">~90 mil farmácias no Brasil</span>
+      </div>
+    </div>
+    <div class="target-item">
+      <div class="target-icon" style="background:rgba(238,115,110,0.12)">🍽️</div>
+      <div>
+        <h4>Restaurantes e Food</h4>
+        <p>Espera na fila reduz conversão. Fila virtual com notificação por WhatsApp aumenta permanência no estabelecimento.</p>
+        <span class="size">Segmento de alto giro</span>
+      </div>
+    </div>
+    <div class="target-item">
+      <div class="target-icon" style="background:rgba(45,106,140,0.1)">🎓</div>
+      <div>
+        <h4>Universidades e Escolas</h4>
+        <p>Secretarias, serviço social, laboratórios — múltiplos pontos com pico sazonal (matrícula, rematrícula).</p>
+        <span class="size">~30 mil instituições de ensino</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 3. CONCORRÊNCIA ==================== -->
+<div class="section">
+  <div class="section-eyebrow">03 — Competição</div>
+  <div class="section-title">Panorama competitivo</div>
+  <div class="section-lead">
+    O mercado está fragmentado entre soluções legadas (totens físicos), plataformas internacionais caras e ferramentas genéricas. Existe espaço claro para uma solução nativa digital, acessível e sem hardware.
+  </div>
+
+  <table class="comp-table">
+    <thead>
+      <tr>
+        <th>Concorrente</th>
+        <th>Modelo</th>
+        <th>Preço est.</th>
+        <th>App cliente?</th>
+        <th>Tempo Real?</th>
+        <th>Ponto fraco</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Qmatic</td>
+        <td>Hardware + SaaS</td>
+        <td>R$ 15–80k/ano</td>
+        <td><span class="badge badge-amber">Opcional</span></td>
+        <td><span class="badge badge-green">Sim</span></td>
+        <td>Custo altíssimo, implantação longa</td>
+      </tr>
+      <tr>
+        <td>Totvs Fila</td>
+        <td>On-premise / Totem</td>
+        <td>R$ 8–30k/ano</td>
+        <td><span class="badge badge-red">Não</span></td>
+        <td><span class="badge badge-amber">Limitado</span></td>
+        <td>Legado, UX datada, depende de totem</td>
+      </tr>
+      <tr>
+        <td>WaitWhile</td>
+        <td>SaaS (EUA)</td>
+        <td>USD 50–300/mês</td>
+        <td><span class="badge badge-green">Sim</span></td>
+        <td><span class="badge badge-green">Sim</span></td>
+        <td>Sem suporte PT-BR, moeda estrangeira, LGPD</td>
+      </tr>
+      <tr>
+        <td>QLess</td>
+        <td>SaaS (EUA)</td>
+        <td>USD 200–500/mês</td>
+        <td><span class="badge badge-green">Sim</span></td>
+        <td><span class="badge badge-green">Sim</span></td>
+        <td>Preço proibitivo PMEs, suporte em inglês</td>
+      </tr>
+      <tr>
+        <td>Senha Fácil (BR)</td>
+        <td>SaaS local</td>
+        <td>R$ 99–499/mês</td>
+        <td><span class="badge badge-amber">Web básico</span></td>
+        <td><span class="badge badge-red">Polling</span></td>
+        <td>UX ultrapassada, sem WebSocket real</td>
+      </tr>
+      <tr>
+        <td>Totem físico genérico</td>
+        <td>Hardware</td>
+        <td>R$ 2–8k + manutenção</td>
+        <td><span class="badge badge-red">Não</span></td>
+        <td><span class="badge badge-red">Não</span></td>
+        <td>CapEx alto, quebra, sem dados, não escalável</td>
+      </tr>
+      <tr>
+        <td>Google Forms + WhatsApp</td>
+        <td>Gambiarra</td>
+        <td>Grátis</td>
+        <td><span class="badge badge-amber">Parcial</span></td>
+        <td><span class="badge badge-red">Não</span></td>
+        <td>Manual, sem controle, sem métricas</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="6">✦ Fila Virtual: solução 100% web, tempo real nativo (WebSocket), QR Code sem app, PT-BR, preço competitivo para o mercado nacional.</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<!-- ==================== 4. SWOT ==================== -->
+<div class="section">
+  <div class="section-eyebrow">04 — SWOT</div>
+  <div class="section-title">Forças, Fraquezas, Oportunidades e Ameaças</div>
+
+  <div class="swot">
+    <div class="swot-cell swot-s">
+      <h3>Forças (Strengths)</h3>
+      <ul>
+        <li>Zero fricção para o cliente (sem app, só QR)</li>
+        <li>WebSocket real — dados 100% ao vivo</li>
+        <li>Stack moderna (Node, Docker, Nginx)</li>
+        <li>Deploy automático via GitHub Actions</li>
+        <li>UX polida e responsiva</li>
+        <li>Custo operacional muito baixo (sem hardware)</li>
+        <li>Customizável por unidade (nome, operador)</li>
+      </ul>
+    </div>
+    <div class="swot-cell swot-w">
+      <h3>Fraquezas (Weaknesses)</h3>
+      <ul>
+        <li>Sem notificação push ao cliente (WhatsApp/SMS)</li>
+        <li>Sem painel multi-unidade (rede/franquia)</li>
+        <li>Sem agendamento prévio integrado</li>
+        <li>Dados não persistidos (sem banco de dados externo)</li>
+        <li>Sem integração com CRM/ERP</li>
+        <li>Depende de backend self-hosted para produção</li>
+        <li>Marca ainda sem reconhecimento de mercado</li>
+      </ul>
+    </div>
+    <div class="swot-cell swot-o">
+      <h3>Oportunidades (Opportunities)</h3>
+      <ul>
+        <li>Mercado BR sem líder claro nativo digital</li>
+        <li>Regulação de filas em expansão (estados e municípios)</li>
+        <li>Digitalização das PMEs acelerada pós-COVID</li>
+        <li>Demanda em órgãos públicos (licitação)</li>
+        <li>Integração WhatsApp Business API (Meta)</li>
+        <li>Franquias precisam de gestão centralizada</li>
+        <li>Modelo white-label para integradores</li>
+      </ul>
+    </div>
+    <div class="swot-cell swot-t">
+      <h3>Ameaças (Threats)</h3>
+      <ul>
+        <li>Entrada de players como iFood/Totvs no segmento</li>
+        <li>Commoditização por ferramentas de low-code</li>
+        <li>Resistência cultural ("gosto de senha de papel")</li>
+        <li>Dependência de conectividade (Internet no local)</li>
+        <li>LGPD: dados de clientes em fila exigem compliance</li>
+        <li>Ciclo de venda longo em contas enterprise</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 5. POSICIONAMENTO ==================== -->
+<div class="section">
+  <div class="section-eyebrow">05 — Posicionamento</div>
+  <div class="section-title">Proposta de valor e mensagem central</div>
+  <div class="section-lead">
+    Nos posicionamos como a alternativa moderna, acessível e sem hardware para gestão de filas no Brasil — entre a complexidade cara das soluções enterprise e a gambiarra do Google Forms.
+  </div>
+
+  <div class="cards cards-2">
+    <div class="card">
+      <div class="card-accent" style="background:var(--red)"></div>
+      <h3>Para quem é</h3>
+      <ul>
+        <li>Clínicas e consultórios de pequeno e médio porte</li>
+        <li>Redes de farmácia com serviço farmacêutico</li>
+        <li>Órgãos públicos em digitalização</li>
+        <li>Restaurantes com espera na porta</li>
+        <li>Qualquer negócio com fila presencial recorrente</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-accent" style="background:var(--blue)"></div>
+      <h3>Promessa central</h3>
+      <p style="margin-bottom:10px">"Elimine a fila física em menos de 1 hora, sem totem, sem app e sem obra — apenas um QR Code e um browser."</p>
+      <p><strong style="color:var(--blue)">Tagline sugerida:</strong><br>"Fila Virtual. Atendimento real."</p>
+    </div>
+  </div>
+
+  <div class="highlight">
+    <strong>Posicionamento de preço:</strong> Entrar no mercado como "preço justo para o Brasil" — R$ 99–499/mês por unidade, contra USD 200–500/mês dos concorrentes internacionais. Freemium para 1 balcão captura clientes menores e cria base para upsell.
+  </div>
+</div>
+
+<!-- ==================== 6. PREÇOS ==================== -->
+<div class="section">
+  <div class="section-eyebrow">06 — Precificação</div>
+  <div class="section-title">Estratégia de planos e pricing</div>
+  <div class="section-lead">
+    Modelo SaaS por unidade com freemium limitado para aquisição orgânica. Tier enterprise para redes e franquias com pricing por volume.
+  </div>
+
+  <div class="pricing">
+    <div class="price-card">
+      <div class="price-plan">Starter</div>
+      <div class="price-val">R$ 0<span>/mês</span></div>
+      <div class="price-period">Grátis para sempre · 1 balcão</div>
+      <ul class="price-features">
+        <li>1 balcão / operador</li>
+        <li>Até 50 senhas/dia</li>
+        <li>QR Code de entrada</li>
+        <li>Painel ao vivo básico</li>
+        <li>Marca Fila Virtual visível</li>
+      </ul>
+    </div>
+    <div class="price-card featured">
+      <div class="price-badge">Mais Popular</div>
+      <div class="price-plan">Pro</div>
+      <div class="price-val">R$ 249<span>/mês</span></div>
+      <div class="price-period">Por unidade · fatura anual −20%</div>
+      <ul class="price-features">
+        <li>Balcões ilimitados</li>
+        <li>Senhas ilimitadas</li>
+        <li>Notificação por WhatsApp</li>
+        <li>Relatórios e histórico 90 dias</li>
+        <li>White-label (sua marca)</li>
+        <li>Suporte por chat</li>
+      </ul>
+    </div>
+    <div class="price-card">
+      <div class="price-plan">Enterprise</div>
+      <div class="price-val">Sob<span> consulta</span></div>
+      <div class="price-period">Redes, franquias e órgãos públicos</div>
+      <ul class="price-features">
+        <li>Multi-unidade / painel central</li>
+        <li>API e webhooks</li>
+        <li>Integração CRM/ERP</li>
+        <li>SLA 99,9% garantido</li>
+        <li>Onboarding dedicado</li>
+        <li>Contrato e NF eletrônica</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="hdivider"></div>
+  <div class="cards cards-3" style="margin-top:0">
+    <div class="stat-card">
+      <span class="stat-value">R$ 2.988</span>
+      <div class="stat-label">ARR por cliente Pro (anual)</div>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value">34</span>
+      <div class="stat-label">Clientes Pro para R$ 100k ARR</div>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value">&lt; 6 mi</span>
+      <div class="stat-label">Payback estimado por cliente</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 7. CANAIS ==================== -->
+<div class="section">
+  <div class="section-eyebrow">07 — Canais de Aquisição</div>
+  <div class="section-title">Como chegar nos clientes</div>
+  <div class="section-lead">
+    Estratégia multi-canal com ênfase em tração inbound no curto prazo (SEO + conteúdo) e parcerias outbound para escalar redes.
+  </div>
+
+  <div class="channels">
+    <div class="channel-card">
+      <div class="channel-icon" style="background:rgba(238,115,110,0.12)">🔍</div>
+      <h4>SEO &amp; Blog</h4>
+      <p>Artigos sobre "como organizar fila em clínica", "sistema de senha grátis" capturando intenção de busca no Google.</p>
+    </div>
+    <div class="channel-card">
+      <div class="channel-icon" style="background:rgba(45,106,140,0.12)">📱</div>
+      <h4>WhatsApp &amp; Instagram</h4>
+      <p>Conteúdo educativo para gestores de saúde, farmácias e restaurantes. Vídeo curto demonstrando o QR em ação.</p>
+    </div>
+    <div class="channel-card">
+      <div class="channel-icon" style="background:rgba(31,93,58,0.12)">🤝</div>
+      <h4>Parcerias com Associações</h4>
+      <p>CFM, CFF, AGAS, SEBRAE — acesso a base de associados com desconto de parceiro.</p>
+    </div>
+    <div class="channel-card">
+      <div class="channel-icon" style="background:rgba(232,163,61,0.13)">📊</div>
+      <h4>Google Ads</h4>
+      <p>Campanhas de busca para palavras-chave de fundo de funil: "sistema de fila digital", "totem de senha online".</p>
+    </div>
+    <div class="channel-card">
+      <div class="channel-icon" style="background:rgba(237,44,39,0.1)">🏪</div>
+      <h4>Outbound para Redes</h4>
+      <p>Prospecção direta em redes de franquia, cooperativas de saúde e prefeituras. CAC alto mas ticket alto.</p>
+    </div>
+    <div class="channel-card">
+      <div class="channel-icon" style="background:rgba(45,106,140,0.12)">🔗</div>
+      <h4>White-label / Revenda</h4>
+      <p>Integradores de TI e consultorias de saúde revendem com margem. Reduz CAC, aumenta cobertura geográfica.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 8. ROADMAP ==================== -->
+<div class="section">
+  <div class="section-eyebrow">08 — Próximos Passos</div>
+  <div class="section-title">Plano de ação 12 meses</div>
+  <div class="section-lead">
+    Executar em 4 ondas: validação, produto mínimo vendável, escala e expansão. Foco total em receita recorrente antes de crescimento de time.
+  </div>
+
+  <div class="roadmap">
+    <div class="rm-item">
+      <div class="rm-dot rm-dot-1">1</div>
+      <div class="rm-content">
+        <div class="rm-period" style="color:var(--red)">Meses 1–2 · Fundação</div>
+        <h3>Validação e primeiros pagantes</h3>
+        <ul>
+          <li>Implantar backend em cloud pública (Railway, Fly.io ou VPS própria)</li>
+          <li>Criar landing page com proposta de valor e CTA de teste grátis</li>
+          <li>Configurar Stripe/PagSeguro para cobrança recorrente</li>
+          <li>Recrutar 10 clientes beta (clínicas, farmácias locais) — grátis</li>
+          <li>Coletar feedback e medir NPS semanalmente</li>
+          <li>Definir ICP (Ideal Customer Profile) com dados reais</li>
+        </ul>
+      </div>
+    </div>
+    <div class="rm-item">
+      <div class="rm-dot rm-dot-2">2</div>
+      <div class="rm-content">
+        <div class="rm-period" style="color:var(--coral)">Meses 3–5 · Produto Vendável</div>
+        <h3>Fechar gaps críticos de produto</h3>
+        <ul>
+          <li>Adicionar notificação por WhatsApp (via Evolution API ou Twilio)</li>
+          <li>Persistência de dados com banco PostgreSQL (Railway/Supabase)</li>
+          <li>Dashboard de relatórios (atendimentos, tempo médio, ausências)</li>
+          <li>Tela do cliente (app web para acompanhar posição na fila)</li>
+          <li>Onboarding self-service (setup em menos de 5 minutos)</li>
+          <li>Lançar plano Pro e converter betas em pagantes</li>
+        </ul>
+      </div>
+    </div>
+    <div class="rm-item">
+      <div class="rm-dot rm-dot-3">3</div>
+      <div class="rm-content">
+        <div class="rm-period" style="color:var(--blue)">Meses 6–9 · Escala</div>
+        <h3>Crescimento de receita e canal</h3>
+        <ul>
+          <li>Lançar programa de parceiros/revendas (margem 30%)</li>
+          <li>Ativar Google Ads com budget inicial R$ 3k/mês</li>
+          <li>Publicar 8 artigos de SEO sobre filas digitais no Brasil</li>
+          <li>Buscar acordo com 1 associação de saúde (CFM, CFF ou CREMESP)</li>
+          <li>Meta: 50 clientes pagantes, MRR R$ 12.500</li>
+          <li>Contratar 1 SDR (Sales Development Rep)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="rm-item">
+      <div class="rm-dot rm-dot-4">4</div>
+      <div class="rm-content">
+        <div class="rm-period" style="color:var(--green)">Meses 10–12 · Expansão</div>
+        <h3>Enterprise e novas verticais</h3>
+        <ul>
+          <li>Desenvolver painel multi-unidade para redes e franquias</li>
+          <li>Prospectar 3 prefeituras ou órgãos públicos (licitação dispensada)</li>
+          <li>API pública documentada para integrações (CRM, ERP, Agendamento)</li>
+          <li>Criar programa de white-label para consultorias de TI em saúde</li>
+          <li>Meta: 150 clientes pagantes, MRR R$ 45.000, ARR R$ 540k</li>
+          <li>Avaliar rodada seed ou bootstrapping com lucro</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 9. MÉTRICAS ==================== -->
+<div class="section">
+  <div class="section-eyebrow">09 — Métricas de Sucesso</div>
+  <div class="section-title">KPIs que guiam as decisões</div>
+  <div class="section-lead">
+    Priorizar métricas de negócio sobre métricas de vaidade. Foco em MRR, churn e NPS nos primeiros 6 meses.
+  </div>
+
+  <div class="cards cards-2">
+    <div class="card">
+      <div class="card-accent" style="background:var(--red)"></div>
+      <h3>Métricas de Receita</h3>
+      <ul>
+        <li><strong>MRR</strong> (Receita Mensal Recorrente)</li>
+        <li><strong>ARR</strong> — meta R$ 540k ao fim do mês 12</li>
+        <li><strong>Churn mensal</strong> — meta &lt; 3%</li>
+        <li><strong>LTV / CAC</strong> — meta ratio &gt; 3x</li>
+        <li><strong>Payback period</strong> — meta &lt; 6 meses</li>
+        <li><strong>ARPU</strong> (Receita média por cliente)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-accent" style="background:var(--blue)"></div>
+      <h3>Métricas de Produto e Sucesso</h3>
+      <ul>
+        <li><strong>NPS</strong> — meta ≥ 50 (Promotor)</li>
+        <li><strong>Ativação</strong> — % que cria 1a fila em 24h</li>
+        <li><strong>DAU/MAU</strong> — engajamento dos operadores</li>
+        <li><strong>Time to value</strong> — setup em &lt; 10 min</li>
+        <li><strong>Senhas processadas/dia</strong> por conta</li>
+        <li><strong>Upsell rate</strong> — Starter → Pro</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-accent" style="background:var(--green)"></div>
+      <h3>Métricas de Aquisição</h3>
+      <ul>
+        <li><strong>CAC</strong> por canal (orgânico vs pago)</li>
+        <li><strong>Leads/mês</strong> por fonte (SEO, Ads, Parceiros)</li>
+        <li><strong>Trial → Pago</strong> — meta &gt; 25% de conversão</li>
+        <li><strong>Pipeline de vendas</strong> (enterprise)</li>
+        <li><strong>Visitantes únicos</strong> no site</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-accent" style="background:var(--amber)"></div>
+      <h3>Marcos por Fase</h3>
+      <ul>
+        <li><strong>Mês 2:</strong> 10 betas ativos, NPS coletado</li>
+        <li><strong>Mês 5:</strong> 25 pagantes, MRR R$ 6.250</li>
+        <li><strong>Mês 9:</strong> 50 pagantes, MRR R$ 12.500</li>
+        <li><strong>Mês 12:</strong> 150 pagantes, MRR R$ 45k</li>
+        <li><strong>Mês 12+:</strong> 1 contrato enterprise ≥ R$ 5k/mês</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 10. RISCOS ==================== -->
+<div class="section">
+  <div class="section-eyebrow">10 — Gestão de Riscos</div>
+  <div class="section-title">O que pode dar errado e como mitigar</div>
+
+  <div class="cards cards-2">
+    <div class="card">
+      <div class="card-accent" style="background:var(--amber)"></div>
+      <h3>Risco: Baixa adoção pelos clientes finais</h3>
+      <p>Se os clientes não escanearem o QR Code, o produto não gera valor. <strong>Mitigação:</strong> Criar material de sinalização (cartaz imprimível com QR) + opção de senha balcão como fallback — já existe no produto.</p>
+    </div>
+    <div class="card">
+      <div class="card-accent" style="background:var(--amber)"></div>
+      <h3>Risco: Churn alto por falta de diferenciação</h3>
+      <p>Clientes podem cancelar se não perceberem valor contínuo. <strong>Mitigação:</strong> Relatórios semanais automáticos por e-mail mostrando tempo economizado e atendimentos — dado concreto de ROI.</p>
+    </div>
+    <div class="card">
+      <div class="card-accent" style="background:var(--red)"></div>
+      <h3>Risco: Dependência de infraestrutura</h3>
+      <p>Queda do backend derruba todas as filas em tempo real. <strong>Mitigação:</strong> SLA por plano, deploy multi-região, fallback offline com modo degradado (pool de senhas locais).</p>
+    </div>
+    <div class="card">
+      <div class="card-accent" style="background:var(--red)"></div>
+      <h3>Risco: Concorrente grande entra no mercado</h3>
+      <p>iFood, Totvs ou startup bem capitalizada pode copiar o produto. <strong>Mitigação:</strong> Mover rápido, construir efeito de rede em verticais específicas (ex: saúde) e focar em relacionamento local.</p>
+    </div>
+  </div>
+
+  <div class="highlight">
+    <strong>Regra de ouro para os próximos 90 dias:</strong> Não construir features antes de ter 10 clientes pagando. Validar disposição a pagar antes de investir em desenvolvimento. A velocidade de aprendizado supera a velocidade de código nesse estágio.
+  </div>
+</div>
+
+<!-- ==================== FOOTER ==================== -->
+<div class="footer">
+  <div>
+    <strong>Fila Virtual</strong> · Análise de Mercado &amp; Estratégia de Go-to-Market
+  </div>
+  <div>
+    Julho 2026 · Gerência de Marketing &amp; Vendas · Confidencial
+  </div>
+</div>
+
+</div><!-- /page -->
+</body>
+</html>
