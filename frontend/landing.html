@@ -269,6 +269,73 @@
   details .faq-a{animation:fadeUp .4s var(--ease-out)}
   summary::after{transition:transform .25s var(--ease-out)}
 
+  /* ================= FLUXO: CELULAR + DASHBOARD ================= */
+  @keyframes qrScan{0%,100%{top:10%}50%{top:86%}}
+  @keyframes caretBlink{0%,45%{opacity:1}50%,100%{opacity:0}}
+  @keyframes travel{0%{left:0;opacity:0}12%{opacity:1}88%{opacity:1}100%{left:calc(100% - 10px);opacity:0}}
+  @keyframes travelV{0%{top:0;opacity:0}12%{opacity:1}88%{opacity:1}100%{top:calc(100% - 10px);opacity:0}}
+  @keyframes ringPulse{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.9);opacity:0}}
+
+  .flow-grid{display:grid;grid-template-columns:auto minmax(60px,120px) 1fr;gap:26px;align-items:center;margin-top:52px}
+  @media(max-width:900px){.flow-grid{grid-template-columns:1fr;justify-items:center;gap:18px}}
+
+  /* --- celular --- */
+  .phone{position:relative;width:262px;height:540px;background:#0B0B0B;border-radius:44px;border:3px solid #2A2826;box-shadow:0 32px 64px rgba(25,25,25,.35);padding:12px;flex:none;animation:floatY 7s ease-in-out infinite}
+  .phone::before{content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:104px;height:22px;background:#0B0B0B;border-radius:0 0 14px 14px;z-index:3}
+  .phone-viewport{position:relative;width:100%;height:100%;border-radius:33px;overflow:hidden;background:var(--ink)}
+  .pscreen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;padding:30px 22px;opacity:0;transform:translateX(26px);transition:opacity .5s var(--ease-out),transform .5s var(--ease-out)}
+  .flow-scene.p0 .ps-qr,.flow-scene.p1 .ps-join,.flow-scene.p2 .ps-pos,.flow-scene.p3 .ps-call{opacity:1;transform:translateX(0)}
+  .ps-brand{font-family:var(--font-display);font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--coral)}
+  .ps-title{font-family:var(--font-display);font-size:17px;font-weight:600;color:var(--bone);text-align:center;line-height:1.25}
+  .ps-sub{font-size:12px;color:#877F73;text-align:center;line-height:1.5}
+  .qr-box{width:150px;height:150px;background:#fff;border-radius:16px;padding:13px;position:relative;overflow:hidden}
+  .qr-box svg{width:100%;height:100%;display:block}
+  .qr-scan{position:absolute;left:7%;right:7%;height:3px;background:var(--red);border-radius:99px;box-shadow:0 0 16px rgba(237,44,39,.85);animation:qrScan 2.4s ease-in-out infinite}
+  .ps-input{width:100%;background:#232220;border:1px solid #34322E;border-radius:11px;padding:13px 15px;color:var(--bone);font-size:13.5px;font-weight:600;display:flex;align-items:center}
+  .ps-caret{width:2px;height:15px;background:var(--coral);margin-left:2px;animation:caretBlink 1s infinite}
+  .ps-btn{width:100%;background:var(--red);color:#fff;border-radius:11px;padding:14px;font-weight:800;font-size:14px;text-align:center;box-shadow:0 10px 24px rgba(237,44,39,.35)}
+  .ps-code{font-family:var(--font-mono);font-size:15px;color:#877F73;background:#232220;border:1px solid #34322E;padding:5px 14px;border-radius:99px}
+  .ps-bignum{font-family:var(--font-display);font-size:64px;font-weight:700;color:var(--coral);line-height:1;letter-spacing:-.03em;transition:opacity .3s}
+  .ps-bar{width:100%;height:8px;background:#2A2826;border-radius:99px;overflow:hidden}
+  .ps-fill{height:100%;width:30%;background:linear-gradient(90deg,var(--coral),var(--red));border-radius:99px;transition:width .7s var(--ease-out)}
+  .ps-live{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--leaf);background:rgba(63,138,91,.14);border:1px solid rgba(63,138,91,.4);padding:4px 11px;border-radius:99px}
+  .ps-call{background:linear-gradient(165deg,#1F5D3A,#12331F)}
+  .ps-bell{position:relative;width:74px;height:74px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;margin-bottom:6px}
+  .ps-bell .ring{position:absolute;inset:0;border:2px solid rgba(255,255,255,.4);border-radius:50%;animation:ringPulse 1.7s ease-out infinite}
+  .ps-bell .ring:nth-child(2){animation-delay:.55s}
+  .ps-call .ps-title{color:#fff;font-size:22px}
+  .ps-call .ps-sub{color:rgba(255,255,255,.75)}
+  .ps-chip{font-family:var(--font-mono);font-size:20px;color:#fff;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);padding:8px 20px;border-radius:12px}
+
+  /* --- conector tempo real --- */
+  .flow-link{position:relative;height:2px;align-self:center;width:100%;background:repeating-linear-gradient(90deg,var(--sand) 0 8px,transparent 8px 16px)}
+  .flow-link span{position:absolute;top:-26px;left:50%;transform:translateX(-50%);font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--stone);white-space:nowrap}
+  .flow-dot{position:absolute;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--red);box-shadow:0 0 12px rgba(237,44,39,.65);animation:travel 2.6s linear infinite}
+  .flow-dot:nth-child(2){animation-delay:.85s}
+  .flow-dot:nth-child(3){animation-delay:1.7s}
+  @media(max-width:900px){
+    .flow-link{width:2px;height:72px;background:repeating-linear-gradient(180deg,var(--sand) 0 8px,transparent 8px 16px)}
+    .flow-link span{top:50%;left:auto;right:-14px;transform:translateY(-50%) rotate(90deg);transform-origin:right center}
+    .flow-dot{left:-4px;top:0;animation-name:travelV}
+  }
+
+  /* --- print do dashboard --- */
+  .browser{border-radius:16px;overflow:hidden;box-shadow:var(--shadow-lg);border:1px solid #2A2826;background:#0B0B0B;position:relative;animation:floatY 8s ease-in-out 1s infinite;min-width:0}
+  .browser-bar{display:flex;align-items:center;gap:7px;background:#191919;padding:11px 15px;border-bottom:1px solid #2A2826}
+  .b-dot{width:10px;height:10px;border-radius:50%}
+  .b-url{margin-left:10px;background:#232220;color:#877F73;font-family:var(--font-mono);font-size:11px;padding:4px 14px;border-radius:99px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .browser img{display:block;width:100%;height:auto}
+  .dash-toast{position:absolute;left:50%;bottom:16px;transform:translate(-50%,16px);background:#2A2826;color:var(--cream);border:1px solid #4A4742;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:700;opacity:0;transition:opacity .45s var(--ease-out),transform .45s var(--ease-out);box-shadow:0 14px 34px rgba(0,0,0,.55);white-space:nowrap}
+  .dash-toast.show{opacity:1;transform:translate(-50%,0)}
+  .dash-toast strong{color:var(--coral)}
+
+  /* --- passos do fluxo --- */
+  .flow-steps{display:flex;gap:10px;justify-content:center;margin-top:40px;flex-wrap:wrap}
+  .fstep{display:flex;align-items:center;gap:9px;background:#fff;border:1.5px solid var(--cream-2);border-radius:999px;padding:9px 18px;font-size:13px;font-weight:700;color:var(--stone);transition:all .35s var(--ease-out)}
+  .fstep b{width:22px;height:22px;border-radius:50%;background:var(--cream-2);color:var(--slate);display:flex;align-items:center;justify-content:center;font-size:11px;flex:none;transition:all .35s}
+  .fstep.on{color:var(--ink);border-color:var(--coral);box-shadow:0 8px 22px rgba(237,44,39,.16);transform:translateY(-2px)}
+  .fstep.on b{background:var(--red);color:#fff}
+
   /* acessibilidade: reduz movimento */
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
@@ -389,8 +456,96 @@
   </div>
 </section>
 
+<!-- ============ FLUXO AO VIVO: CELULAR + DASHBOARD ============ -->
+<section class="alt" id="fluxo">
+  <div class="wrap">
+    <div class="eyebrow">Veja por dentro</div>
+    <h2 class="h2">Do celular do paciente ao seu painel — em tempo real</h2>
+    <p class="lead">À esquerda, o que o paciente vê. À direita, o painel do operador de verdade. Cada senha que entra pelo QR Code aparece no painel no mesmo segundo.</p>
+
+    <div class="flow-grid">
+      <!-- CELULAR -->
+      <div class="phone">
+        <div class="phone-viewport flow-scene p2" id="flowScene">
+          <!-- tela 1: QR -->
+          <div class="pscreen ps-qr">
+            <div class="ps-brand">Fila Virtual</div>
+            <div class="ps-title">Aponte a câmera<br>para o QR Code</div>
+            <div class="qr-box">
+              <svg viewBox="0 0 29 29" fill="#191919">
+                <path d="M0 0h7v7H0zM2 2v3h3V2z" fill-rule="evenodd"/><path d="M22 0h7v7h-7zM24 2v3h3V2z" fill-rule="evenodd"/><path d="M0 22h7v7H0zM2 24v3h3v-3z" fill-rule="evenodd"/>
+                <rect x="9" y="1" width="2" height="2"/><rect x="13" y="0" width="2" height="3"/><rect x="17" y="2" width="2" height="2"/><rect x="10" y="5" width="3" height="2"/><rect x="15" y="5" width="2" height="2"/><rect x="19" y="5" width="1" height="2"/>
+                <rect x="1" y="9" width="2" height="2"/><rect x="5" y="10" width="2" height="2"/><rect x="9" y="9" width="2" height="3"/><rect x="13" y="10" width="3" height="2"/><rect x="18" y="9" width="2" height="2"/><rect x="22" y="10" width="2" height="2"/><rect x="26" y="9" width="2" height="3"/>
+                <rect x="0" y="14" width="3" height="2"/><rect x="5" y="14" width="2" height="3"/><rect x="10" y="14" width="2" height="2"/><rect x="14" y="13" width="2" height="3"/><rect x="18" y="14" width="3" height="2"/><rect x="23" y="14" width="2" height="2"/><rect x="27" y="13" width="2" height="2"/>
+                <rect x="2" y="18" width="2" height="2"/><rect x="6" y="19" width="2" height="2"/><rect x="10" y="18" width="3" height="2"/><rect x="15" y="18" width="2" height="2"/><rect x="19" y="19" width="2" height="2"/><rect x="24" y="18" width="2" height="2"/>
+                <rect x="9" y="23" width="2" height="2"/><rect x="13" y="22" width="2" height="3"/><rect x="17" y="24" width="2" height="2"/><rect x="21" y="22" width="2" height="2"/><rect x="25" y="23" width="2" height="2"/><rect x="10" y="27" width="3" height="2"/><rect x="15" y="26" width="2" height="2"/><rect x="20" y="27" width="2" height="2"/>
+              </svg>
+              <div class="qr-scan"></div>
+            </div>
+            <div class="ps-sub">Sem baixar aplicativo.<br>Abre direto no navegador.</div>
+          </div>
+          <!-- tela 2: entrar na fila -->
+          <div class="pscreen ps-join">
+            <div class="ps-brand">Unidade Centro</div>
+            <div class="ps-title">Entre na fila</div>
+            <div class="ps-sub">Só precisamos do seu nome:</div>
+            <div class="ps-input">Maria Souza<span class="ps-caret"></span></div>
+            <div class="ps-btn">Entrar na fila</div>
+            <div class="ps-sub" style="font-size:11px">9 pessoas na fila agora · ~8 min</div>
+          </div>
+          <!-- tela 3: posição -->
+          <div class="pscreen ps-pos">
+            <span class="ps-live"><span class="mock-dot"></span>AO VIVO</span>
+            <div class="ps-code">Senha M-052</div>
+            <div class="ps-bignum" id="flowPos">3ª</div>
+            <div class="ps-sub" style="margin-top:-6px">posição na fila</div>
+            <div class="ps-bar"><div class="ps-fill" id="flowFill"></div></div>
+            <div class="ps-sub">Espera estimada: <strong style="color:var(--bone)">~8 min</strong><br>Pode aguardar onde preferir 😉</div>
+          </div>
+          <!-- tela 4: sua vez -->
+          <div class="pscreen ps-call">
+            <div class="ps-bell">
+              <span class="ring"></span><span class="ring"></span>
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            </div>
+            <div class="ps-title">É a sua vez!</div>
+            <div class="ps-chip">M-052</div>
+            <div class="ps-sub">Dirija-se ao <strong style="color:#fff">Balcão 2</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONECTOR -->
+      <div class="flow-link" aria-hidden="true">
+        <span>tempo real</span>
+        <i class="flow-dot"></i><i class="flow-dot"></i><i class="flow-dot"></i>
+      </div>
+
+      <!-- DASHBOARD (print real) -->
+      <div class="browser">
+        <div class="browser-bar">
+          <span class="b-dot" style="background:#FF5F57"></span>
+          <span class="b-dot" style="background:#FEBC2E"></span>
+          <span class="b-dot" style="background:#28C840"></span>
+          <span class="b-url">app.filavirtual.com.br/painel</span>
+        </div>
+        <img src="assets/dashboard.png" alt="Painel do operador da Fila Virtual mostrando a fila ao vivo, KPIs e a senha M-042 sendo chamada no Balcão 3" loading="lazy" width="1440" height="900">
+        <div class="dash-toast" id="dashToast"><strong>M-052</strong> chamada · Balcão 2 · Maria Souza</div>
+      </div>
+    </div>
+
+    <!-- passos sincronizados -->
+    <div class="flow-steps" id="flowSteps">
+      <div class="fstep"><b>1</b>Escaneia o QR</div>
+      <div class="fstep"><b>2</b>Entra na fila</div>
+      <div class="fstep on"><b>3</b>Acompanha a vez</div>
+      <div class="fstep"><b>4</b>É chamado</div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ DOR vs SOLUÇÃO ============ -->
-<section class="alt">
+<section>
   <div class="wrap">
     <div class="eyebrow">Antes e depois</div>
     <h2 class="h2">A recepção que você tem hoje — e a que pode ter amanhã</h2>
@@ -423,7 +578,7 @@
 </section>
 
 <!-- ============ NÚMEROS ============ -->
-<section>
+<section class="alt">
   <div class="wrap center">
     <div class="eyebrow">Por que agora</div>
     <h2 class="h2">Fila é a primeira impressão do seu atendimento</h2>
@@ -437,7 +592,7 @@
 </section>
 
 <!-- ============ PARA QUEM ============ -->
-<section class="alt">
+<section>
   <div class="wrap">
     <div class="eyebrow">Para quem é</div>
     <h2 class="h2">Feito para quem atende gente todos os dias</h2>
@@ -453,7 +608,7 @@
 </section>
 
 <!-- ============ PREÇOS ============ -->
-<section id="precos">
+<section class="alt" id="precos">
   <div class="wrap center">
     <div class="eyebrow">Preços</div>
     <h2 class="h2">Comece grátis. Cresça quando fizer sentido.</h2>
@@ -503,7 +658,7 @@
 </section>
 
 <!-- ============ FAQ ============ -->
-<section class="alt" id="faq">
+<section id="faq">
   <div class="wrap">
     <div class="eyebrow">Dúvidas frequentes</div>
     <h2 class="h2">Perguntas que todo gestor faz</h2>
@@ -659,6 +814,34 @@
     }, 380);
   }
   if (!reduced) setInterval(callNext, 3600);
+
+  /* ---- fluxo sincronizado: celular + dashboard ---- */
+  var scene = document.getElementById('flowScene');
+  if (scene && !reduced) {
+    var posEl = document.getElementById('flowPos');
+    var fillEl = document.getElementById('flowFill');
+    var toastEl = document.getElementById('dashToast');
+    var stepEls = document.querySelectorAll('#flowSteps .fstep');
+    var seq = [
+      { c: 'p0', step: 0, ms: 3000 },
+      { c: 'p1', step: 1, ms: 2600 },
+      { c: 'p2', step: 2, ms: 1500, pos: '3ª', fill: '30%' },
+      { c: 'p2', step: 2, ms: 1500, pos: '2ª', fill: '58%' },
+      { c: 'p2', step: 2, ms: 1400, pos: '1ª', fill: '86%' },
+      { c: 'p3', step: 3, ms: 3800 }
+    ];
+    var fi = 0;
+    function flowTick(){
+      var st = seq[fi];
+      scene.className = 'phone-viewport flow-scene ' + st.c;
+      if (st.pos) { posEl.textContent = st.pos; fillEl.style.width = st.fill; }
+      stepEls.forEach(function(el, i){ el.classList.toggle('on', i === st.step); });
+      toastEl.classList.toggle('show', st.c === 'p3');
+      fi = (fi + 1) % seq.length;
+      setTimeout(flowTick, st.ms);
+    }
+    flowTick();
+  }
 })();
 </script>
 
