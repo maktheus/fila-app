@@ -185,6 +185,94 @@
   .alt{background:var(--cream-2)}
   .center{text-align:center}
   .center .h2,.center .lead{margin-left:auto;margin-right:auto}
+
+  /* ================= ANIMAÇÕES ================= */
+  @keyframes fadeUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes popIn{0%{opacity:0;transform:scale(.85)}70%{transform:scale(1.04)}100%{opacity:1;transform:scale(1)}}
+  @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+  @keyframes blobDrift{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.12)}66%{transform:translate(-30px,24px) scale(.94)}}
+  @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  @keyframes shine{from{transform:translateX(-120%) skewX(-18deg)}to{transform:translateX(240%) skewX(-18deg)}}
+  @keyframes glowPulse{0%,100%{box-shadow:0 18px 40px rgba(237,44,39,0.14),0 4px 8px rgba(25,25,25,0.06)}50%{box-shadow:0 22px 54px rgba(237,44,39,0.30),0 4px 8px rgba(25,25,25,0.06)}}
+  @keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-7deg)}75%{transform:rotate(7deg)}}
+  @keyframes rowSlideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes rowSlideOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(28px)}}
+  @keyframes gradientShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+  @keyframes bounceArrow{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
+
+  /* entrada do hero em cascata */
+  .hero-badge{animation:fadeUp .7s var(--ease-out) both}
+  .hero h1{animation:fadeUp .7s var(--ease-out) .12s both}
+  .hero-sub{animation:fadeUp .7s var(--ease-out) .24s both}
+  .hero-ctas{animation:fadeUp .7s var(--ease-out) .36s both}
+  .hero-note{animation:fadeUp .7s var(--ease-out) .46s both}
+  .hero-mock{animation:fadeUp .9s var(--ease-out) .55s both,floatY 7s ease-in-out 2s infinite}
+
+  /* blobs flutuantes no hero */
+  .hero::before,.hero::after{content:'';position:absolute;border-radius:50%;pointer-events:none;z-index:-1;filter:blur(4px)}
+  .hero::before{top:-120px;right:-100px;width:460px;height:460px;background:radial-gradient(circle,rgba(238,115,110,0.22),transparent 68%);animation:blobDrift 16s ease-in-out infinite}
+  .hero::after{bottom:-80px;left:-120px;width:400px;height:400px;background:radial-gradient(circle,rgba(63,138,91,0.14),transparent 68%);animation:blobDrift 20s ease-in-out infinite reverse}
+  .hero{z-index:0}
+
+  /* destaque animado no título */
+  .hero h1 em{background:linear-gradient(90deg,var(--red),var(--coral),var(--red));background-size:220% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:gradientShift 5s ease-in-out infinite}
+
+  /* reveal ao rolar */
+  .reveal{opacity:0;transform:translateY(30px);transition:opacity .7s var(--ease-out),transform .7s var(--ease-out)}
+  .reveal.in{opacity:1;transform:translateY(0)}
+  .reveal-stagger>*{opacity:0;transform:translateY(26px);transition:opacity .65s var(--ease-out),transform .65s var(--ease-out)}
+  .reveal-stagger.in>*{opacity:1;transform:translateY(0)}
+  .reveal-stagger.in>*:nth-child(1){transition-delay:.05s}
+  .reveal-stagger.in>*:nth-child(2){transition-delay:.15s}
+  .reveal-stagger.in>*:nth-child(3){transition-delay:.25s}
+  .reveal-stagger.in>*:nth-child(4){transition-delay:.35s}
+  .reveal-stagger.in>*:nth-child(5){transition-delay:.45s}
+  .reveal-stagger.in>*:nth-child(6){transition-delay:.55s}
+
+  /* marquee da faixa de confiança */
+  .trust-inner{flex-wrap:nowrap;justify-content:flex-start;overflow:hidden;gap:0;max-width:100%}
+  .marquee-track{display:flex;align-items:center;gap:48px;width:max-content;padding-right:48px;animation:marquee 24s linear infinite}
+  .trust:hover .marquee-track{animation-play-state:paused}
+  .marquee-track .trust-item{white-space:nowrap}
+
+  /* hover dos cards */
+  .step,.aud-card,.num,.price{transition:transform .35s var(--ease-out),box-shadow .35s var(--ease-out)}
+  .step:hover,.aud-card:hover{transform:translateY(-8px);box-shadow:var(--shadow-lg)}
+  .num:hover{transform:translateY(-6px) scale(1.03);box-shadow:var(--shadow-lg)}
+  .price:hover{transform:translateY(-8px);box-shadow:var(--shadow-lg)}
+  .step:hover .step-num{animation:wiggle .5s ease-in-out}
+  .aud-card:hover .aud-icon{display:inline-block;animation:wiggle .5s ease-in-out}
+  .price.featured{animation:glowPulse 3.4s ease-in-out infinite}
+
+  /* brilho varrendo os botões primários */
+  .btn{position:relative;overflow:hidden}
+  .btn-primary::after,.btn-whats::after{content:'';position:absolute;top:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent);transform:translateX(-120%) skewX(-18deg)}
+  .btn-primary:hover::after,.btn-whats:hover::after{animation:shine .8s var(--ease-out)}
+  .btn-primary,.btn-whats{transition:transform 120ms var(--ease-out),background 140ms,filter 140ms,box-shadow .3s}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(237,44,39,0.38)}
+  .btn-whats:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(31,93,58,0.32)}
+
+  /* fila simulada no mockup */
+  .mock-row{transition:background .3s,border-color .3s}
+  .mock-row.entering{animation:rowSlideIn .45s var(--ease-out) both}
+  .mock-row.leaving{animation:rowSlideOut .4s var(--ease-out) both}
+  .mock-hero-code.pop{animation:popIn .5s var(--ease-out)}
+  .mock-tag.call{animation:fadeIn .4s both}
+
+  /* seta indicando scroll */
+  .scroll-hint{display:flex;justify-content:center;margin-top:36px;animation:fadeIn 1s 1.4s both}
+  .scroll-hint svg{animation:bounceArrow 1.8s ease-in-out infinite;color:var(--stone)}
+
+  /* FAQ suave */
+  details .faq-a{animation:fadeUp .4s var(--ease-out)}
+  summary::after{transition:transform .25s var(--ease-out)}
+
+  /* acessibilidade: reduz movimento */
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+    .reveal,.reveal-stagger>*{opacity:1;transform:none}
+  }
 </style>
 </head>
 <body>
@@ -230,16 +318,17 @@
           Fila ao vivo
           <span class="mock-live"><span class="mock-dot"></span>AO VIVO</span>
         </div>
-        <div class="mock-row"><span class="mock-code">A-042</span><span class="mock-name">Maria Souza</span><span class="mock-tag call">Chamando</span></div>
-        <div class="mock-row"><span class="mock-code">A-043</span><span class="mock-name">João Pereira</span><span class="mock-tag wait">3 min</span></div>
-        <div class="mock-row"><span class="mock-code">A-044</span><span class="mock-name">Ana Lima</span><span class="mock-tag wait">7 min</span></div>
-        <div class="mock-row"><span class="mock-code">A-045</span><span class="mock-name">Carlos Mendes</span><span class="mock-tag wait">11 min</span></div>
+        <div id="mockList"></div>
       </div>
       <div class="mock-hero">
         <div class="mock-hero-label"><span class="mock-dot" style="background:var(--coral)"></span>Chamando agora</div>
-        <div class="mock-hero-code">A-042</div>
-        <div class="mock-hero-sub">Balcão 2 · Maria Souza</div>
+        <div class="mock-hero-code" id="mockHeroCode">A-042</div>
+        <div class="mock-hero-sub" id="mockHeroSub">Balcão 2 · Maria Souza</div>
       </div>
+    </div>
+
+    <div class="scroll-hint">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
     </div>
   </div>
 </header>
@@ -247,10 +336,7 @@
 <!-- ============ TRUST STRIP ============ -->
 <div class="trust">
   <div class="wrap trust-inner">
-    <span class="trust-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3F8A5B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Setup em menos de 1 hora</span>
-    <span class="trust-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3F8A5B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Sem instalação de app</span>
-    <span class="trust-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3F8A5B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Atualização em tempo real</span>
-    <span class="trust-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3F8A5B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Suporte em português</span>
+    <div class="marquee-track" id="marquee"></div>
   </div>
 </div>
 
@@ -261,7 +347,7 @@
     <h2 class="h2">Três passos. Zero fricção.</h2>
     <p class="lead">Nada de totem de R$ 5.000, senha de papel ou aplicativo que ninguém baixa. Só um QR Code na recepção e um navegador no balcão.</p>
 
-    <div class="steps">
+    <div class="steps reveal-stagger">
       <div class="step">
         <div class="step-num">1</div>
         <h3>Paciente escaneia o QR Code</h3>
@@ -290,7 +376,7 @@
     <div class="eyebrow">Antes e depois</div>
     <h2 class="h2">A recepção que você tem hoje — e a que pode ter amanhã</h2>
 
-    <div class="split">
+    <div class="split reveal-stagger">
       <div class="pain-card">
         <h3>Hoje, sem a Fila Virtual</h3>
         <ul>
@@ -322,9 +408,9 @@
   <div class="wrap center">
     <div class="eyebrow">Por que agora</div>
     <h2 class="h2">Fila é a primeira impressão do seu atendimento</h2>
-    <div class="numbers">
-      <div class="num"><div class="num-val">12 min</div><div class="num-lbl">espera média que vira reclamação</div></div>
-      <div class="num"><div class="num-val">R$ 5.000+</div><div class="num-lbl">custo de um totem físico</div></div>
+    <div class="numbers reveal-stagger">
+      <div class="num"><div class="num-val" data-count="12" data-suffix=" min">0 min</div><div class="num-lbl">espera média que vira reclamação</div></div>
+      <div class="num"><div class="num-val" data-count="5000" data-prefix="R$ " data-suffix="+">R$ 0+</div><div class="num-lbl">custo de um totem físico</div></div>
       <div class="num"><div class="num-val">0</div><div class="num-lbl">apps para o paciente baixar</div></div>
       <div class="num"><div class="num-val">&lt; 1 h</div><div class="num-lbl">para colocar no ar</div></div>
     </div>
@@ -336,7 +422,7 @@
   <div class="wrap">
     <div class="eyebrow">Para quem é</div>
     <h2 class="h2">Feito para quem atende gente todos os dias</h2>
-    <div class="aud">
+    <div class="aud reveal-stagger">
       <div class="aud-card"><div class="aud-icon">🏥</div><h4>Clínicas e consultórios</h4><p>Reduza a aglomeração na sala de espera e dê previsibilidade ao paciente.</p></div>
       <div class="aud-card"><div class="aud-icon">💊</div><h4>Farmácias com serviços</h4><p>Organize a fila da aplicação de injetáveis, testes e farmácia clínica.</p></div>
       <div class="aud-card"><div class="aud-icon">🍽️</div><h4>Restaurantes</h4><p>Cliente entra na fila da porta pelo celular e é avisado quando a mesa liberar.</p></div>
@@ -354,7 +440,7 @@
     <h2 class="h2">Comece grátis. Cresça quando fizer sentido.</h2>
     <p class="lead">Sem contrato de fidelidade, sem taxa de implantação, sem pegadinha.</p>
 
-    <div class="price-grid" style="text-align:left">
+    <div class="price-grid reveal-stagger" style="text-align:left">
       <div class="price">
         <div class="price-name">Starter</div>
         <div class="price-val">R$ 0<span>/mês</span></div>
@@ -402,7 +488,7 @@
   <div class="wrap">
     <div class="eyebrow">Dúvidas frequentes</div>
     <h2 class="h2">Perguntas que todo gestor faz</h2>
-    <div class="faq-list">
+    <div class="faq-list reveal-stagger">
       <details>
         <summary>O paciente precisa baixar algum aplicativo?</summary>
         <div class="faq-a">Não. Ele escaneia o QR Code com a câmera do celular e a fila abre direto no navegador. Funciona em qualquer smartphone, Android ou iPhone.</div>
@@ -456,6 +542,117 @@
     </div>
   </div>
 </footer>
+
+<script>
+(function(){
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- reveal ao rolar ---- */
+  var revealEls = [].slice.call(document.querySelectorAll('.reveal, .reveal-stagger'));
+  document.querySelectorAll('section .eyebrow, section .h2, section .lead').forEach(function(el){
+    el.classList.add('reveal'); revealEls.push(el);
+  });
+  if ('IntersectionObserver' in window && !reduced) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+    revealEls.forEach(function(el){ io.observe(el); });
+  } else {
+    revealEls.forEach(function(el){ el.classList.add('in'); });
+  }
+
+  /* ---- contadores animados ---- */
+  function animateCount(el){
+    var target = parseInt(el.dataset.count, 10);
+    var prefix = el.dataset.prefix || '';
+    var suffix = el.dataset.suffix || '';
+    var dur = 1400, start = null;
+    function fmt(n){ return n.toLocaleString('pt-BR'); }
+    function tick(ts){
+      if (!start) start = ts;
+      var p = Math.min((ts - start) / dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = prefix + fmt(Math.round(target * eased)) + suffix;
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+  var counters = document.querySelectorAll('[data-count]');
+  if ('IntersectionObserver' in window && !reduced) {
+    var cio = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting) { animateCount(e.target); cio.unobserve(e.target); }
+      });
+    }, { threshold: 0.5 });
+    counters.forEach(function(el){ cio.observe(el); });
+  } else {
+    counters.forEach(function(el){
+      el.textContent = (el.dataset.prefix||'') + parseInt(el.dataset.count,10).toLocaleString('pt-BR') + (el.dataset.suffix||'');
+    });
+  }
+
+  /* ---- marquee de confiança ---- */
+  var CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3F8A5B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> ';
+  var items = ['Setup em menos de 1 hora','Sem instalação de app','Atualização em tempo real','Suporte em português','QR Code na recepção','Funciona em qualquer celular'];
+  var track = document.getElementById('marquee');
+  var html = '';
+  for (var r = 0; r < 2; r++) {
+    items.forEach(function(t){ html += '<span class="trust-item">' + CHECK + t + '</span>'; });
+  }
+  track.innerHTML = html;
+
+  /* ---- simulação da fila ao vivo no mockup ---- */
+  var NAMES = ['Maria Souza','João Pereira','Ana Lima','Carlos Mendes','Beatriz Rocha','Pedro Alves','Juliana Castro','Rafael Nunes','Fernanda Dias','Lucas Martins','Camila Freitas','Bruno Costa'];
+  var list = document.getElementById('mockList');
+  var heroCode = document.getElementById('mockHeroCode');
+  var heroSub = document.getElementById('mockHeroSub');
+  var nextCode = 42, nameIdx = 0, queue = [];
+
+  function newTicket(){
+    var t = { code: 'A-0' + nextCode, name: NAMES[nameIdx % NAMES.length], wait: queue.length * 4 + 3 };
+    nextCode++; nameIdx++;
+    return t;
+  }
+  function rowHTML(t, calling){
+    return '<span class="mock-code">' + t.code + '</span>' +
+           '<span class="mock-name">' + t.name + '</span>' +
+           '<span class="mock-tag ' + (calling ? 'call">Chamando' : 'wait">' + t.wait + ' min') + '</span>';
+  }
+  function renderQueue(){
+    list.innerHTML = '';
+    queue.forEach(function(t, i){
+      var div = document.createElement('div');
+      div.className = 'mock-row';
+      div.innerHTML = rowHTML(t, i === 0);
+      list.appendChild(div);
+    });
+  }
+  for (var i = 0; i < 4; i++) queue.push(newTicket());
+  renderQueue();
+
+  function callNext(){
+    var first = list.firstElementChild;
+    if (!first) return;
+    first.classList.add('leaving');
+    setTimeout(function(){
+      var called = queue.shift();
+      queue.push(newTicket());
+      queue.forEach(function(t, i){ t.wait = Math.max(2, i * 4 + 2); });
+      renderQueue();
+      var newFirst = list.firstElementChild;
+      if (newFirst) newFirst.classList.add('entering');
+      heroCode.textContent = queue[0].code;
+      heroSub.textContent = 'Balcão ' + (1 + Math.floor(Math.random() * 3)) + ' · ' + queue[0].name;
+      heroCode.classList.remove('pop');
+      void heroCode.offsetWidth;
+      heroCode.classList.add('pop');
+    }, 380);
+  }
+  if (!reduced) setInterval(callNext, 3600);
+})();
+</script>
 
 </body>
 </html>
