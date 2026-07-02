@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fila Virtual — Sua fila no celular do paciente. Sem totem, sem app.</title>
+<meta name="description" content="Elimine a fila física da sua clínica em menos de 1 hora. O paciente entra na fila pelo QR Code, acompanha pelo celular e você gerencia tudo em tempo real. Teste grátis por 14 dias.">
+<meta property="og:title" content="Fila Virtual — Atendimento real, sem fila na porta">
+<meta property="og:description" content="O paciente entra na fila pelo QR Code, sem baixar nada. Você gerencia tudo em tempo real. Teste grátis 14 dias.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+
+  :root{
+    --red:#ED2C27;
+    --red-deep:#EC2B26;
+    --coral:#EE736E;
+    --coral-soft:#F5A5A1;
+    --blush:#FBE3E1;
+    --cream:#F0EFEB;
+    --cream-2:#E8E6DF;
+    --bone:#DBD4C9;
+    --sand:#C9C2B5;
+    --stone:#8C857A;
+    --slate:#4D4943;
+    --ink:#191919;
+    --ink-2:#2A2826;
+    --forest:#1F5D3A;
+    --leaf:#3F8A5B;
+    --river:#2D6A8C;
+    --amber:#E8A33D;
+
+    --font-display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif;
+    --font-body:"Manrope",ui-sans-serif,system-ui,sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,monospace;
+
+    --ease-out:cubic-bezier(0.22,1,0.36,1);
+    --shadow-lg:0 18px 40px rgba(25,25,25,0.12),0 4px 8px rgba(25,25,25,0.06);
+    --shadow-red:0 10px 28px rgba(237,44,39,0.28);
+  }
+
+  html{scroll-behavior:smooth}
+  body{background:var(--cream);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;line-height:1.6}
+
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+
+  /* ---------- NAV ---------- */
+  .nav{position:sticky;top:0;z-index:40;background:color-mix(in oklch,var(--cream) 88%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--cream-2)}
+  .nav-inner{display:flex;align-items:center;gap:12px;padding:14px 24px;max-width:1120px;margin:0 auto}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+  .brand-name{font-family:var(--font-display);font-weight:700;font-size:17px;letter-spacing:-0.01em}
+  .nav-links{margin-left:auto;display:flex;align-items:center;gap:24px}
+  .nav-links a{font-size:14px;font-weight:600;color:var(--slate);text-decoration:none}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-cta{background:var(--ink);color:var(--cream)!important;padding:10px 18px;border-radius:10px;font-weight:700!important;transition:background 140ms}
+  .nav-cta:hover{background:var(--ink-2)}
+  @media(max-width:720px){.nav-links a:not(.nav-cta){display:none}}
+
+  /* ---------- HERO ---------- */
+  .hero{padding:84px 0 64px;position:relative;overflow:hidden}
+  .hero-badge{display:inline-flex;align-items:center;gap:8px;background:var(--blush);border:1px solid var(--coral-soft);color:var(--red);font-size:12px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;padding:7px 16px;border-radius:999px;margin-bottom:26px}
+  .hero h1{font-family:var(--font-display);font-weight:700;font-size:clamp(34px,5.4vw,58px);line-height:1.06;letter-spacing:-0.03em;max-width:760px}
+  .hero h1 em{font-style:normal;color:var(--red)}
+  .hero-sub{font-size:clamp(16px,2vw,19px);color:var(--slate);max-width:600px;margin-top:20px}
+  .hero-ctas{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .btn{display:inline-flex;align-items:center;gap:10px;border:none;border-radius:13px;padding:16px 28px;font-family:var(--font-body);font-weight:800;font-size:16px;text-decoration:none;cursor:pointer;transition:transform 120ms var(--ease-out),background 140ms,filter 140ms}
+  .btn:active{transform:scale(0.98)}
+  .btn-primary{background:var(--red);color:#fff;box-shadow:var(--shadow-red)}
+  .btn-primary:hover{background:var(--red-deep);filter:brightness(1.06)}
+  .btn-whats{background:var(--forest);color:#fff}
+  .btn-whats:hover{filter:brightness(1.1)}
+  .btn-ghost{background:transparent;border:1.5px solid var(--bone);color:var(--ink)}
+  .btn-ghost:hover{border-color:var(--sand);background:var(--cream-2)}
+  .hero-note{font-size:13px;color:var(--stone);margin-top:16px}
+  .hero-note strong{color:var(--slate)}
+
+  /* mock panel */
+  .hero-mock{margin-top:56px;background:var(--ink);border-radius:20px;padding:26px;box-shadow:var(--shadow-lg);display:grid;grid-template-columns:1.5fr 1fr;gap:18px}
+  @media(max-width:720px){.hero-mock{grid-template-columns:1fr}}
+  .mock-q{background:#232220;border:1px solid #34322E;border-radius:14px;padding:18px}
+  .mock-q-title{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:600;font-size:14px;color:var(--bone);margin-bottom:14px}
+  .mock-live{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;color:var(--leaf);background:rgba(63,138,91,0.15);border:1px solid rgba(63,138,91,0.4);padding:3px 10px;border-radius:999px;letter-spacing:0.06em}
+  .mock-dot{width:6px;height:6px;border-radius:99px;background:var(--leaf);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .mock-row{display:flex;align-items:center;gap:12px;background:#2A2826;border:1px solid #34322E;border-radius:10px;padding:11px 14px;margin-bottom:8px}
+  .mock-code{font-family:var(--font-mono);font-size:15px;color:var(--bone)}
+  .mock-name{font-size:13px;font-weight:700;color:var(--bone);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mock-tag{font-size:10px;font-weight:800;padding:3px 9px;border-radius:99px;text-transform:uppercase;letter-spacing:0.04em}
+  .mock-tag.call{background:rgba(238,115,110,0.18);color:var(--coral)}
+  .mock-tag.wait{background:#34322E;color:#877F73}
+  .mock-hero{background:linear-gradient(135deg,rgba(238,115,110,0.16),rgba(237,44,39,0.08));border:1px solid rgba(238,115,110,0.45);border-radius:14px;padding:20px;display:flex;flex-direction:column;justify-content:center}
+  .mock-hero-label{font-family:var(--font-display);font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--coral);display:flex;align-items:center;gap:7px}
+  .mock-hero-code{font-family:var(--font-display);font-weight:700;font-size:52px;letter-spacing:-0.03em;color:var(--coral);line-height:1;margin-top:10px}
+  .mock-hero-sub{font-size:13px;color:var(--bone);margin-top:8px}
+
+  /* ---------- LOGO STRIP / TRUST ---------- */
+  .trust{padding:26px 0;border-top:1px solid var(--cream-2);border-bottom:1px solid var(--cream-2);background:var(--cream)}
+  .trust-inner{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 40px;font-size:13px;font-weight:700;color:var(--stone)}
+  .trust-item{display:flex;align-items:center;gap:8px}
+  .trust-item svg{flex:0 0 auto}
+
+  /* ---------- SECTIONS ---------- */
+  section{padding:84px 0}
+  .eyebrow{font-family:var(--font-display);font-size:12px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--red);margin-bottom:12px}
+  .h2{font-family:var(--font-display);font-weight:700;font-size:clamp(28px,3.6vw,40px);letter-spacing:-0.02em;line-height:1.12;max-width:640px}
+  .lead{font-size:17px;color:var(--slate);max-width:600px;margin-top:16px}
+
+  /* how it works */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:48px}
+  @media(max-width:820px){.steps{grid-template-columns:1fr}}
+  .step{background:#fff;border:1px solid var(--cream-2);border-radius:18px;padding:28px 24px;position:relative}
+  .step-num{font-family:var(--font-display);font-weight:700;font-size:15px;color:#fff;background:var(--red);width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+  .step h3{font-family:var(--font-display);font-weight:600;font-size:19px;letter-spacing:-0.01em;margin-bottom:8px}
+  .step p{font-size:14.5px;color:var(--slate)}
+  .step-time{display:inline-block;margin-top:14px;font-family:var(--font-mono);font-size:12px;color:var(--forest);background:rgba(63,138,91,0.1);padding:4px 10px;border-radius:999px}
+
+  /* pain / benefits */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:48px}
+  @media(max-width:820px){.split{grid-template-columns:1fr}}
+  .pain-card{background:var(--ink);color:var(--cream);border-radius:18px;padding:32px 28px}
+  .pain-card h3,.gain-card h3{font-family:var(--font-display);font-weight:600;font-size:20px;margin-bottom:18px}
+  .pain-card ul,.gain-card ul{list-style:none}
+  .pain-card li,.gain-card li{padding:9px 0 9px 30px;position:relative;font-size:15px;border-bottom:1px solid rgba(255,255,255,0.08)}
+  .pain-card li:last-child,.gain-card li:last-child{border-bottom:none}
+  .pain-card li::before{content:'✕';position:absolute;left:0;color:var(--coral);font-weight:800}
+  .pain-card li{color:rgba(240,239,235,0.75)}
+  .gain-card{background:#fff;border:1px solid var(--cream-2);border-radius:18px;padding:32px 28px}
+  .gain-card li{color:var(--slate);border-bottom:1px solid var(--cream-2)}
+  .gain-card li::before{content:'✓';position:absolute;left:0;color:var(--leaf);font-weight:800}
+
+  /* numbers */
+  .numbers{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:48px}
+  @media(max-width:820px){.numbers{grid-template-columns:repeat(2,1fr)}}
+  .num{background:#fff;border:1px solid var(--cream-2);border-radius:16px;padding:24px 20px;text-align:center}
+  .num-val{font-family:var(--font-display);font-weight:700;font-size:34px;letter-spacing:-0.02em;color:var(--red)}
+  .num-lbl{font-size:12.5px;font-weight:700;color:var(--stone);margin-top:6px;text-transform:uppercase;letter-spacing:0.06em}
+
+  /* audience */
+  .aud{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
+  @media(max-width:820px){.aud{grid-template-columns:1fr}}
+  .aud-card{background:#fff;border:1px solid var(--cream-2);border-radius:16px;padding:24px}
+  .aud-icon{font-size:30px;margin-bottom:12px}
+  .aud-card h4{font-family:var(--font-display);font-weight:600;font-size:17px;margin-bottom:6px}
+  .aud-card p{font-size:14px;color:var(--slate)}
+
+  /* pricing */
+  .price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:48px;align-items:start}
+  @media(max-width:820px){.price-grid{grid-template-columns:1fr}}
+  .price{background:#fff;border:2px solid var(--cream-2);border-radius:18px;padding:30px 26px;position:relative}
+  .price.featured{border-color:var(--red);box-shadow:var(--shadow-lg)}
+  .price-tag{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--red);color:#fff;font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;padding:5px 16px;border-radius:999px;white-space:nowrap}
+  .price-name{font-family:var(--font-display);font-size:13px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--stone)}
+  .price-val{font-family:var(--font-display);font-weight:700;font-size:42px;letter-spacing:-0.02em;margin-top:10px}
+  .price-val span{font-size:16px;font-weight:500;color:var(--stone)}
+  .price-desc{font-size:13px;color:var(--stone);margin-top:4px}
+  .price ul{list-style:none;margin-top:22px;border-top:1px solid var(--cream-2);padding-top:18px}
+  .price li{font-size:14px;color:var(--slate);padding:6px 0 6px 26px;position:relative}
+  .price li::before{content:'✓';position:absolute;left:0;color:var(--leaf);font-weight:800}
+  .price .btn{width:100%;justify-content:center;margin-top:24px;font-size:15px;padding:14px}
+
+  /* faq */
+  .faq-list{margin-top:44px;max-width:760px}
+  details{background:#fff;border:1px solid var(--cream-2);border-radius:14px;padding:0;margin-bottom:12px;overflow:hidden}
+  summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px;font-weight:700;font-size:15.5px;padding:20px 24px}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:'+';font-family:var(--font-display);font-size:22px;color:var(--red);flex:0 0 auto;transition:transform 160ms}
+  details[open] summary::after{transform:rotate(45deg)}
+  .faq-a{padding:0 24px 20px;font-size:14.5px;color:var(--slate)}
+
+  /* final cta */
+  .final{background:var(--ink);border-radius:24px;padding:64px 40px;text-align:center;color:var(--cream);position:relative;overflow:hidden}
+  .final::before{content:'';position:absolute;top:-100px;right:-60px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(238,115,110,0.22),transparent 70%)}
+  .final h2{font-family:var(--font-display);font-weight:700;font-size:clamp(26px,3.6vw,38px);letter-spacing:-0.02em;position:relative}
+  .final p{color:rgba(240,239,235,0.65);margin-top:14px;font-size:16px;position:relative}
+  .final .btn{margin-top:30px;position:relative}
+
+  /* footer */
+  footer{padding:44px 0 56px;color:var(--stone);font-size:13px}
+  .foot-inner{display:flex;flex-wrap:wrap;align-items:center;gap:16px;justify-content:space-between}
+  footer a{color:var(--slate);text-decoration:none;font-weight:600}
+
+  .alt{background:var(--cream-2)}
+  .center{text-align:center}
+  .center .h2,.center .lead{margin-left:auto;margin-right:auto}
+</style>
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <svg width="22" height="28" viewBox="0 0 384 483" fill="none"><path d="M161.518 248.013C200.113 248.013 231.4 279.25 231.4 317.783C231.4 356.317 200.113 387.554 161.518 387.554C161.067 387.554 160.616 387.549 160.167 387.54L160.175 387.554L45.8376 390.119C43.5125 390.171 42.0147 387.673 43.157 385.647L98.8816 286.81C110.31 263.817 134.066 248.013 161.518 248.013Z" fill="#EE736E"/><path fill-rule="evenodd" clip-rule="evenodd" d="M291.873 274.848C273.505 287.685 239.084 278.927 239.084 278.927C239.084 278.927 252.903 309.733 240.806 345.96C228.709 382.187 215.272 378.162 216.615 384.871C217.959 391.58 287.84 386.213 317.407 351.327C346.975 316.441 361.757 253.379 348.316 245.329C334.875 237.279 305.312 265.456 291.873 274.848Z" fill="#EE736E"/><path d="M262.31 170.191C265.576 170.191 268.764 170.524 271.843 171.157C262.44 173.982 255.59 182.692 255.59 193.001C255.59 205.598 265.819 215.811 278.437 215.811C291.054 215.81 301.282 205.598 301.282 193.001C301.282 192.219 301.242 191.446 301.165 190.685C306.325 198.221 309.346 207.334 309.346 217.152C309.346 243.088 288.287 264.113 262.31 264.113C236.333 264.113 215.274 243.088 215.274 217.152C215.274 191.217 236.333 170.191 262.31 170.191Z" fill="#EC2B26"/><path fill-rule="evenodd" clip-rule="evenodd" d="M35.1926 403.655H142.704C142.704 403.655 125.233 447.933 82.2287 470.742C39.2243 493.551 3.96593 478.792 0.251526 472.084C-3.46286 465.375 35.1926 403.655 35.1926 403.655Z" fill="#EC2B26"/><path d="M235.432 123.23C171.858 132.81 142.545 218.285 136.98 236.54C136.521 238.047 137.943 239.372 139.46 238.952C145.266 237.345 157.13 234.403 165.55 234.594C173.923 234.784 185.7 238.227 191.541 240.105C193.069 240.596 194.626 239.198 194.329 237.62C191.285 221.433 183.657 157.095 252.903 150.064C324.184 142.827 325.952 214.751 325.583 229.353C325.549 230.665 326.727 231.681 328.02 231.453C333.298 230.524 345.613 228.455 353.694 227.886C362.318 227.278 376.664 229.469 381.561 230.28C382.541 230.442 383.474 229.863 383.641 228.883C384.316 224.91 384.943 214.098 376.54 198.368C367.165 180.818 350.638 176.53 346.56 175.72C345.972 175.604 345.457 175.277 345.126 174.777C340.361 167.576 301.97 113.203 235.432 123.23Z" fill="#ED2C27"/><path d="M160.975 407.423L150.862 427.617C150.199 428.941 151.155 430.502 152.636 430.512L336.894 431.826C337.331 431.83 337.762 431.689 338.103 431.416C348.27 423.284 346.793 408.953 336.224 404.996C334.81 404.467 220.87 405.43 162.704 406.32C161.958 406.331 161.309 406.757 160.975 407.423Z" fill="#ED2C27"/><path d="M293.271 52.4925C317.149 72.7298 316.879 117.623 309.904 120.191C302.929 122.759 295.799 105.629 287.213 98.481C278.627 91.3328 251.07 75.4076 229.317 56.044C207.565 36.6804 218.26 10.6154 226.326 0.00337097C238.692 9.06758 269.394 32.2553 293.271 52.4925Z" fill="#ED2C27"/><path d="M205.537 54.803C236.347 60.3236 258.644 99.2882 253.9 105.01C249.156 110.732 234.391 99.4946 223.378 97.6208C212.364 95.7471 180.537 95.8026 152.004 89.9713C123.471 84.14 119.64 56.2278 121.291 43.0006C136.536 44.6345 174.728 49.2824 205.537 54.803Z" fill="#ED2C27"/><path d="M125.36 102.074C154.633 90.9935 193.773 112.983 192.639 120.329C191.506 127.675 173.066 125.612 162.653 129.658C152.239 133.705 124.955 150.093 97.4762 159.738C69.997 169.383 52.3793 147.397 47.0054 135.198C60.9266 128.773 96.0873 113.154 125.36 102.074Z" fill="#ED2C27"/><path d="M85.9338 187.43C104.189 162.005 148.959 158.67 152.079 165.417C155.199 172.163 138.696 180.646 132.26 189.777C125.824 198.909 112.162 227.655 94.6066 250.892C77.0513 274.128 50.2121 265.56 38.9869 258.371C47.0294 245.317 67.6782 212.854 85.9338 187.43Z" fill="#ED2C27"/></svg>
+      <span class="brand-name">Fila Virtual</span>
+    </a>
+    <div class="nav-links">
+      <a href="#como-funciona">Como funciona</a>
+      <a href="#precos">Preços</a>
+      <a href="#faq">Dúvidas</a>
+      <a class="nav-cta" href="#teste">Testar grátis</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-badge">
+      <span style="width:7px;height:7px;border-radius:99px;background:var(--red);display:inline-block"></span>
+      Sem totem · Sem app · Sem obra
+    </div>
+    <h1>Sua fila no celular do paciente.<br><em>Sem fila na porta.</em></h1>
+    <p class="hero-sub">O paciente escaneia um QR Code, entra na fila e acompanha a vez pelo próprio celular — sem baixar nada. Você gerencia tudo em um painel ao vivo. Configuração em menos de 1 hora.</p>
+    <div class="hero-ctas">
+      <a class="btn btn-primary" href="#teste">Testar grátis por 14 dias</a>
+      <a class="btn btn-whats" href="https://wa.me/5500000000000?text=Oi!%20Quero%20conhecer%20a%20Fila%20Virtual%20para%20minha%20cl%C3%ADnica." target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Falar no WhatsApp
+      </a>
+    </div>
+    <p class="hero-note"><strong>Grátis por 14 dias.</strong> Sem cartão de crédito. Cancelamento com um clique.</p>
+
+    <!-- mock do painel -->
+    <div class="hero-mock" aria-hidden="true">
+      <div class="mock-q">
+        <div class="mock-q-title">
+          Fila ao vivo
+          <span class="mock-live"><span class="mock-dot"></span>AO VIVO</span>
+        </div>
+        <div class="mock-row"><span class="mock-code">A-042</span><span class="mock-name">Maria Souza</span><span class="mock-tag call">Chamando</span></div>
+        <div class="mock-row"><span class="mock-code">A-043</span><span class="mock-name">João Pereira</span><span class="mock-tag wait">3 min</span></div>
+        <div class="mock-row"><span class="mock-code">A-044</span><span class="mock-name">Ana Lima</span><span class="mock-tag wait">7 min</span></div>
+        <div class="mock-row"><span class="mock-code">A-045</span><span class="mock-name">Carlos Mendes</span><span class="mock-tag wait">11 min</span></div>
+      </div>
+      <div class="mock-hero">
+        <div class="mock-hero-label"><span class="mock-dot" style="background:var(--coral)"></span>Chamando agora</div>
+        <div class="mock-hero-code">A-042</div>
+        <div class="mock-hero-sub">Balcão 2 · Maria Souza</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ TRUST STRIP ============ -->
+<div class="trust">
+  <div class="wrap trust-inner">
+    <span class="trust-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3F8A5B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Setup em menos de 1 hora</span>
+    <span class="trust-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3F8A5B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Sem instalação de app</span>
+    <span class="trust-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3F8A5B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Atualização em tempo real</span>
+    <span class="trust-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3F8A5B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Suporte em português</span>
+  </div>
+</div>
+
+<!-- ============ COMO FUNCIONA ============ -->
+<section id="como-funciona">
+  <div class="wrap">
+    <div class="eyebrow">Como funciona</div>
+    <h2 class="h2">Três passos. Zero fricção.</h2>
+    <p class="lead">Nada de totem de R$ 5.000, senha de papel ou aplicativo que ninguém baixa. Só um QR Code na recepção e um navegador no balcão.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Paciente escaneia o QR Code</h3>
+        <p>Um cartaz na recepção com o QR Code da sua fila. O paciente aponta a câmera, digita o nome e pronto — está na fila.</p>
+        <span class="step-time">~15 segundos</span>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Acompanha a vez pelo celular</h3>
+        <p>Ele vê a posição na fila e o tempo estimado em tempo real. Pode esperar no carro, na padaria ao lado — onde quiser.</p>
+        <span class="step-time">Sem aglomeração</span>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Você chama pelo painel</h3>
+        <p>Um clique em "Chamar próximo" e o paciente é avisado na hora. KPIs de espera, ausências e atendimentos do dia, tudo ao vivo.</p>
+        <span class="step-time">1 clique</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOR vs SOLUÇÃO ============ -->
+<section class="alt">
+  <div class="wrap">
+    <div class="eyebrow">Antes e depois</div>
+    <h2 class="h2">A recepção que você tem hoje — e a que pode ter amanhã</h2>
+
+    <div class="split">
+      <div class="pain-card">
+        <h3>Hoje, sem a Fila Virtual</h3>
+        <ul>
+          <li>Sala de espera lotada e pacientes irritados</li>
+          <li>"Doutor, ainda falta muito?" a cada 5 minutos</li>
+          <li>Senha de papel que acaba, rasga ou se perde</li>
+          <li>Totem caro que quebra e ninguém conserta</li>
+          <li>Zero dado: você não sabe quanto tempo cada um espera</li>
+          <li>Recepcionista virando "gerente de conflito"</li>
+        </ul>
+      </div>
+      <div class="gain-card">
+        <h3>Amanhã, com a Fila Virtual</h3>
+        <ul>
+          <li>Paciente espera onde quiser, acompanhando pelo celular</li>
+          <li>Recepção calma — a fila se explica sozinha</li>
+          <li>QR Code impresso: custo de um papel A4</li>
+          <li>Funciona em qualquer navegador, sem hardware</li>
+          <li>Espera média, ausências e atendimentos medidos ao vivo</li>
+          <li>Recepcionista focada em receber bem, não em apagar incêndio</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ NÚMEROS ============ -->
+<section>
+  <div class="wrap center">
+    <div class="eyebrow">Por que agora</div>
+    <h2 class="h2">Fila é a primeira impressão do seu atendimento</h2>
+    <div class="numbers">
+      <div class="num"><div class="num-val">12 min</div><div class="num-lbl">espera média que vira reclamação</div></div>
+      <div class="num"><div class="num-val">R$ 5.000+</div><div class="num-lbl">custo de um totem físico</div></div>
+      <div class="num"><div class="num-val">0</div><div class="num-lbl">apps para o paciente baixar</div></div>
+      <div class="num"><div class="num-val">&lt; 1 h</div><div class="num-lbl">para colocar no ar</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PARA QUEM ============ -->
+<section class="alt">
+  <div class="wrap">
+    <div class="eyebrow">Para quem é</div>
+    <h2 class="h2">Feito para quem atende gente todos os dias</h2>
+    <div class="aud">
+      <div class="aud-card"><div class="aud-icon">🏥</div><h4>Clínicas e consultórios</h4><p>Reduza a aglomeração na sala de espera e dê previsibilidade ao paciente.</p></div>
+      <div class="aud-card"><div class="aud-icon">💊</div><h4>Farmácias com serviços</h4><p>Organize a fila da aplicação de injetáveis, testes e farmácia clínica.</p></div>
+      <div class="aud-card"><div class="aud-icon">🍽️</div><h4>Restaurantes</h4><p>Cliente entra na fila da porta pelo celular e é avisado quando a mesa liberar.</p></div>
+      <div class="aud-card"><div class="aud-icon">🏛️</div><h4>Órgãos públicos</h4><p>Atendimento ao cidadão com transparência e métricas de espera.</p></div>
+      <div class="aud-card"><div class="aud-icon">🎓</div><h4>Secretarias de ensino</h4><p>Matrícula e rematrícula sem corredor lotado.</p></div>
+      <div class="aud-card"><div class="aud-icon">🔧</div><h4>Assistências e oficinas</h4><p>Fila de orçamento e retirada organizada, sem ninguém "furando".</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PREÇOS ============ -->
+<section id="precos">
+  <div class="wrap center">
+    <div class="eyebrow">Preços</div>
+    <h2 class="h2">Comece grátis. Cresça quando fizer sentido.</h2>
+    <p class="lead">Sem contrato de fidelidade, sem taxa de implantação, sem pegadinha.</p>
+
+    <div class="price-grid" style="text-align:left">
+      <div class="price">
+        <div class="price-name">Starter</div>
+        <div class="price-val">R$ 0<span>/mês</span></div>
+        <div class="price-desc">Para testar no dia a dia real</div>
+        <ul>
+          <li>1 balcão / operador</li>
+          <li>Até 50 senhas por dia</li>
+          <li>Entrada por QR Code</li>
+          <li>Painel ao vivo</li>
+        </ul>
+        <a class="btn btn-ghost" href="#teste">Começar grátis</a>
+      </div>
+      <div class="price featured">
+        <div class="price-tag">Oferta de lançamento</div>
+        <div class="price-name">Pro</div>
+        <div class="price-val">R$ 249<span>/mês</span></div>
+        <div class="price-desc">Por unidade · anual com 20% off</div>
+        <ul>
+          <li>Balcões e senhas ilimitados</li>
+          <li>Relatórios e histórico de 90 dias</li>
+          <li>Sua marca no lugar da nossa</li>
+          <li>Suporte prioritário por WhatsApp</li>
+          <li>Novidades primeiro (notificação WhatsApp em breve)</li>
+        </ul>
+        <a class="btn btn-primary" href="#teste">Testar 14 dias grátis</a>
+      </div>
+      <div class="price">
+        <div class="price-name">Enterprise</div>
+        <div class="price-val">Sob<span> consulta</span></div>
+        <div class="price-desc">Redes, franquias e setor público</div>
+        <ul>
+          <li>Multi-unidade com painel central</li>
+          <li>API e integrações</li>
+          <li>SLA garantido em contrato</li>
+          <li>Onboarding dedicado</li>
+        </ul>
+        <a class="btn btn-ghost" href="https://wa.me/5500000000000?text=Oi!%20Quero%20falar%20sobre%20o%20plano%20Enterprise%20da%20Fila%20Virtual." target="_blank" rel="noopener">Falar com vendas</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="alt" id="faq">
+  <div class="wrap">
+    <div class="eyebrow">Dúvidas frequentes</div>
+    <h2 class="h2">Perguntas que todo gestor faz</h2>
+    <div class="faq-list">
+      <details>
+        <summary>O paciente precisa baixar algum aplicativo?</summary>
+        <div class="faq-a">Não. Ele escaneia o QR Code com a câmera do celular e a fila abre direto no navegador. Funciona em qualquer smartphone, Android ou iPhone.</div>
+      </details>
+      <details>
+        <summary>E se o paciente não tiver celular ou não souber usar?</summary>
+        <div class="faq-a">A recepção pode gerar uma senha pelo balcão em dois cliques, exatamente como uma senha tradicional. Os dois modos convivem na mesma fila.</div>
+      </details>
+      <details>
+        <summary>Preciso comprar algum equipamento?</summary>
+        <div class="faq-a">Não. Você só precisa de um computador, tablet ou celular com navegador para o painel do operador, e um cartaz impresso com o QR Code na recepção.</div>
+      </details>
+      <details>
+        <summary>Quanto tempo leva para começar a usar?</summary>
+        <div class="faq-a">Menos de 1 hora. Criamos sua fila, você imprime o QR Code e já pode atender. Fazemos o setup junto com você por WhatsApp ou chamada de vídeo.</div>
+      </details>
+      <details>
+        <summary>E se a internet cair?</summary>
+        <div class="faq-a">O painel reconecta automaticamente assim que a conexão voltar. Enquanto isso, a recepção segue emitindo senhas de balcão normalmente.</div>
+      </details>
+      <details>
+        <summary>Posso cancelar quando quiser?</summary>
+        <div class="faq-a">Sim. Não há contrato de fidelidade nem multa. O plano é mensal e o cancelamento é imediato, com um clique.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA FINAL ============ -->
+<section id="teste">
+  <div class="wrap">
+    <div class="final">
+      <h2>Elimine a fila da porta ainda esta semana.</h2>
+      <p>14 dias grátis, sem cartão de crédito. A gente configura tudo com você.</p>
+      <a class="btn btn-whats" href="https://wa.me/5500000000000?text=Oi!%20Quero%20testar%20a%20Fila%20Virtual%20gr%C3%A1tis%20por%2014%20dias." target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Quero testar grátis — chamar no WhatsApp
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="wrap foot-inner">
+    <div><strong style="color:var(--ink)">Fila Virtual</strong> · Fila no celular. Atendimento real.</div>
+    <div>
+      <a href="#como-funciona">Como funciona</a> &nbsp;·&nbsp;
+      <a href="#precos">Preços</a> &nbsp;·&nbsp;
+      <a href="https://wa.me/5500000000000" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
