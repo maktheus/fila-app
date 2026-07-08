@@ -1,5 +1,7 @@
 const express = require('express');
 const http = require('http');
+const path = require('path');
+const fs = require('fs');
 const { WebSocketServer } = require('ws');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
@@ -10,6 +12,13 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 
 app.use(cors());
 app.use(express.json());
+
+// Local dev convenience: serve the frontend when the folder is present
+// (in Docker the image has no ../frontend — nginx/GitHub Pages serve it).
+const frontendDir = path.join(__dirname, '..', 'frontend');
+if (fs.existsSync(frontendDir)) {
+  app.use(express.static(frontendDir));
+}
 
 // --------------- In-memory store ---------------
 
@@ -42,7 +51,65 @@ const store = {
     { t: '14:27', text: 'M-041 marcada como ausente', ts: Date.now() },
     { t: '14:25', text: 'M-039 atendida · Balcão 2', ts: Date.now() },
   ],
+  events: [],
 };
+
+// --------------- Metrics events ---------------
+// Every queue movement is recorded as an event so /api/metrics can
+// aggregate history. Seeded with a plausible day (since 08:00) so the
+// dashboard has data on a fresh boot, matching servedToday.
+
+function recordEvent(type, extra) {
+  store.events.push(Object.assign({ ts: Date.now(), type }, extra || {}));
+  if (store.events.length > 5000) store.events = store.events.slice(-4000);
+}
+
+function seedEvents() {
+  const now = Date.now();
+  const midnight = new Date(now); midnight.setHours(0, 0, 0, 0);
+  // Last 8 hours of demo traffic, never crossing into yesterday
+  const start = Math.max(midnight.getTime(), now - 8 * 3600000);
+  const hours = Math.max((now - start) / 3600000, 1);
+  const sources = ['qr', 'qr', 'qr', 'senha', 'senha', 'passou'];
+  let seq = 0;
+  // Hourly intensity curve: ramps up to a mid-window peak, tapers off
+  for (let h = 0; h < Math.ceil(hours); h++) {
+    const hourStart = start + h * 3600000;
+    const intensity = 4 + Math.round(4 * Math.sin((h + 1) / (hours + 1) * Math.PI));
+    for (let i = 0; i < intensity; i++) {
+      const ts = hourStart + Math.floor((i + 0.3) / intensity * 3600000);
+      if (ts > now) continue;
+      const source = sources[seq++ % sources.length];
+      recordEventAt(ts, 'joined', { source });
+      // Wait grows with the hour's load plus per-ticket jitter
+      const waitMin = 2 + intensity + ((seq * 5) % 9);
+      const calledTs = ts + waitMin * 60000;
+      if (calledTs > now) continue;
+      if (seq % 9 !== 0) {
+        recordEventAt(calledTs, 'called', { waitMin });
+        const serviceMin = 3 + ((seq * 5) % 7);
+        const servedTs = calledTs + serviceMin * 60000;
+        if (servedTs <= now) recordEventAt(servedTs, 'served', { serviceMin, counter: (seq % store.countersTotal) + 1 });
+      } else {
+        recordEventAt(calledTs, 'called', { waitMin });
+        const absentTs = calledTs + 4 * 60000;
+        if (absentTs <= now) recordEventAt(absentTs, 'absent', {});
+      }
+    }
+  }
+  // The tickets currently waiting in the store also joined recently
+  store.tickets.filter(t => t.status === 'waiting').forEach(t => {
+    recordEventAt(t.createdAt, 'joined', { source: t.source });
+  });
+  store.events.sort((a, b) => a.ts - b.ts);
+  store.servedToday = store.events.filter(e => e.type === 'served').length;
+}
+
+function recordEventAt(ts, type, extra) {
+  store.events.push(Object.assign({ ts, type }, extra || {}));
+}
+
+seedEvents();
 
 // --------------- Helpers ---------------
 
@@ -148,6 +215,86 @@ app.get('/api/state', (_req, res) => {
   res.json(buildState());
 });
 
+// Observability: aggregated history for the overview dashboard.
+// ?range=today|4h|1h scopes every series and KPI to the same slice.
+app.get('/api/metrics', (req, res) => {
+  const now = Date.now();
+  const range = req.query.range === '4h' ? '4h' : req.query.range === '1h' ? '1h' : 'today';
+  let from;
+  if (range === '4h') from = now - 4 * 3600000;
+  else if (range === '1h') from = now - 3600000;
+  else { const d = new Date(now); d.setHours(0, 0, 0, 0); from = d.getTime(); }
+
+  const evs = store.events.filter(e => e.ts >= from && e.ts <= now);
+  const byType = t => evs.filter(e => e.type === t);
+  const joined = byType('joined'), called = byType('called'), servedEv = byType('served'), absentEv = byType('absent');
+
+  const waits = called.map(e => e.waitMin).filter(v => typeof v === 'number').sort((a, b) => a - b);
+  const avgWait = waits.length ? Math.round(waits.reduce((a, b) => a + b, 0) / waits.length) : 0;
+  const p90Wait = waits.length ? waits[Math.min(waits.length - 1, Math.floor(waits.length * 0.9))] : 0;
+  const services = servedEv.map(e => e.serviceMin).filter(v => typeof v === 'number');
+  const avgService = services.length ? Math.round(services.reduce((a, b) => a + b, 0) / services.length) : 0;
+  const finished = servedEv.length + absentEv.length;
+  const absentRate = finished ? Math.round(absentEv.length / finished * 100) : 0;
+
+  // Buckets: hourly for "today", 30 min for 4h, 10 min for 1h
+  const bucketMs = range === 'today' ? 3600000 : range === '4h' ? 1800000 : 600000;
+  const bucketStart = Math.floor(from / bucketMs) * bucketMs;
+  const nBuckets = Math.ceil((now - bucketStart) / bucketMs);
+  const buckets = [];
+  for (let i = 0; i < nBuckets; i++) {
+    const t0 = bucketStart + i * bucketMs, t1 = t0 + bucketMs;
+    const inB = e => e.ts >= t0 && e.ts < t1;
+    const bWaits = called.filter(inB).map(e => e.waitMin).filter(v => typeof v === 'number');
+    buckets.push({
+      t0,
+      label: new Date(t0).toTimeString().slice(0, 5),
+      joined: joined.filter(inB).length,
+      served: servedEv.filter(inB).length,
+      avgWait: bWaits.length ? Math.round(bWaits.reduce((a, b) => a + b, 0) / bWaits.length) : null,
+    });
+  }
+
+  const sources = { qr: 0, senha: 0, passou: 0 };
+  joined.forEach(e => { if (sources[e.source] !== undefined) sources[e.source]++; });
+
+  const perCounter = [];
+  for (let n = 1; n <= store.countersTotal; n++) {
+    perCounter.push({ id: n, name: 'Balcão ' + n, served: servedEv.filter(e => e.counter === n).length });
+  }
+
+  const hoursElapsed = Math.max((now - from) / 3600000, 0.25);
+  const state = buildState();
+
+  res.json({
+    generatedAt: now,
+    range,
+    health: {
+      status: 'ok',
+      uptimeSec: Math.round(process.uptime()),
+      wsClients: clients.size,
+      memoryMb: Math.round(process.memoryUsage().rss / 1048576),
+      node: process.version,
+      eventsStored: store.events.length,
+    },
+    kpis: {
+      waitingNow: state.kpis.waiting,
+      callingNow: state.kpis.calling,
+      joined: joined.length,
+      served: servedEv.length,
+      absent: absentEv.length,
+      absentRate,
+      avgWait,
+      p90Wait,
+      avgService,
+      throughputHour: Math.round(servedEv.length / hoursElapsed * 10) / 10,
+    },
+    buckets,
+    sources,
+    perCounter,
+  });
+});
+
 app.post('/api/tickets/call-next', (_req, res) => {
   const next = store.tickets.find(t => t.status === 'waiting');
   if (!next) return res.status(409).json({ error: 'A fila está vazia.' });
@@ -156,7 +303,9 @@ app.post('/api/tickets/call-next', (_req, res) => {
 
   next.status = 'calling';
   next.counter = cn;
+  next.calledAt = Date.now();
   store.lastCalled = next.id;
+  recordEvent('called', { waitMin: Math.round((Date.now() - next.createdAt) / 60000) });
   const log = pushLog(next.code + ' chamada · Balcão ' + cn);
   broadcast({ action: 'called', ticketId: next.id, counter: cn });
   res.json({ ticket: next, log, message: next.code + ' chamada para o Balcão ' + cn + '.' });
@@ -172,7 +321,9 @@ app.post('/api/tickets/:id/call', (req, res) => {
 
   t.status = 'calling';
   t.counter = cn;
+  t.calledAt = Date.now();
   store.lastCalled = id;
+  recordEvent('called', { waitMin: Math.round((Date.now() - t.createdAt) / 60000) });
   pushLog(t.code + ' chamada · Balcão ' + cn);
   broadcast({ action: 'called', ticketId: id, counter: cn });
   res.json({ ticket: t });
@@ -187,6 +338,10 @@ app.post('/api/tickets/:id/finish', (req, res) => {
   pushLog(t.code + ' atendida · Balcão ' + t.counter);
   t.status = 'served';
   store.servedToday++;
+  recordEvent('served', {
+    serviceMin: t.calledAt ? Math.round((Date.now() - t.calledAt) / 60000) : null,
+    counter: t.counter,
+  });
   broadcast({ action: 'finished', ticketId: id });
   res.json({ ticket: t });
 });
@@ -211,6 +366,7 @@ app.post('/api/tickets/:id/absent', (req, res) => {
 
   t.status = 'absent';
   t.counter = null;
+  recordEvent('absent', {});
   pushLog(t.code + ' marcada como ausente');
   broadcast({ action: 'absent', ticketId: id });
   res.json({ ticket: t });
@@ -233,6 +389,7 @@ app.post('/api/tickets', (req, res) => {
     createdAt: Date.now(),
   };
   store.tickets.push(ticket);
+  recordEvent('joined', { source: ticket.source });
   pushLog(code + ' entrou na fila');
   broadcast({ action: 'joined', ticketId: id });
   res.status(201).json({ ticket });
