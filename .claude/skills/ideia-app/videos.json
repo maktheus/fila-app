@@ -1,0 +1,94 @@
+{
+  "meta": {
+    "gerado_em": "2026-07-08",
+    "atualizado_em": "2026-07-08",
+    "observacao": "Transcricoes REAIS obtidas via yt-dlp (legendas pt) e limpas. Os campos 'playbook_real' foram extraidos do que foi efetivamente dito em cada video. Ferramentas, precos e passos abaixo sao citacoes do conteudo, nao inferencia."
+  },
+  "videos": [
+    {
+      "id": "gIidQVgCYIo",
+      "url": "https://youtu.be/gIidQVgCYIo",
+      "confirmado": {
+        "titulo": "Como Criar Apps Ridículos no Claude de R$ 4K/mês",
+        "apresentador": "Paulo (com convidado de cibersegurança apelidado 'Mitini')",
+        "plataforma_pagamento_citada": "Cacto (Cakto)",
+        "tema": "Criar micro-apps de assinatura que resolvem UMA dor simples (beber água, calcular sono) usando Claude Code ou Codex, publicar e vender via Pix/Cacto, com um bloco dedicado de seguranca."
+      },
+      "playbook_real": {
+        "tese": "As pessoas pagam mensalidade por apps que resolvem um probleminha simples. Modelo Duolingo: entra gratis (com anuncio), cria rotina, e a assinatura vira a porta de saida do incomodo. O app e so a 'portinha de entrada'.",
+        "passos": [
+          "Achar ideia por espionagem de apps: numa ferramenta de analise (o video usa a secao 'Organic User Acquisition') entrar em apps similares muito baixados e bem monetizados que normalmente nao aparecem. Exemplos citados: Water Tracker (>US$30k/mes) e AutoSleep.",
+          "Gerar o plano: colar o link da App Store / Play Store no ChatGPT e pedir um plano completo de como o app funciona; salvar tudo num bloco de notas.",
+          "Construir no Claude Code (plano Pro) ou no Codex: colar o plano e pedir para ele criar um plano POR CIMA (revisar/aquecer antes de codar). Depois escolher um estilo de design.",
+          "Design via brand guidelines publicas: empresas de capital aberto (Duolingo, Revolut) publicam tudo. Pesquisar 'brand guidelines <marca>', copiar o dominio do site e pedir ao Claude para estudar o design e virar uma SKILL reutilizavel (ex.: /duolingo-design). Depois: 'crie o app com base nessa skill'.",
+          "Publicar por um de 3 caminhos (ver campo caminhos_de_publicacao).",
+          "Monetizar via Cacto/Pix: copiar o link da doc da API da Cacto, mandar pro Claude e dizer 'quero monetizar meu app via web'. Ele responde com side quests (criar conta, criar produto, gerar chave API, mandar o link).",
+          "Rodar o bloco de seguranca antes de soltar o app (ver campo seguranca).",
+          "Usar Opus 4.8 (esforco maximo) para CRIAR o plano e depois trocar para Sonnet para EXECUTAR o plano — economiza tokens."
+        ],
+        "criterios_de_ideia_boa": [
+          "Resolve UMA dor simples e recorrente (beber agua, sono)",
+          "Cabe no modelo freemium -> assinatura barata",
+          "Da para clonar o design de uma marca forte via brand guidelines publicas",
+          "Simples o bastante para o Claude construir dialogando"
+        ],
+        "caminhos_de_publicacao": {
+          "web": "Mais rapido. Deploy em Netlify/Vercel — Claude Code e Codex tem integracao/plugin que faz automatico, incluindo conexoes por API e webhook.",
+          "pwa": "Meio-termo: a mesma web publicada pode ser 'adicionada a tela de inicio' do celular, funcionando como atalho/app.",
+          "lojas": "Google Play: taxa unica, mas hoje exige juntar 12 pessoas para testar por 14 dias antes de liberar. Apple: US$99 por ano. Enquanto o app for gratis a loja nao cobra comissao; ela so 'morde' quando ha venda por dentro."
+        },
+        "seguranca": {
+          "responsavel_no_video": "Convidado 'Mitini'",
+          "riscos": [
+            "Vibe coding expoe segredos no front: chaves de API e config do Firebase visiveis (inspecionar elemento).",
+            "Atacante pode pegar o banco de dados, trocar a chave/gateway de pagamento e desviar pagamentos (caixa dois / clonagem de cartao).",
+            "LGPD: o dono do app e responsavel pelo vazamento. E obrigatorio avisar todos os clientes afetados (credibilidade morre). Multa de 5% do faturamento anual, a vista, sem parcelar."
+          ],
+          "defesas": [
+            "Extensao Snyk no VS Code para procurar vazamentos e vulnerabilidades.",
+            "Prompt ao Claude: 'verifique se tem algo hardcoded (senha/segredo/chave) que nao deveria estar ai'.",
+            "Checar robots.txt / sitemap: Gemini e Codex as vezes expoem rotas como /admin (backoffice). O admin jamais deve ser enumeravel/visivel para o atacante."
+          ]
+        }
+      }
+    },
+    {
+      "id": "fHp2FG-ufog",
+      "url": "https://youtu.be/fHp2FG-ufog",
+      "confirmado": {
+        "titulo": "Copiei um App Chinês e Vou Tentar Fazer R$5.000/mês",
+        "plataforma_pagamento_citada": "Cacto (Cakto)",
+        "tema": "Garimpar apps validados na China (via Qimai/Kimi), filtrar por 3 criterios, reconstruir o nucleo no Claude/Codex ditando o plano por voz (Whisper), hospedar em Supabase+Vercel e vender por assinatura Pix R$9,90 via Cacto."
+      },
+      "playbook_real": {
+        "tese": "App aparentemente idiota (Silem: apertar um botao a cada 2 dias so para avisar que esta vivo; senao manda mensagem a alguem proximo) virou um dos mais baixados da China — custou ~US$210 e fez US$1 milhao em 3 dias. Se um app desses da dinheiro, ache outro igual e copie/localize.",
+        "passos": [
+          "Sair da bolha: olhar os apps mais baixados da CHINA — mercado gigante, fechado, e de onde vem as tendencias.",
+          "Ferramenta 1 — Sensor Tower: filtra por China, mostra downloads e receita, MAS so cobre a App Store (Apple).",
+          "Ferramenta 2 — Qimai/Kimi (七麦): mostra as lojas Android chinesas (enormes). Pede cadastro com numero chines -> usar app de chip virtual (~US$9) para receber SMS. Depois traduzir a interface para portugues.",
+          "Navegar: ver apps mais baixados, palavras-chave buscadas, downloads e avaliacoes. Filtrar por categoria 'esporte e saude' (nicho de saude e o que mais cresce; dor universal).",
+          "Filtrar a ideia pelos 3 criterios (ver criterios_de_clone_bom). Exemplo achado: app de registro de saude intestinal/humor, >400 mil downloads.",
+          "Copiar TODAS as telas do app original.",
+          "Construir no Claude (pago) ou Codex. Ditar o plano por VOZ com o Whisper (app 'Winsper') — transcreve sem erro e ainda resume/melhora o que voce falou.",
+          "Construir em BLOCOS, aprovando cada um — ou ligar o MODO AUTOMATICO (ele nao pergunta nada e vai direto). Regra: 80% planejamento, 20% execucao; sem plano, o app vira 'AI slop' (lixo digital).",
+          "Design: se inspirar no Duolingo via skill, NAO copiar 100% (risco judicial).",
+          "Hospedar: lojas (burocratico, precisa aprovacao) OU site com banco proprio no Supabase + deploy na Vercel como MVP; AWS so quando crescer. Para deploy, mencionar @netlify ou @vercel no Codex/Claude.",
+          "Pagamento via Cacto: copiar a pagina 'introducao' da doc 'cacto API', mandar pro Claude/Codex conectar. Criar produto de assinatura recorrente R$9,90; configurar webhooks para eventos Pix (pagamento, boleto gerado). Opcoes citadas: Stripe, Mercado Pago. Fazer inumeros testes (comprar o proprio app).",
+          "Backend leve: confirmacao de e-mail + senha + recuperacao de senha (evita suporte). Depois pedir ao Claude uma revisao do codigo para nao vazar API keys nem arquivos .env.",
+          "Lancar: deploy na Vercel/Netlify ja publica; depois comprar dominio personalizado (a propria Vercel/Netlify intermedeia)."
+        ],
+        "criterios_de_clone_bom": [
+          "Simples de criar: poucas telas, poucas funcoes, pouca complicacao",
+          "Facil de replicar: evitar apps que parecem basicos mas escondem tecnologia pesada — o dificil deve ser PERCEBER a ideia, nao construir a tech",
+          "Faz sentido no Brasil: focar em dores humanas universais (solidao, organizacao, dinheiro, saude, relacionamento), nao em dores que so existem na cultura chinesa"
+        ]
+      }
+    }
+  ],
+  "sintese_combinada": {
+    "metodo": "1) Achar ideia validada por espionagem (apps similares muito baixados no Ocidente OU rankings da China via Qimai/Sensor Tower). 2) Filtrar por simplicidade + replicabilidade + faz-sentido-no-Brasil. 3) Gerar o plano (ChatGPT a partir do link da store, ou ditado por voz com Whisper). 4) Construir dialogando no Claude Code/Codex, em blocos, com uma skill de design (brand guidelines tipo Duolingo). 5) Publicar (web/PWA/loja) no Netlify/Vercel + Supabase. 6) Vender por assinatura Pix via Cacto (ex.: R$9,90 recorrente) com webhooks. 7) Blindar antes de lancar (Snyk, sem segredos hardcoded, sem /admin exposto, LGPD).",
+    "modelos_recomendados_no_video": "Opus 4.8 (esforco maximo) para PLANEJAR; Sonnet para EXECUTAR o plano.",
+    "formula_receita": "meta_mensal = preco x assinantes. Ex.: R$ 4.950/mes = R$ 9,90/mes x 500 assinantes, ou R$ 49/mes x ~100 assinantes.",
+    "regra_de_ouro": "80% planejamento, 20% execucao — sem plano vira AI slop."
+  }
+}
