@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fila-backend",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["backend/server.js"],
+      "port": 3000
+    }
+  ]
+}
