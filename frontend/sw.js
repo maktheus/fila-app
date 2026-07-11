@@ -1,11 +1,16 @@
-const CACHE_NAME = 'fila-app-v1';
+const CACHE_NAME = 'fila-app-v2';
 const APP_SHELL = [
   './',
   'cliente.html',
   'operador.html',
+  'telao.html',
   'landing.html',
   'manifest.webmanifest',
-  'config.js'
+  'config.js',
+  'ads.js',
+  'assets/mark-bird.svg',
+  'assets/mutum-design-system.css',
+  'assets/fila-cliente-qr.png'
 ];
 
 self.addEventListener('install', (event) => {

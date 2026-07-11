@@ -1,13 +1,13 @@
 {
   "name": "Fila App",
   "short_name": "Fila App",
-  "description": "Web app mobile-first gerado pelo padrao Bateia.",
+  "description": "Entre na fila, acompanhe sua posição e receba a chamada pelo celular.",
   "start_url": "cliente.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#191919",
-  "theme_color": "#191919",
+  "background_color": "#f0efeb",
+  "theme_color": "#f0efeb",
   "categories": [
     "business",
     "productivity"
