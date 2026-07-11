@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fila-app-v2';
+const CACHE_NAME = 'fila-app-v3';
 const APP_SHELL = [
   './',
   'cliente.html',
@@ -6,7 +6,6 @@ const APP_SHELL = [
   'telao.html',
   'landing.html',
   'manifest.webmanifest',
-  'config.js',
   'ads.js',
   'assets/mark-bird.svg',
   'assets/mutum-design-system.css',
@@ -28,7 +27,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname === '/ws') return;
+  if (url.pathname.endsWith('/config.js')) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
       const copy = response.clone();
