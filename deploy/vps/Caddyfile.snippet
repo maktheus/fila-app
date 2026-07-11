@@ -1,0 +1,8 @@
+    handle /fila-ws {
+        rewrite * /ws
+        reverse_proxy 172.18.0.1:40006
+    }
+
+    handle_path /fila-api/* {
+        reverse_proxy 172.18.0.1:40006
+    }
