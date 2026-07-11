@@ -1,0 +1,42 @@
+name: fila-app
+
+services:
+  backend:
+    build:
+      context: ../../backend
+    image: fila-app-backend:latest
+    container_name: fila-app-backend
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      PORT: 3000
+      DATA_FILE: /app/data/store.json
+    ports:
+      - "172.18.0.1:40006:3000"
+    volumes:
+      - fila-backend-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    mem_limit: 256m
+    cpus: 0.50
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  fila-backend-data:
