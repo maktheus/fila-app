@@ -1,0 +1,18 @@
+{
+  "packageId": "br.com.seudominio.filavirtual",
+  "host": "<usuario-ou-org>.github.io",
+  "name": "Fila Virtual",
+  "launcherName": "Fila Virtual",
+  "display": "standalone",
+  "themeColor": "#191919",
+  "navigationColor": "#191919",
+  "backgroundColor": "#191919",
+  "startUrl": "/<repo>/cliente.html",
+  "iconUrl": "https://<usuario-ou-org>.github.io/<repo>/assets/app-icon.svg",
+  "signingKey": {
+    "path": "./release.keystore",
+    "alias": "release"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1
+}

@@ -1,0 +1,37 @@
+plugins {
+    id 'com.android.application'
+}
+
+def admobAppIdValue = providers.gradleProperty('FILA_ADMOB_ANDROID_APP_ID')
+        .orElse('ca-app-pub-3940256099942544~3347511713')
+        .get()
+def admobBannerUnitIdValue = providers.gradleProperty('FILA_ADMOB_BANNER_UNIT_ID')
+        .orElse('ca-app-pub-3940256099942544/6300978111')
+        .get()
+
+android {
+    namespace 'br.com.filaapp.cliente'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'br.com.filaapp.cliente'
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+
+        manifestPlaceholders = [
+                admobAppId: admobAppIdValue
+        ]
+        buildConfigField 'String', 'ADMOB_BANNER_UNIT_ID', "\"${admobBannerUnitIdValue}\""
+        buildConfigField 'String', 'CLIENT_ENTRY_URL', '"file:///android_asset/public/cliente.html?token=demo-centro"'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+}
+
+dependencies {
+    implementation 'com.google.android.gms:play-services-ads:25.4.0'
+}

@@ -2,3 +2,8 @@ node_modules/
 npm-debug.log
 .env
 patches/
+backend/data/
+backend/.run/
+mobile/android/.gradle/
+mobile/android/**/build/
+mobile/android/local.properties

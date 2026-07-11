@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bateia · Fila Virtual</title>
+  <style>
+    :root{color-scheme:dark;--bg:#11110f;--surface:#1d1c19;--line:#38352f;--text:#f0efeb;--muted:#b9b1a5;--red:#ee736e;--green:#49a66c;--amber:#e8a33d;--blue:#5b9ec9}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{max-width:1180px;margin:0 auto;padding:32px 20px 56px}
+    header{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;border-bottom:1px solid var(--line);padding-bottom:24px}
+    h1{font-size:clamp(32px,5vw,64px);line-height:.95;margin:0;letter-spacing:-.03em}
+    .score{width:150px;height:150px;border-radius:20px;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface)}
+    .score b{font-size:44px}.score span{display:block;color:var(--muted);font-size:12px;text-align:center}
+    .stats,.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}
+    .stat,.card,.skills{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px}
+    .stat small,.meta{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}.stat strong{display:block;font-size:28px;margin-top:6px}
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;margin-top:20px}
+    .card h2{margin:8px 0 8px;font-size:20px}.card p{color:var(--muted);line-height:1.5}.card.critical{border-color:var(--red)}.card.high{border-color:var(--amber)}.card.medium{border-color:var(--blue)}
+    .skills{margin-top:20px}.skills ul{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:0;margin:0;list-style:none}.skills li{border:1px solid var(--line);border-radius:8px;padding:12px;color:var(--muted)}.skills li.warn{border-color:var(--amber)}.skills span{display:block;color:var(--text);font-weight:700;margin-bottom:4px}
+    code{background:#292720;border:1px solid var(--line);border-radius:6px;padding:2px 6px}
+    @media(max-width:800px){header,.stats,.grid,.skills ul{grid-template-columns:1fr}.score{width:100%;height:auto;padding:22px}}
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="meta">Aplicar Bateia · 2026-07-10T20:37:48.704Z</p>
+        <h1>Fila Virtual</h1>
+        <p>Fluxo padrao: <code>analise</code> → <code>execute</code> → <code>revise</code></p>
+      </div>
+      <div class="score"><div><b>100</b><span>score / 100</span></div></div>
+    </header>
+    <section class="stats">
+      <div class="stat"><small>Issues</small><strong>0</strong></div>
+      <div class="stat"><small>Criticas</small><strong>0</strong></div>
+      <div class="stat"><small>Altas</small><strong>0</strong></div>
+      <div class="stat"><small>Skills</small><strong>40/40</strong></div>
+    </section>
+    
+    <section class="skills">
+      <p class="meta">Desenvolvimento</p>
+      <ul><li class=""><span>product-blueprint · aplicada</span>Aplicada: MVP, blocos e escopo tecnico.</li><li class=""><span>frontend-architecture · aplicada</span>Aplicada: web mobile/desktop, PWA e caminho para lojas.</li><li class=""><span>api-contracts · aplicada</span>Aplicada: contratos REST/WebSocket claros e consumiveis.</li><li class=""><span>data-persistence · aplicada</span>Aplicada: estado persistente e limpeza LGPD.</li><li class=""><span>realtime-websocket · aplicada</span>Aplicada: estado ao vivo sem polling.</li><li class=""><span>pwa-store-readiness · aplicada</span>Aplicada: instalabilidade e empacotamento Play/App Store.</li><li class=""><span>security-review · aplicada</span>Aplicada: auth, CORS, secrets e endpoints criticos.</li><li class=""><span>env-config · aplicada</span>Aplicada: configuracao por ambiente sem segredo hardcoded.</li><li class=""><span>observability-uptime-kuma · aplicada</span>Aplicada: healthcheck e painel Uptime Kuma.</li><li class=""><span>release-deploy · aplicada</span>Aplicada: compose/deploy validavel e reversivel.</li></ul>
+    </section>
+    <section class="skills">
+      <p class="meta">Marketing</p>
+      <ul><li class=""><span>market-research · aplicada</span>Aplicada: concorrentes, demanda e sinais de compra.</li><li class=""><span>positioning · aplicada</span>Aplicada: posicionamento e promessa central.</li><li class=""><span>offer-copy · aplicada</span>Aplicada: copy de oferta clara para o publico pagante.</li><li class=""><span>landing-page · aplicada</span>Aplicada: pagina comercial com proposta e CTA.</li><li class=""><span>pricing-monetization · aplicada</span>Aplicada: gratis com ads e premium sem ads.</li><li class=""><span>ads-creative · aplicada</span>Aplicada: slots e mensagens para aquisicao paga.</li><li class=""><span>seo-keywords · aplicada</span>Aplicada: termos organicos e paginas indexaveis.</li><li class=""><span>analytics-funnel · aplicada</span>Aplicada: eventos de funil e conversao.</li><li class=""><span>onboarding-retention · aplicada</span>Aplicada: primeiro uso, rotina e retorno.</li><li class=""><span>launch-checklist · aplicada</span>Aplicada: checklist de lancamento e canais.</li></ul>
+    </section>
+    <section class="skills">
+      <p class="meta">Teste</p>
+      <ul><li class=""><span>smoke-tests · aplicada</span>Aplicada: fluxo minimo abre e executa.</li><li class=""><span>api-tests · aplicada</span>Aplicada: health, tickets, auth e erros da API.</li><li class=""><span>e2e-tests · aplicada</span>Aplicada: jornada cliente + operador.</li><li class=""><span>mobile-responsive-tests · aplicada</span>Aplicada: layout mobile e desktop sem quebra.</li><li class=""><span>accessibility-tests · aplicada</span>Aplicada: teclado, contraste e labels basicos.</li><li class=""><span>performance-tests · aplicada</span>Aplicada: carregamento PWA e WebSocket estavel.</li><li class=""><span>security-tests · aplicada</span>Aplicada: auth, CORS, rate limit e secrets.</li><li class=""><span>payment-webhook-tests · aplicada</span>Aplicada: checkout/webhook quando premium for real.</li><li class=""><span>observability-tests · aplicada</span>Aplicada: healthcheck e monitores Uptime Kuma.</li><li class=""><span>regression-review · aplicada</span>Aplicada: revisao final depois do execute.</li></ul>
+    </section>
+    <section class="skills">
+      <p class="meta">Design</p>
+      <ul><li class=""><span>brand-discovery · aplicada</span>Aplicada: marca, publico, voz e personalidade.</li><li class=""><span>design-system · aplicada</span>Aplicada: tokens, componentes e consistencia visual.</li><li class=""><span>mobile-first-ui · aplicada</span>Aplicada: experiencia principal pensada para celular.</li><li class=""><span>dashboard-ui · aplicada</span>Aplicada: painel denso para operador/admin.</li><li class=""><span>pwa-app-shell · aplicada</span>Aplicada: shell instalavel com icone e tema.</li><li class=""><span>empty-loading-error-states · aplicada</span>Aplicada: estados vazios, carregando e erro.</li><li class=""><span>ads-premium-ui · aplicada</span>Aplicada: ads no gratis e remocao no premium.</li><li class=""><span>conversion-ui · aplicada</span>Aplicada: CTA, precos e onboarding visual.</li><li class=""><span>accessibility-design · aplicada</span>Aplicada: contraste, tamanho de toque e leitura.</li><li class=""><span>visual-qa · aplicada</span>Aplicada: checagem visual final web/mobile.</li></ul>
+    </section>
+    <section class="grid"><article class="card"><h2>Nenhuma issue</h2><p>Checklist atual passou.</p></article></section>
+  </main>
+</body>
+</html>

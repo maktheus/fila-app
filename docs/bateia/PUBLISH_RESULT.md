@@ -1,0 +1,27 @@
+# Publish - Aplicar Bateia
+
+Gerado em 2026-07-10T20:37:48.718Z.
+
+## Aplicado
+
+- estado publish gravado.
+
+## Pulado
+
+- GitHub Pages .nojekyll ja estava atualizado.
+- config runtime ja estava atualizado.
+- config runtime exemplo ja estava atualizado.
+- index.html ja carrega config.js.
+- landing.html ja carrega config.js.
+- cliente.html ja carrega config.js.
+- operador.html ja carrega config.js.
+- service worker ja estava pronto para publish.
+- template Digital Asset Links ja estava atualizado.
+- workflow GitHub Pages ja estava atualizado.
+- template TWA ja estava atualizado.
+- guia Play Store ja estava atualizado.
+- doc publish ja estava atualizado.
+
+## Bloqueios
+
+- Nenhum bloqueio.

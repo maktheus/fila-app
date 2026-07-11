@@ -1,0 +1,776 @@
+{
+  "version": "0.2.0",
+  "generatedAt": "2026-07-10T20:37:48.704Z",
+  "projectName": "Fila Virtual",
+  "root": "E:\\UFAM\\tcc\\fila-app",
+  "score": 100,
+  "summary": {
+    "files": 74,
+    "issues": 0,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "topSkills": [
+    {
+      "group": "desenvolvimento",
+      "name": "product-blueprint",
+      "role": "MVP, blocos e escopo tecnico",
+      "status": "aplicada",
+      "output": "Aplicada: MVP, blocos e escopo tecnico.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "desenvolvimento",
+      "name": "frontend-architecture",
+      "role": "web mobile/desktop, PWA e caminho para lojas",
+      "status": "aplicada",
+      "output": "Aplicada: web mobile/desktop, PWA e caminho para lojas.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "desenvolvimento",
+      "name": "api-contracts",
+      "role": "contratos REST/WebSocket claros e consumiveis",
+      "status": "aplicada",
+      "output": "Aplicada: contratos REST/WebSocket claros e consumiveis.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "desenvolvimento",
+      "name": "data-persistence",
+      "role": "estado persistente e limpeza LGPD",
+      "status": "aplicada",
+      "output": "Aplicada: estado persistente e limpeza LGPD.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "desenvolvimento",
+      "name": "realtime-websocket",
+      "role": "estado ao vivo sem polling",
+      "status": "aplicada",
+      "output": "Aplicada: estado ao vivo sem polling.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "desenvolvimento",
+      "name": "pwa-store-readiness",
+      "role": "instalabilidade e empacotamento Play/App Store",
+      "status": "aplicada",
+      "output": "Aplicada: instalabilidade e empacotamento Play/App Store.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "desenvolvimento",
+      "name": "security-review",
+      "role": "auth, CORS, secrets e endpoints criticos",
+      "status": "aplicada",
+      "output": "Aplicada: auth, CORS, secrets e endpoints criticos.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "desenvolvimento",
+      "name": "env-config",
+      "role": "configuracao por ambiente sem segredo hardcoded",
+      "status": "aplicada",
+      "output": "Aplicada: configuracao por ambiente sem segredo hardcoded.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "desenvolvimento",
+      "name": "observability-uptime-kuma",
+      "role": "healthcheck e painel Uptime Kuma",
+      "status": "aplicada",
+      "output": "Aplicada: healthcheck e painel Uptime Kuma.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "desenvolvimento",
+      "name": "release-deploy",
+      "role": "compose/deploy validavel e reversivel",
+      "status": "aplicada",
+      "output": "Aplicada: compose/deploy validavel e reversivel.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "marketing",
+      "name": "market-research",
+      "role": "concorrentes, demanda e sinais de compra",
+      "status": "aplicada",
+      "output": "Aplicada: concorrentes, demanda e sinais de compra.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "marketing",
+      "name": "positioning",
+      "role": "posicionamento e promessa central",
+      "status": "aplicada",
+      "output": "Aplicada: posicionamento e promessa central.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "marketing",
+      "name": "offer-copy",
+      "role": "copy de oferta clara para o publico pagante",
+      "status": "aplicada",
+      "output": "Aplicada: copy de oferta clara para o publico pagante.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "marketing",
+      "name": "landing-page",
+      "role": "pagina comercial com proposta e CTA",
+      "status": "aplicada",
+      "output": "Aplicada: pagina comercial com proposta e CTA.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "marketing",
+      "name": "pricing-monetization",
+      "role": "gratis com ads e premium sem ads",
+      "status": "aplicada",
+      "output": "Aplicada: gratis com ads e premium sem ads.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "marketing",
+      "name": "ads-creative",
+      "role": "slots e mensagens para aquisicao paga",
+      "status": "aplicada",
+      "output": "Aplicada: slots e mensagens para aquisicao paga.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "marketing",
+      "name": "seo-keywords",
+      "role": "termos organicos e paginas indexaveis",
+      "status": "aplicada",
+      "output": "Aplicada: termos organicos e paginas indexaveis.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "marketing",
+      "name": "analytics-funnel",
+      "role": "eventos de funil e conversao",
+      "status": "aplicada",
+      "output": "Aplicada: eventos de funil e conversao.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "marketing",
+      "name": "onboarding-retention",
+      "role": "primeiro uso, rotina e retorno",
+      "status": "aplicada",
+      "output": "Aplicada: primeiro uso, rotina e retorno.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "marketing",
+      "name": "launch-checklist",
+      "role": "checklist de lancamento e canais",
+      "status": "aplicada",
+      "output": "Aplicada: checklist de lancamento e canais.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "teste",
+      "name": "smoke-tests",
+      "role": "fluxo minimo abre e executa",
+      "status": "aplicada",
+      "output": "Aplicada: fluxo minimo abre e executa.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "teste",
+      "name": "api-tests",
+      "role": "health, tickets, auth e erros da API",
+      "status": "aplicada",
+      "output": "Aplicada: health, tickets, auth e erros da API.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "teste",
+      "name": "e2e-tests",
+      "role": "jornada cliente + operador",
+      "status": "aplicada",
+      "output": "Aplicada: jornada cliente + operador.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "teste",
+      "name": "mobile-responsive-tests",
+      "role": "layout mobile e desktop sem quebra",
+      "status": "aplicada",
+      "output": "Aplicada: layout mobile e desktop sem quebra.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "teste",
+      "name": "accessibility-tests",
+      "role": "teclado, contraste e labels basicos",
+      "status": "aplicada",
+      "output": "Aplicada: teclado, contraste e labels basicos.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "teste",
+      "name": "performance-tests",
+      "role": "carregamento PWA e WebSocket estavel",
+      "status": "aplicada",
+      "output": "Aplicada: carregamento PWA e WebSocket estavel.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "teste",
+      "name": "security-tests",
+      "role": "auth, CORS, rate limit e secrets",
+      "status": "aplicada",
+      "output": "Aplicada: auth, CORS, rate limit e secrets.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "teste",
+      "name": "payment-webhook-tests",
+      "role": "checkout/webhook quando premium for real",
+      "status": "aplicada",
+      "output": "Aplicada: checkout/webhook quando premium for real.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "teste",
+      "name": "observability-tests",
+      "role": "healthcheck e monitores Uptime Kuma",
+      "status": "aplicada",
+      "output": "Aplicada: healthcheck e monitores Uptime Kuma.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "teste",
+      "name": "regression-review",
+      "role": "revisao final depois do execute",
+      "status": "aplicada",
+      "output": "Aplicada: revisao final depois do execute.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "design",
+      "name": "brand-discovery",
+      "role": "marca, publico, voz e personalidade",
+      "status": "aplicada",
+      "output": "Aplicada: marca, publico, voz e personalidade.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "design",
+      "name": "design-system",
+      "role": "tokens, componentes e consistencia visual",
+      "status": "aplicada",
+      "output": "Aplicada: tokens, componentes e consistencia visual.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "design",
+      "name": "mobile-first-ui",
+      "role": "experiencia principal pensada para celular",
+      "status": "aplicada",
+      "output": "Aplicada: experiencia principal pensada para celular.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "design",
+      "name": "dashboard-ui",
+      "role": "painel denso para operador/admin",
+      "status": "aplicada",
+      "output": "Aplicada: painel denso para operador/admin.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "design",
+      "name": "pwa-app-shell",
+      "role": "shell instalavel com icone e tema",
+      "status": "aplicada",
+      "output": "Aplicada: shell instalavel com icone e tema.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "design",
+      "name": "empty-loading-error-states",
+      "role": "estados vazios, carregando e erro",
+      "status": "aplicada",
+      "output": "Aplicada: estados vazios, carregando e erro.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "design",
+      "name": "ads-premium-ui",
+      "role": "ads no gratis e remocao no premium",
+      "status": "aplicada",
+      "output": "Aplicada: ads no gratis e remocao no premium.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "design",
+      "name": "conversion-ui",
+      "role": "CTA, precos e onboarding visual",
+      "status": "aplicada",
+      "output": "Aplicada: CTA, precos e onboarding visual.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "design",
+      "name": "accessibility-design",
+      "role": "contraste, tamanho de toque e leitura",
+      "status": "aplicada",
+      "output": "Aplicada: contraste, tamanho de toque e leitura.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    },
+    {
+      "group": "design",
+      "name": "visual-qa",
+      "role": "checagem visual final web/mobile",
+      "status": "aplicada",
+      "output": "Aplicada: checagem visual final web/mobile.",
+      "nextAction": "Nenhuma acao pendente neste gate."
+    }
+  ],
+  "skillGroups": {
+    "desenvolvimento": [
+      {
+        "name": "product-blueprint",
+        "role": "MVP, blocos e escopo tecnico",
+        "status": "aplicada",
+        "output": "Aplicada: MVP, blocos e escopo tecnico.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "frontend-architecture",
+        "role": "web mobile/desktop, PWA e caminho para lojas",
+        "status": "aplicada",
+        "output": "Aplicada: web mobile/desktop, PWA e caminho para lojas.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "api-contracts",
+        "role": "contratos REST/WebSocket claros e consumiveis",
+        "status": "aplicada",
+        "output": "Aplicada: contratos REST/WebSocket claros e consumiveis.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "data-persistence",
+        "role": "estado persistente e limpeza LGPD",
+        "status": "aplicada",
+        "output": "Aplicada: estado persistente e limpeza LGPD.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "realtime-websocket",
+        "role": "estado ao vivo sem polling",
+        "status": "aplicada",
+        "output": "Aplicada: estado ao vivo sem polling.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "pwa-store-readiness",
+        "role": "instalabilidade e empacotamento Play/App Store",
+        "status": "aplicada",
+        "output": "Aplicada: instalabilidade e empacotamento Play/App Store.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "security-review",
+        "role": "auth, CORS, secrets e endpoints criticos",
+        "status": "aplicada",
+        "output": "Aplicada: auth, CORS, secrets e endpoints criticos.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "env-config",
+        "role": "configuracao por ambiente sem segredo hardcoded",
+        "status": "aplicada",
+        "output": "Aplicada: configuracao por ambiente sem segredo hardcoded.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "observability-uptime-kuma",
+        "role": "healthcheck e painel Uptime Kuma",
+        "status": "aplicada",
+        "output": "Aplicada: healthcheck e painel Uptime Kuma.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "release-deploy",
+        "role": "compose/deploy validavel e reversivel",
+        "status": "aplicada",
+        "output": "Aplicada: compose/deploy validavel e reversivel.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      }
+    ],
+    "marketing": [
+      {
+        "name": "market-research",
+        "role": "concorrentes, demanda e sinais de compra",
+        "status": "aplicada",
+        "output": "Aplicada: concorrentes, demanda e sinais de compra.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "positioning",
+        "role": "posicionamento e promessa central",
+        "status": "aplicada",
+        "output": "Aplicada: posicionamento e promessa central.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "offer-copy",
+        "role": "copy de oferta clara para o publico pagante",
+        "status": "aplicada",
+        "output": "Aplicada: copy de oferta clara para o publico pagante.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "landing-page",
+        "role": "pagina comercial com proposta e CTA",
+        "status": "aplicada",
+        "output": "Aplicada: pagina comercial com proposta e CTA.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "pricing-monetization",
+        "role": "gratis com ads e premium sem ads",
+        "status": "aplicada",
+        "output": "Aplicada: gratis com ads e premium sem ads.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "ads-creative",
+        "role": "slots e mensagens para aquisicao paga",
+        "status": "aplicada",
+        "output": "Aplicada: slots e mensagens para aquisicao paga.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "seo-keywords",
+        "role": "termos organicos e paginas indexaveis",
+        "status": "aplicada",
+        "output": "Aplicada: termos organicos e paginas indexaveis.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "analytics-funnel",
+        "role": "eventos de funil e conversao",
+        "status": "aplicada",
+        "output": "Aplicada: eventos de funil e conversao.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "onboarding-retention",
+        "role": "primeiro uso, rotina e retorno",
+        "status": "aplicada",
+        "output": "Aplicada: primeiro uso, rotina e retorno.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "launch-checklist",
+        "role": "checklist de lancamento e canais",
+        "status": "aplicada",
+        "output": "Aplicada: checklist de lancamento e canais.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      }
+    ],
+    "teste": [
+      {
+        "name": "smoke-tests",
+        "role": "fluxo minimo abre e executa",
+        "status": "aplicada",
+        "output": "Aplicada: fluxo minimo abre e executa.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "api-tests",
+        "role": "health, tickets, auth e erros da API",
+        "status": "aplicada",
+        "output": "Aplicada: health, tickets, auth e erros da API.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "e2e-tests",
+        "role": "jornada cliente + operador",
+        "status": "aplicada",
+        "output": "Aplicada: jornada cliente + operador.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "mobile-responsive-tests",
+        "role": "layout mobile e desktop sem quebra",
+        "status": "aplicada",
+        "output": "Aplicada: layout mobile e desktop sem quebra.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "accessibility-tests",
+        "role": "teclado, contraste e labels basicos",
+        "status": "aplicada",
+        "output": "Aplicada: teclado, contraste e labels basicos.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "performance-tests",
+        "role": "carregamento PWA e WebSocket estavel",
+        "status": "aplicada",
+        "output": "Aplicada: carregamento PWA e WebSocket estavel.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "security-tests",
+        "role": "auth, CORS, rate limit e secrets",
+        "status": "aplicada",
+        "output": "Aplicada: auth, CORS, rate limit e secrets.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "payment-webhook-tests",
+        "role": "checkout/webhook quando premium for real",
+        "status": "aplicada",
+        "output": "Aplicada: checkout/webhook quando premium for real.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "observability-tests",
+        "role": "healthcheck e monitores Uptime Kuma",
+        "status": "aplicada",
+        "output": "Aplicada: healthcheck e monitores Uptime Kuma.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "regression-review",
+        "role": "revisao final depois do execute",
+        "status": "aplicada",
+        "output": "Aplicada: revisao final depois do execute.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      }
+    ],
+    "design": [
+      {
+        "name": "brand-discovery",
+        "role": "marca, publico, voz e personalidade",
+        "status": "aplicada",
+        "output": "Aplicada: marca, publico, voz e personalidade.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "design-system",
+        "role": "tokens, componentes e consistencia visual",
+        "status": "aplicada",
+        "output": "Aplicada: tokens, componentes e consistencia visual.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "mobile-first-ui",
+        "role": "experiencia principal pensada para celular",
+        "status": "aplicada",
+        "output": "Aplicada: experiencia principal pensada para celular.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "dashboard-ui",
+        "role": "painel denso para operador/admin",
+        "status": "aplicada",
+        "output": "Aplicada: painel denso para operador/admin.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "pwa-app-shell",
+        "role": "shell instalavel com icone e tema",
+        "status": "aplicada",
+        "output": "Aplicada: shell instalavel com icone e tema.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "empty-loading-error-states",
+        "role": "estados vazios, carregando e erro",
+        "status": "aplicada",
+        "output": "Aplicada: estados vazios, carregando e erro.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "ads-premium-ui",
+        "role": "ads no gratis e remocao no premium",
+        "status": "aplicada",
+        "output": "Aplicada: ads no gratis e remocao no premium.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "conversion-ui",
+        "role": "CTA, precos e onboarding visual",
+        "status": "aplicada",
+        "output": "Aplicada: CTA, precos e onboarding visual.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "accessibility-design",
+        "role": "contraste, tamanho de toque e leitura",
+        "status": "aplicada",
+        "output": "Aplicada: contraste, tamanho de toque e leitura.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      },
+      {
+        "name": "visual-qa",
+        "role": "checagem visual final web/mobile",
+        "status": "aplicada",
+        "output": "Aplicada: checagem visual final web/mobile.",
+        "nextAction": "Nenhuma acao pendente neste gate."
+      }
+    ]
+  },
+  "skillSummary": {
+    "total": 40,
+    "applied": 40,
+    "attention": 0
+  },
+  "signals": {
+    "hasBackend": true,
+    "hasFrontend": true,
+    "hasDockerCompose": true,
+    "hasGarimpo": true,
+    "hasLanding": true
+  },
+  "checks": [
+    {
+      "id": "front-client-app",
+      "status": "ok",
+      "severity": "high",
+      "category": "front",
+      "title": "App do cliente mobile/web ainda nao esta materializado",
+      "why": "O produto precisa abrir pelo QR e funcionar primeiro no celular; hoje o painel do operador esta mais pronto que a experiencia do cliente.",
+      "fix": "Criar frontend/cliente.html como tela principal do usuario, consumindo POST /api/tickets e /ws.",
+      "files": [
+        "frontend/cliente.html"
+      ]
+    },
+    {
+      "id": "pwa-base",
+      "status": "ok",
+      "severity": "medium",
+      "category": "front",
+      "title": "Base PWA incompleta",
+      "why": "Sem manifest e service worker a web nao vira um app instalavel com caminho simples para Android/iOS.",
+      "fix": "Adicionar manifest.webmanifest, sw.js e registrar o service worker nas entradas HTML.",
+      "files": [
+        "frontend/manifest.webmanifest",
+        "frontend/sw.js"
+      ]
+    },
+    {
+      "id": "front-architecture-doc",
+      "status": "ok",
+      "severity": "medium",
+      "category": "arquitetura",
+      "title": "Arquitetura do front precisa estar explicitada",
+      "why": "O padrao Bateia exige uma saida unica: web mobile + web desktop, PWA agora e empacotavel para lojas depois.",
+      "fix": "Gerar docs/FRONT_ARCHITECTURE.md com superficies, rotas, dados, build de loja e criterios de pronto.",
+      "files": [
+        "docs/FRONT_ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "cors-production",
+      "status": "ok",
+      "severity": "high",
+      "category": "seguranca",
+      "title": "CORS esta aberto para qualquer origem",
+      "why": "Em producao, qualquer site poderia tentar acionar a API do produto.",
+      "fix": "Trocar app.use(cors()) por allowlist via env, mantendo localhost apenas em desenvolvimento.",
+      "files": [
+        "backend/server.js"
+      ]
+    },
+    {
+      "id": "admin-auth",
+      "status": "ok",
+      "severity": "critical",
+      "category": "seguranca",
+      "title": "Endpoints de operador parecem estar sem autenticacao",
+      "why": "Acoes como chamar, concluir, rechamar e marcar ausente controlam a fila e nao podem ficar publicas.",
+      "fix": "Criar middleware de operador com token/sessao, aplicar nos endpoints de acao e mover o painel admin para rota autenticada.",
+      "files": [
+        "backend/server.js:345"
+      ]
+    },
+    {
+      "id": "persistence",
+      "status": "ok",
+      "severity": "high",
+      "category": "dados",
+      "title": "Fila depende de memoria do processo",
+      "why": "Restart do servidor apaga senhas, historico e estado de atendimento.",
+      "fix": "Persistir tickets, unidades, operadores e assinaturas em SQLite/Supabase/Postgres, com limpeza LGPD.",
+      "files": [
+        "backend/server.js:30"
+      ]
+    },
+    {
+      "id": "monetization-contract",
+      "status": "ok",
+      "severity": "medium",
+      "category": "monetizacao",
+      "title": "Contrato free com ads + premium sem ads ainda nao esta claro no codigo",
+      "why": "O padrao final deve sempre sair com plano gratis monetizado por ads e plano premium removendo ads.",
+      "fix": "Documentar entitlement premium, slots de ads, eventos de billing e fallback quando ads estiver indisponivel.",
+      "files": [
+        "docs/MONETIZATION_OBSERVABILITY.md"
+      ]
+    },
+    {
+      "id": "uptime-kuma",
+      "status": "ok",
+      "severity": "medium",
+      "category": "observabilidade",
+      "title": "Uptime Kuma nao esta no stack local",
+      "why": "A observabilidade geral precisa de painel admin para health, API, WS, landing e fila do cliente.",
+      "fix": "Adicionar servico uptime-kuma no docker-compose com volume persistente e perfil observability.",
+      "files": [
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "id": "healthcheck",
+      "status": "ok",
+      "severity": "low",
+      "category": "observabilidade",
+      "title": "Healthcheck HTTP ausente",
+      "why": "Uptime Kuma e hosts de deploy precisam de endpoint simples para saber se a API esta viva.",
+      "fix": "Expor GET /api/health com status, uptime e versao.",
+      "files": [
+        "backend/server.js"
+      ]
+    },
+    {
+      "id": "tests",
+      "status": "ok",
+      "severity": "medium",
+      "category": "qualidade",
+      "title": "Cobertura automatizada ainda esta fraca ou ausente",
+      "why": "Fila, WebSocket, premium e auth precisam de testes antes de virar app de loja.",
+      "fix": "Adicionar testes de API para tickets/auth e smoke test de front mobile.",
+      "files": [
+        "backend/package.json",
+        "frontend/"
+      ]
+    },
+    {
+      "id": "admin-route",
+      "status": "ok",
+      "severity": "high",
+      "category": "seguranca",
+      "title": "Index publico parece ser o painel do operador",
+      "why": "A rota raiz deve privilegiar cliente/landing; o admin precisa ficar em rota autenticada e nao enumeravel.",
+      "fix": "Promover cliente/landing para entrada publica e mover operador para /operador com auth.",
+      "files": [
+        "frontend/index.html"
+      ]
+    }
+  ],
+  "executePlan": []
+}
