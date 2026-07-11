@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telão - Fila Virtual</title>
+<meta name="theme-color" content="#191919">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/mutum-design-system.css">
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--mutum-ink);overflow:hidden}
+  body{font-family:var(--font-body);color:var(--mutum-bone)}
+  .board{height:100vh;width:100vw;display:flex;flex-direction:column;background:var(--mutum-ink)}
+  .topbar{flex:0 0 auto;display:flex;align-items:center;gap:24px;padding:2vh 2.6vw;border-bottom:1px solid #34322e}
+  .brand{display:flex;align-items:center;gap:14px;min-width:0}
+  .brand img{height:4.2vh;min-height:30px;max-height:48px;width:auto}
+  .brand-copy{line-height:1.05;min-width:0}
+  .brand-copy small{display:block;font-family:var(--font-display);font-size:clamp(9px,1.15vh,13px);font-weight:600;text-transform:uppercase;letter-spacing:.16em;color:#877f73}
+  .brand-copy strong{display:block;font-family:var(--font-display);font-size:clamp(17px,2.4vh,30px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .top-right{margin-left:auto;display:flex;align-items:center;gap:24px}
+  .waiting-pill{display:flex;align-items:baseline;gap:9px;padding:.9vh 1.4vw;border-radius:999px;background:#1f1e1c;border:1px solid #34322e}
+  .waiting-pill strong{font-family:var(--font-display);font-size:clamp(18px,2.5vh,30px)}
+  .waiting-pill span{font-size:clamp(11px,1.6vh,18px);color:#877f73}
+  .clock-wrap{display:flex;align-items:center;gap:9px}
+  .live-dot{width:1vh;height:1vh;min-width:8px;min-height:8px;border-radius:999px;background:var(--mutum-leaf);animation:pulseDot 1.6s infinite}
+  .live-dot.off{background:var(--mutum-amber)}
+  .clock{font-family:var(--font-mono);font-size:clamp(16px,2.4vh,30px);color:#b5afa4}
+  .grid{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1.6vh 1.4vw;padding:1.8vh 1.6vw}
+  .counter-card{min-height:0;display:flex;flex-direction:column;gap:1vh;padding:2vh 1.8vw;border-radius:20px;background:#1f1e1c;border:1px solid #34322e;overflow:hidden}
+  .counter-card.calling{border-color:color-mix(in oklch,var(--mutum-coral) 55%,transparent);animation:cardPulse 420ms var(--ease-out)}
+  .counter-head{display:flex;align-items:center;gap:12px}
+  .signal{position:relative;width:1.1vh;height:1.1vh;min-width:8px;min-height:8px}
+  .signal:before,.signal:after{content:"";position:absolute;inset:0;border-radius:999px;background:var(--mutum-coral)}
+  .calling .signal:after{animation:ring 1.8s var(--ease-out) infinite}
+  .free .signal:before{background:var(--mutum-leaf)}
+  .free .signal:after{display:none}
+  .counter-name{font-family:var(--font-display);font-weight:700;font-size:clamp(16px,2.5vh,31px)}
+  .counter-status{margin-left:auto;font-size:clamp(11px,1.6vh,18px);color:#877f73}
+  .call{flex:1;display:flex;flex-direction:column;justify-content:center}
+  .call-label{font-family:var(--font-display);font-size:clamp(10px,1.5vh,17px);font-weight:600;text-transform:uppercase;letter-spacing:.18em;color:var(--mutum-coral)}
+  .free .call-label{color:var(--mutum-leaf)}
+  .call-main{display:flex;align-items:baseline;gap:1.4vw;flex-wrap:wrap}
+  .call-code{font-family:var(--font-display);font-weight:700;font-size:clamp(48px,7.4vw,132px);line-height:.9;color:var(--mutum-coral)}
+  .free .call-code{color:#4a4742}
+  .counter-number{font-family:var(--font-display);font-weight:700;font-size:clamp(20px,2.6vw,48px)}
+  .recent{display:flex;align-items:center;gap:1vw;padding-top:1.2vh;border-top:1px solid #34322e;min-height:3.8vh}
+  .recent-label{font-size:clamp(10px,1.5vh,17px);color:#877f73;flex:0 0 auto}
+  .recent-list{display:flex;gap:1.2vw;min-width:0;overflow:hidden}
+  .recent-item{font-family:var(--font-mono);font-size:clamp(11px,1.8vh,21px);color:#b5afa4;white-space:nowrap}
+  .recent-item span{font-family:var(--font-body);color:#877f73}
+  .footer{flex:0 0 auto;display:flex;align-items:center;gap:1.6vw;padding:1.5vh 2.6vw;border-top:1px solid #34322e;background:#232220}
+  .qr{background:#fff;border-radius:12px;padding:.8vh;display:flex;flex:0 0 auto}
+  .qr img{width:8.5vh;height:8.5vh;min-width:62px;min-height:62px;display:block}
+  .footer-copy{line-height:1.2;max-width:760px}
+  .footer-copy strong{display:block;font-family:var(--font-display);font-size:clamp(16px,2.6vh,32px)}
+  .footer-copy span{display:block;font-size:clamp(10px,1.65vh,18px);color:#877f73;margin-top:.4vh}
+  .footer-meta{margin-left:auto;text-align:right;line-height:1.15}
+  .footer-meta strong{display:block;font-family:var(--font-display);font-size:clamp(19px,3vh,36px);color:var(--mutum-coral)}
+  .footer-meta span{font-size:clamp(10px,1.6vh,17px);color:#877f73}
+  @keyframes pulseDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.55)}}
+  @keyframes ring{from{opacity:.5;transform:scale(1)}to{opacity:0;transform:scale(1.8)}}
+  @keyframes cardPulse{0%{transform:scale(.985);background:color-mix(in oklch,var(--mutum-coral) 26%,#1f1e1c)}100%{transform:scale(1);background:#1f1e1c}}
+  @media(max-width:760px){
+    html,body{overflow:auto}
+    .board{height:auto;min-height:100vh}
+    .topbar{padding:16px;gap:12px;flex-wrap:wrap}
+    .brand img{height:34px}
+    .top-right{width:100%;margin-left:0;justify-content:space-between}
+    .grid{grid-template-columns:1fr;grid-template-rows:none;gap:10px;padding:12px}
+    .counter-card{min-height:220px;padding:18px;border-radius:16px}
+    .call-code{font-size:64px}
+    .footer{padding:16px;gap:14px}
+    .footer-meta{display:none}
+    .qr img{width:72px;height:72px}
+  }
+</style>
+<script src="config.js"></script>
+</head>
+<body>
+<main class="board">
+  <header class="topbar">
+    <div class="brand"><img src="assets/mark-bird.svg" alt="Mutum"><div class="brand-copy"><small>Fila virtual</small><strong id="venue">Clínica Centro</strong></div></div>
+    <div class="top-right">
+      <div class="waiting-pill"><strong id="waiting">0</strong><span>na fila</span></div>
+      <div class="clock-wrap"><i class="live-dot off" id="liveDot"></i><time class="clock" id="clock">--:--:--</time></div>
+    </div>
+  </header>
+  <section class="grid" id="counterGrid"></section>
+  <footer class="footer">
+    <a class="qr" href="cliente.html?token=demo-centro" aria-label="Abrir app do cliente"><img src="assets/fila-cliente-qr.png" alt="QR code para entrar na fila"></a>
+    <div class="footer-copy"><strong>Aponte a câmera para entrar na fila</strong><span>Escolha o atendimento, acompanhe sua posição pelo celular e passe a vez sem perder o lugar.</span></div>
+    <div class="footer-meta"><strong id="activeCounters">4 balcões</strong><span>atendimento ativo</span></div>
+  </footer>
+</main>
+<script>
+(function() {
+  "use strict";
+  var API_BASE = window.FILA_API_BASE || "";
+  var WS_BASE = window.FILA_WS_BASE || "";
+  var connected = false;
+  var state = {
+    venue: "Clínica Centro",
+    tickets: [],
+    counters: [
+      { number: 1, busy: false, ticketCode: null },
+      { number: 2, busy: false, ticketCode: null },
+      { number: 3, busy: false, ticketCode: null },
+      { number: 4, busy: false, ticketCode: null }
+    ],
+    kpis: { waiting: 0 }
+  };
+
+  function esc(value) {
+    var div = document.createElement("div");
+    div.textContent = value == null ? "" : String(value);
+    return div.innerHTML;
+  }
+
+  function clockNow() {
+    var date = new Date();
+    return [date.getHours(), date.getMinutes(), date.getSeconds()].map(function(value) {
+      return String(value).padStart(2, "0");
+    }).join(":");
+  }
+
+  function recentFor(counter) {
+    return state.tickets.filter(function(ticket) {
+      return ticket.counter === counter && (ticket.status === "served" || ticket.status === "absent");
+    }).slice(-2).reverse();
+  }
+
+  function render() {
+    document.getElementById("venue").textContent = state.venue || "Clínica Centro";
+    document.getElementById("waiting").textContent = state.kpis && state.kpis.waiting != null
+      ? state.kpis.waiting
+      : state.tickets.filter(function(ticket) { return ticket.status === "waiting"; }).length;
+    document.getElementById("liveDot").classList.toggle("off", !connected);
+    var counters = state.counters && state.counters.length ? state.counters.slice(0, 4) : [];
+    while (counters.length < 4) counters.push({ number: counters.length + 1, busy: false, ticketCode: null });
+    document.getElementById("activeCounters").textContent = counters.length + " balcões";
+    document.getElementById("counterGrid").innerHTML = counters.map(function(counter) {
+      var recent = recentFor(counter.number);
+      var recentHtml = recent.length ? recent.map(function(ticket) {
+        return "<span class=\"recent-item\">" + esc(ticket.code) + " <span>· " + (ticket.status === "absent" ? "ausente" : "atendido") + "</span></span>";
+      }).join("") : "<span class=\"recent-item\"><span>Nenhuma chamada anterior</span></span>";
+      return [
+        "<article class=\"counter-card ", counter.busy ? "calling" : "free", "\">",
+        "<header class=\"counter-head\"><i class=\"signal\"></i><strong class=\"counter-name\">Balcão ", esc(counter.number), "</strong>",
+        "<span class=\"counter-status\">", counter.busy ? "em atendimento" : "disponível", "</span></header>",
+        "<div class=\"call\"><span class=\"call-label\">", counter.busy ? "Chamando" : "Aguardando", "</span>",
+        "<div class=\"call-main\"><strong class=\"call-code\">", esc(counter.ticketCode || "—"), "</strong>",
+        "<span class=\"counter-number\">Balcão ", esc(counter.number), "</span></div></div>",
+        "<div class=\"recent\"><span class=\"recent-label\">Últimas</span><div class=\"recent-list\">", recentHtml, "</div></div></article>"
+      ].join("");
+    }).join("");
+  }
+
+  async function loadState() {
+    try {
+      var response = await fetch(API_BASE + "/api/state");
+      if (!response.ok) return;
+      state = await response.json();
+      render();
+    } catch (_error) {}
+  }
+
+  function wsUrl() {
+    if (WS_BASE) return /\/ws$/.test(WS_BASE) ? WS_BASE : WS_BASE.replace(/\/$/, "") + "/ws";
+    return (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws";
+  }
+
+  function connect() {
+    var socket = new WebSocket(wsUrl());
+    socket.onopen = function() { connected = true; render(); };
+    socket.onmessage = function(event) {
+      try {
+        var message = JSON.parse(event.data);
+        if (message.type === "state") {
+          state = message.data;
+          render();
+        }
+      } catch (_error) {}
+    };
+    socket.onclose = function() {
+      connected = false;
+      render();
+      setTimeout(connect, 1400);
+    };
+    socket.onerror = function() { socket.close(); };
+  }
+
+  document.getElementById("clock").textContent = clockNow();
+  setInterval(function() { document.getElementById("clock").textContent = clockNow(); }, 1000);
+  render();
+  loadState();
+  connect();
+})();
+</script>
+</body>
+</html>

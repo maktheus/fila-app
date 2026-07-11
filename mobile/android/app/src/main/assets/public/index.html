@@ -271,8 +271,10 @@
   // ---- WEBSOCKET ----
   function connectWs() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = WS_BASE || (proto + '//' + location.host);
-    ws = new WebSocket(wsUrl + '/ws');
+    const wsUrl = WS_BASE
+      ? (/\/ws$/.test(WS_BASE) ? WS_BASE : WS_BASE.replace(/\/$/, '') + '/ws')
+      : (proto + '//' + location.host + '/ws');
+    ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       connected = true;
@@ -359,7 +361,8 @@
         '<span class="live-text">' + (isConnected ? 'ao vivo' : 'offline') + '</span>' +
       '</div>' +
       '<div class="header-right">' +
-        '<a href="#" class="link-client">App do cliente →</a>' +
+        '<a href="telao.html" class="link-client">Telão</a>' +
+        '<a href="cliente.html" class="link-client">App do cliente →</a>' +
         '<div class="clock">' + esc(clockNow()) + '</div>' +
         '<div class="operator">' +
           '<div class="operator-avatar">' + esc(opInitial) + '</div>' +
