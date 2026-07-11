@@ -13,7 +13,7 @@
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function() {
-    navigator.serviceWorker.register("sw.js?v=4").catch(function() {});
+    navigator.serviceWorker.register("sw.js?v=5").catch(function() {});
   });
 }
 </script>
@@ -39,7 +39,9 @@ if ("serviceWorker" in navigator) {
   p{font-size:15px;line-height:1.5;color:var(--fg-2)}
   .intro{margin-top:30px}
   .scanner-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:18px 0;min-height:250px}
-  .scanner{position:relative;width:232px;aspect-ratio:1;border-radius:24px;background:var(--mutum-ink);overflow:hidden;box-shadow:var(--shadow-lg)}
+  .scanner{position:relative;width:232px;aspect-ratio:1;border:0;padding:0;border-radius:24px;background:var(--mutum-ink);overflow:hidden;box-shadow:var(--shadow-lg);color:inherit}
+  button.scanner{cursor:pointer}
+  button.scanner:focus-visible{outline:3px solid var(--primary);outline-offset:4px}
   .scanner-grid{position:absolute;inset:48px;display:grid;grid-template-columns:repeat(9,1fr);gap:5px;opacity:.17}
   .scanner-grid span{background:var(--mutum-cream);border-radius:2px}
   .corner{position:absolute;width:32px;height:32px;border-color:var(--mutum-coral);border-style:solid}
@@ -50,6 +52,7 @@ if ("serviceWorker" in navigator) {
   .scan-line{position:absolute;left:24px;right:24px;top:20%;height:2px;background:var(--mutum-coral);box-shadow:0 0 14px var(--mutum-coral);animation:scanmove 2.4s var(--ease-in-out) infinite}
   .recognized{position:absolute;left:16px;right:16px;bottom:12px;z-index:2;padding:4px 6px;background:var(--mutum-ink);text-align:center;color:var(--mutum-bone);font-family:var(--font-mono);font-size:11px}
   .join-form{display:grid;gap:10px}
+  .scan-actions{display:grid;gap:10px}
   .field{width:100%;border:1px solid var(--border-strong);border-radius:12px;background:var(--surface);color:var(--fg-1);padding:14px 15px;outline:none}
   .field:focus{border-color:var(--primary)}
   .btn{appearance:none;border:0;border-radius:12px;padding:15px 16px;font-weight:700;font-size:15px;transition:background var(--dur-fast),transform 100ms var(--ease-out)}
@@ -153,7 +156,7 @@ if ("serviceWorker" in navigator) {
     .scanner-wrap{min-height:205px}
   }
 </style>
-<script src="config.js?v=4"></script>
+<script src="config.js?v=5"></script>
 <script src="ads.js"></script>
 </head>
 <body>
@@ -167,8 +170,14 @@ if ("serviceWorker" in navigator) {
   var API_BASE = window.FILA_API_BASE || "";
   var WS_BASE = window.FILA_WS_BASE || "";
   var STORAGE_KEY = "fila_virtual_ticket_id";
+  var TOKEN_KEY = "fila_virtual_qr_token";
   var params = new URLSearchParams(window.location.search);
-  var qrToken = params.get("token") || params.get("qr") || "demo-centro";
+  var nativeApp = window.FilaNativeApp || null;
+  var nativeAds = window.FilaNativeAds || null;
+  var isNativeApp = !!nativeApp || /FilaAppAndroid\//.test(navigator.userAgent);
+  var scannedToken = params.get("token") || params.get("qr");
+  var qrToken = scannedToken || localStorage.getItem(TOKEN_KEY) || (isNativeApp ? "" : "demo-centro");
+  if (scannedToken) localStorage.setItem(TOKEN_KEY, scannedToken);
   var config = { venue: { name: "Clínica Centro", qrToken: qrToken }, monetization: { plan: "free", adsEnabled: true } };
   var state = null;
   var ticket = null;
@@ -231,27 +240,56 @@ if ("serviceWorker" in navigator) {
   }
 
   function adsEnabled() {
-    var nativeAds = window.FILA_PLATFORM === "android" && window.FILA_MOBILE_ADS_PROVIDER === "admob";
     return !!(config.monetization && config.monetization.adsEnabled && !nativeAds);
+  }
+
+  function syncNativeAds() {
+    if (!nativeAds || typeof nativeAds.setAdsEnabled !== "function") return;
+    nativeAds.setAdsEnabled(!!(config.monetization && config.monetization.adsEnabled));
+  }
+
+  function showNativeInterstitial(placement) {
+    if (!nativeAds || typeof nativeAds.showInterstitial !== "function") return;
+    if (config.monetization && config.monetization.adsEnabled) nativeAds.showInterstitial(placement);
+  }
+
+  function scanNativeQr(purpose) {
+    if (!nativeApp || typeof nativeApp.scanQrCode !== "function") {
+      flash("O leitor de QR está disponível no aplicativo Android.");
+      return;
+    }
+    nativeApp.scanQrCode(purpose || "entry");
   }
 
   function renderEntry() {
     var cells = "";
     for (var i = 0; i < 45; i += 1) cells += "<span></span>";
+    var scannerTag = isNativeApp ? "button type=\"button\" id=\"scanQr\"" : "div";
+    var scannerClose = isNativeApp ? "button" : "div";
+    var scannerLabel = qrToken ? "Código da unidade reconhecido" : "Toque para ler o QR code";
+    var entryAction = qrToken
+      ? ["<form class=\"join-form\" id=\"joinForm\"><input class=\"field\" name=\"name\" maxlength=\"28\" autocomplete=\"given-name\" placeholder=\"Seu primeiro nome\" aria-label=\"Seu primeiro nome\" required>",
+          "<button class=\"btn btn-primary\" ", busy ? "disabled" : "", ">Entrar na fila</button>",
+          isNativeApp ? "<button class=\"btn btn-quiet\" type=\"button\" id=\"rescanQr\">Ler outro QR code</button>" : "", "</form>"].join("")
+      : "<div class=\"scan-actions\"><button class=\"btn btn-primary\" type=\"button\" id=\"startScan\">Ler QR code</button></div>";
     app.innerHTML = [
       "<div class=\"screen pad scroll\">",
       brand(),
       "<div class=\"intro\"><h1>Entre na fila pelo QR code</h1><p>Aponte a câmera para o QR code no balcão. A gente avisa por aqui quando for sua vez.</p></div>",
-      "<div class=\"scanner-wrap\"><div class=\"scanner\" aria-hidden=\"true\"><div class=\"scanner-grid\">", cells, "</div>",
+      "<div class=\"scanner-wrap\"><", scannerTag, " class=\"scanner\" aria-label=\"Ler QR code da unidade\"><div class=\"scanner-grid\">", cells, "</div>",
       "<i class=\"corner tl\"></i><i class=\"corner tr\"></i><i class=\"corner bl\"></i><i class=\"corner br\"></i><i class=\"scan-line\"></i>",
-      "<div class=\"recognized\">Código da unidade reconhecido</div></div></div>",
-      "<form class=\"join-form\" id=\"joinForm\"><input class=\"field\" name=\"name\" maxlength=\"28\" autocomplete=\"given-name\" placeholder=\"Seu primeiro nome\" aria-label=\"Seu primeiro nome\" required>",
-      "<button class=\"btn btn-primary\" ", busy ? "disabled" : "", ">Entrar na fila</button></form>",
+      "<div class=\"recognized\">", scannerLabel, "</div></", scannerClose, "></div>",
+      entryAction,
       "<p class=\"privacy\">Seus dados ficam só no seu aparelho.</p>",
       "<div class=\"ad ", adsEnabled() ? "show" : "", "\" data-ad-slot=\"queue-join-bottom\">Espaço reservado para anúncio</div>",
       "</div>"
     ].join("");
-    document.getElementById("joinForm").addEventListener("submit", joinQueue);
+    var joinForm = document.getElementById("joinForm");
+    if (joinForm) joinForm.addEventListener("submit", joinQueue);
+    ["scanQr", "startScan", "rescanQr"].forEach(function(id) {
+      var button = document.getElementById(id);
+      if (button) button.addEventListener("click", function() { scanNativeQr("entry"); });
+    });
   }
 
   function renderConfirmation() {
@@ -271,17 +309,20 @@ if ("serviceWorker" in navigator) {
 
   function renderTimeline() {
     var ahead = ticket.ahead || 0;
-    var from = Math.max(1, Number(String(ticket.code).replace(/\D/g, "")) - ahead);
-    var currentCode = String(ticket.code).replace(/\d+/, String(from).padStart(3, "0"));
-    var rangeEnd = Math.max(from, Number(String(ticket.code).replace(/\D/g, "")) - 1);
-    var waitingRange = String(ticket.code).replace(/\d+/, String(from + 1).padStart(3, "0")) + " → " + String(ticket.code).replace(/\d+/, String(rangeEnd).padStart(3, "0"));
+    var calling = state && state.tickets ? state.tickets.find(function(item) { return item.status === "calling"; }) : null;
+    var waiting = state && state.tickets ? state.tickets.filter(function(item) { return item.status === "waiting"; }) : [];
+    var ticketIndex = waiting.findIndex(function(item) { return item.id === ticket.id; });
+    var aheadTickets = ticketIndex > 0 ? waiting.slice(0, ticketIndex) : [];
+    var currentCode = calling ? calling.code : (aheadTickets[0] ? aheadTickets[0].code : "Próxima senha");
+    var currentLabel = calling ? "Chamando agora" + (calling.counter ? " · Balcão " + calling.counter : "") : "Aguardando chamada";
+    var waitingCodes = aheadTickets.map(function(item) { return item.code; }).join(" · ");
     var total = Math.max(1, ahead + 1);
     var pct = Math.max(8, Math.min(100, Math.round(100 / total)));
     return [
       "<div class=\"progress-label\"><span>Sua posição na fila</span><strong>", esc(ticket.position || 1), "ª</strong></div>",
       "<div class=\"progress\"><span style=\"width:", pct, "%\"></span></div>",
-      "<div class=\"timeline\"><div class=\"timeline-row current\"><div class=\"timeline-mark\"><i></i><b></b></div><div class=\"timeline-copy\"><strong>", esc(currentCode), "</strong><span style=\"color:var(--mutum-forest);font-weight:600\">Chamando agora</span></div></div>",
-      ahead > 1 ? "<div class=\"timeline-row\"><div class=\"timeline-mark\"><i></i><b></b></div><div class=\"timeline-copy\"><strong>" + esc(waitingRange) + "</strong><span>" + esc(ahead) + " pessoas aguardando</span></div></div>" : "",
+      "<div class=\"timeline\"><div class=\"timeline-row current\"><div class=\"timeline-mark\"><i></i><b></b></div><div class=\"timeline-copy\"><strong>", esc(currentCode), "</strong><span style=\"color:var(--mutum-forest);font-weight:600\">", esc(currentLabel), "</span></div></div>",
+      aheadTickets.length ? "<div class=\"timeline-row\"><div class=\"timeline-mark\"><i></i><b></b></div><div class=\"timeline-copy\"><strong>" + esc(waitingCodes) + "</strong><span>" + esc(aheadTickets.length) + " pessoas aguardando antes de você</span></div></div>" : "",
       "<div class=\"timeline-row you\"><div class=\"timeline-mark\"><i></i></div><div class=\"timeline-copy you-card\"><header><strong>", esc(ticket.code), "</strong><em>Você</em></header><span>Espera estimada ~", esc(ticket.etaMin || 3), " min</span></div></div></div>"
     ].join("");
   }
@@ -327,7 +368,7 @@ if ("serviceWorker" in navigator) {
       button.addEventListener("click", function() { view = button.dataset.view; render(); });
     });
     var presence = document.getElementById("presence");
-    if (presence) presence.addEventListener("click", function() { flash("Presença confirmada. Você continua na fila."); });
+    if (presence) presence.addEventListener("click", confirmPresence);
     var openPass = document.getElementById("openPass");
     if (openPass) openPass.addEventListener("click", function() { passOpen = true; render(); });
     document.getElementById("leave").addEventListener("click", leaveDevice);
@@ -351,6 +392,7 @@ if ("serviceWorker" in navigator) {
 
   function render() {
     ticket = computeTicket();
+    syncNativeAds();
     if (!ticket) renderEntry();
     else if (confirmation) renderConfirmation();
     else renderStatus();
@@ -365,9 +407,11 @@ if ("serviceWorker" in navigator) {
       var data = await api("POST", "/api/tickets", { name: name, source: "qr", qrToken: qrToken });
       ticket = data.ticket;
       config = data.config || config;
+      localStorage.setItem(TOKEN_KEY, qrToken);
       localStorage.setItem(STORAGE_KEY, String(ticket.id));
       confirmation = true;
       flash(ticket.code + " entrou na fila.");
+      showNativeInterstitial("queue_joined");
     } catch (error) {
       flash(error.message);
     } finally {
@@ -414,10 +458,18 @@ if ("serviceWorker" in navigator) {
   }
 
   async function passWithQr() {
+    if (nativeApp && typeof nativeApp.scanQrCode === "function") {
+      scanNativeQr("pass");
+      return;
+    }
+    return passWithQrToken(qrToken);
+  }
+
+  async function passWithQrToken(token) {
     busy = true;
     render();
     try {
-      var data = await api("POST", "/api/tickets/" + ticket.id + "/pass", { qrToken: qrToken });
+      var data = await api("POST", "/api/tickets/" + ticket.id + "/pass", { qrToken: token });
       ticket = data.ticket;
       passOpen = false;
       flash("Local confirmado pelo QR.");
@@ -428,6 +480,26 @@ if ("serviceWorker" in navigator) {
       render();
     }
   }
+
+  async function confirmPresence() {
+    if (busy) return;
+    busy = true;
+    render();
+    try {
+      var data = await api("POST", "/api/tickets/" + ticket.id + "/presence", { qrToken: qrToken });
+      ticket = data.ticket;
+      flash(data.message || "Presença confirmada. Você continua na fila.");
+    } catch (error) {
+      flash(error.message);
+    } finally {
+      busy = false;
+      render();
+    }
+  }
+
+  window.FilaNativeQrResult = function(token, purpose) {
+    if (purpose === "pass") passWithQrToken(token);
+  };
 
   async function loadConfig() {
     try {

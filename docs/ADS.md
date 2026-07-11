@@ -31,9 +31,8 @@ Configure no wrapper Android:
 - `FILA_ADMOB_ANDROID_APP_ID`
 - `FILA_ADMOB_BANNER_UNIT_ID`
 - `FILA_ADMOB_INTERSTITIAL_UNIT_ID`
-- `FILA_ADMOB_APP_OPEN_UNIT_ID`
 
-Importante: uma TWA pura renderiza a PWA no Chrome/Custom Tabs. Para AdMob nativo, o app Android precisa incluir Google Mobile Ads SDK e expor uma ponte nativa, por exemplo `window.FilaAdMob.requestBanner(...)`, ou evoluir para um shell Android customizado. Se ficar apenas na TWA pura, o conteudo web continua usando Google Ad Manager.
+O shell Android em `mobile/android` ja inclui Google Mobile Ads SDK, consentimento UMP e a ponte `window.FilaNativeAds`. Banner e intersticial usam IDs de teste por padrao; informe IDs reais por propriedades Gradle apenas no build de publicacao.
 
 ## Play Console
 

@@ -22,7 +22,7 @@
     if (el.dataset.adRendered === 'true') return;
 
     const slotName = el.dataset.adSlot;
-    if (platform === 'android' && mobileProvider === 'admob') {
+    if ((platform === 'android' || window.FilaNativeAds || window.FilaAdMob) && mobileProvider === 'admob') {
       return renderAdMobBridge(el, slotName);
     }
     if (webProvider === 'gam') return renderGam(el, slotName);
@@ -31,9 +31,8 @@
 
   function renderAdMobBridge(el, slotName) {
     const bridge = window.FilaAdMob || window.FilaNativeAds;
-    const unitId = el.dataset.admobUnitId || admobUnits.banner;
-    if (bridge && typeof bridge.requestBanner === 'function' && unitId) {
-      bridge.requestBanner({ slot: slotName, unitId });
+    if (bridge && typeof bridge.requestBanner === 'function') {
+      bridge.requestBanner(slotName);
       el.dataset.adRendered = 'true';
       mark(el, 'admob-native');
       return;

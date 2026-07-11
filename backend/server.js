@@ -195,6 +195,7 @@ function ticketView(ticket) {
     counter: ticket.counter,
     waitMin: ticket.waitMin,
     source: ticket.source,
+    lastPresenceAt: ticket.lastPresenceAt || null,
     position: waitingIndex >= 0 ? waitingIndex + 1 : 0,
     ahead: waitingIndex >= 0 ? waitingIndex : 0,
     etaMin: waitingIndex >= 0 ? Math.max(2, waitingIndex * 4 + 3) : 0,
@@ -246,6 +247,7 @@ function moveTicketBack(ticket, steps) {
   store.tickets.splice(targetIndex + 1, 0, ticket);
   ticket.source = 'passou';
   ticket.passedAt = Date.now();
+  ticket.lastPresenceAt = Date.now();
   return ticketView(ticket);
 }
 
@@ -289,6 +291,7 @@ function buildState() {
       waitMin: t.waitMin,
       source: t.source,
       createdAt: t.createdAt,
+      lastPresenceAt: t.lastPresenceAt || null,
     })),
     venueMeta: {
       slug: store.venueSlug,
@@ -361,6 +364,23 @@ app.get('/api/tickets/:id', (req, res) => {
   const t = store.tickets.find(x => x.id === id);
   if (!t) return res.status(404).json({ error: 'Ticket nao encontrado.' });
   res.json({ ticket: ticketView(t), state: buildState() });
+});
+
+app.post('/api/tickets/:id/presence', publicTicketLimiter, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const t = store.tickets.find(x => x.id === id);
+  if (!t) return res.status(404).json({ error: 'Ticket nao encontrado.' });
+  if (t.status !== 'waiting') {
+    return res.status(409).json({ error: 'A presenca so pode ser confirmada enquanto voce aguarda.' });
+  }
+  if (!req.body || req.body.qrToken !== store.qrToken) {
+    return res.status(403).json({ error: 'QR code invalido para este local.' });
+  }
+
+  t.lastPresenceAt = Date.now();
+  pushLog(t.code + ' confirmou presenca');
+  broadcast({ action: 'presence-confirmed', ticketId: id });
+  res.json({ ticket: ticketView(t), message: 'Presenca confirmada.' });
 });
 
 app.post('/api/tickets/:id/pass', publicTicketLimiter, (req, res) => {
@@ -453,6 +473,7 @@ app.post('/api/tickets', publicTicketLimiter, (req, res) => {
     waitMin: 0,
     source: source || 'qr',
     createdAt: Date.now(),
+    lastPresenceAt: Date.now(),
   };
   store.tickets.push(ticket);
   pushLog(code + ' entrou na fila');
