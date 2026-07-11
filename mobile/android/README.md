@@ -1,41 +1,40 @@
-# Fila App Cliente Android
+# Fila Virtual Cliente Android
 
-Primeira versao Android do app cliente usando WebView.
+Aplicativo Android do cliente. O shell nativo abre a versao publicada de `cliente.html` em uma WebView segura e usa os arquivos empacotados como fallback offline.
 
-## Rodar localmente
+## Recursos nativos
 
-1. Suba o backend:
+- WebView restrita ao host confiavel do Fila App.
+- Leitura de QR code pela camera.
+- Geolocalizacao para confirmar a passagem de vez.
+- Banner adaptativo e intersticial AdMob.
+- Consentimento de anuncios com Google UMP.
+- Anuncios removidos quando o backend retorna plano premium.
 
-   ```powershell
-   cd E:\UFAM\tcc\fila-app\backend
-   npm install
-   npm start
-   ```
+## Compilar e testar
 
-2. Sincronize os arquivos web no Android:
-
-   ```powershell
-   cd E:\UFAM\tcc\fila-app\mobile\android
-   powershell -ExecutionPolicy Bypass -File .\scripts\sync-web-assets.ps1
-   ```
-
-3. Compile e instale no emulador:
-
-   ```powershell
-   .\gradlew.bat installDebug
-   ```
-
-O WebView abre `cliente.html` localmente e chama a API do computador pelo endereco especial do emulador: `http://10.0.2.2:3000`.
-
-## Ads
-
-A versao Android usa AdMob nativo com IDs de teste:
-
-- App ID: `ca-app-pub-3940256099942544~3347511713`
-- Banner: `ca-app-pub-3940256099942544/6300978111`
-
-Para publicar, troque pelos IDs reais:
+Sincronize o fallback com o backend de producao:
 
 ```powershell
-.\gradlew.bat bundleRelease -PFILA_ADMOB_ANDROID_APP_ID=ca-app-pub-SEU_APP_ID -PFILA_ADMOB_BANNER_UNIT_ID=ca-app-pub-SEU_BANNER
+powershell -ExecutionPolicy Bypass -File .\scripts\sync-web-assets.ps1
+.\gradlew.bat :app:assembleDebug
 ```
+
+Para usar um backend rodando no computador durante testes no emulador:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\sync-web-assets.ps1 -Environment emulator
+```
+
+## AdMob
+
+Por padrao, o projeto usa os IDs de teste oficiais do Google. Eles nao geram receita. Para gerar o AAB da Play Store, informe os tres IDs reais:
+
+```powershell
+.\gradlew.bat :app:bundleRelease `
+  -PFILA_ADMOB_ANDROID_APP_ID=ca-app-pub-SEU_APP_ID `
+  -PFILA_ADMOB_BANNER_UNIT_ID=ca-app-pub-SEU_BANNER `
+  -PFILA_ADMOB_INTERSTITIAL_UNIT_ID=ca-app-pub-SEU_INTERSTICIAL
+```
+
+O release tambem precisa da chave de assinatura configurada fora do repositorio antes do envio para a Play Console.

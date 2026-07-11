@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fila-app-v3';
+const CACHE_NAME = 'fila-app-v5';
 const APP_SHELL = [
   './',
   'cliente.html',
