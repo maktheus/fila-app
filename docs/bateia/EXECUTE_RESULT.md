@@ -1,0 +1,19 @@
+# Execute - Aplicar Bateia
+
+Gerado em 2026-07-10T19:45:03.981Z.
+
+## Aplicado
+
+- icone PWA gravado.
+- PWA manifest gravado.
+- service worker gravado.
+- PWA registrado em index.html.
+- PWA registrado em landing.html.
+- Doc de arquitetura front atualizado.
+- Doc de monetizacao e observabilidade atualizado.
+- Uptime Kuma adicionado ao docker-compose.yml.
+- estado execute gravado.
+
+## Pulado
+
+- Nada pulado.

@@ -1,21 +1,44 @@
 const express = require('express');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { WebSocketServer } = require('ws');
 const cors = require('cors');
-const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-app.use(cors());
-app.use(express.json());
+const APP_VERSION = process.env.APP_VERSION || '0.1.0';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data', 'store.json');
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin || (!IS_PRODUCTION && allowedOrigins.length === 0) || allowedOrigins.includes(origin)) {
+      return cb(null, true);
+    }
+    return cb(new Error('Origem nao permitida pelo CORS.'));
+  },
+}));
+app.use(express.json({ limit: '32kb' }));
 
 // --------------- In-memory store ---------------
 
 const store = {
   venue: process.env.VENUE_NAME || 'Unidade Centro',
   operator: process.env.OPERATOR_NAME || 'Equipe balcão',
+  venueSlug: process.env.VENUE_SLUG || 'centro',
+  qrToken: process.env.VENUE_QR_TOKEN || 'demo-centro',
+  latitude: Number(process.env.VENUE_LAT || -3.119028),
+  longitude: Number(process.env.VENUE_LNG || -60.021731),
+  proximityRadiusMeters: Number(process.env.PROXIMITY_RADIUS_METERS || 120),
+  plan: process.env.PLAN === 'premium' ? 'premium' : 'free',
+  adsEnabled: process.env.ADS_ENABLED === 'false' ? false : process.env.PLAN !== 'premium',
   countersTotal: 3,
   servedToday: 47,
   lastCalled: 42,
@@ -44,10 +67,36 @@ const store = {
   ],
 };
 
+loadPersistedStore();
+
 // --------------- Helpers ---------------
 
 function pad(n) { return String(n).padStart(2, '0'); }
 function clockShort() { const d = new Date(); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+
+function createRateLimit(windowMs, maxHits) {
+  const hits = new Map();
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = req.ip || req.headers['x-forwarded-for'] || 'local';
+    const bucket = (hits.get(key) || []).filter(ts => now - ts < windowMs);
+    bucket.push(now);
+    hits.set(key, bucket);
+    if (bucket.length > maxHits) return res.status(429).json({ error: 'Muitas tentativas. Aguarde um pouco.' });
+    next();
+  };
+}
+
+const publicTicketLimiter = createRateLimit(60 * 1000, 20);
+
+function requireOperator(req, res, next) {
+  if (!IS_PRODUCTION && !process.env.ADMIN_TOKEN) return next();
+  const auth = req.get('authorization') || '';
+  const bearer = auth.replace(/^Bearer\s+/i, '');
+  const token = bearer || req.get('x-admin-token');
+  if (process.env.ADMIN_TOKEN && token === process.env.ADMIN_TOKEN) return next();
+  return res.status(401).json({ error: 'Operador nao autenticado.' });
+}
 
 function freeCounter() {
   const used = store.tickets.filter(t => t.status === 'calling').map(t => t.counter);
@@ -70,6 +119,134 @@ function updateWaitTimes() {
       t.waitMin = Math.round((now - t.createdAt) / 60000);
     }
   });
+}
+
+function loadPersistedStore() {
+  try {
+    if (!fs.existsSync(DATA_FILE)) return;
+    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (Number.isFinite(data.servedToday)) store.servedToday = data.servedToday;
+    if (Number.isFinite(data.lastCalled)) store.lastCalled = data.lastCalled;
+    if (Number.isFinite(data.nextId)) store.nextId = data.nextId;
+    if (Array.isArray(data.tickets)) store.tickets = data.tickets;
+    if (Array.isArray(data.log)) store.log = data.log;
+  } catch (error) {
+    console.warn('Nao foi possivel carregar persistencia local:', error.message);
+  }
+}
+
+function persistStore() {
+  try {
+    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
+    fs.writeFileSync(DATA_FILE, JSON.stringify({
+      servedToday: store.servedToday,
+      lastCalled: store.lastCalled,
+      nextId: store.nextId,
+      tickets: store.tickets,
+      log: store.log,
+      savedAt: new Date().toISOString(),
+    }, null, 2));
+  } catch (error) {
+    console.warn('Nao foi possivel salvar persistencia local:', error.message);
+  }
+}
+
+function entitlement() {
+  const premium = store.plan === 'premium';
+  return {
+    plan: store.plan,
+    adsEnabled: !premium && store.adsEnabled,
+    premiumRemovesAds: true,
+    limits: premium
+      ? { dailyTickets: null, counters: null }
+      : { dailyTickets: 50, counters: 1 },
+  };
+}
+
+function publicConfig() {
+  return {
+    venue: {
+      name: store.venue,
+      slug: store.venueSlug,
+      qrToken: store.qrToken,
+      proximityRadiusMeters: store.proximityRadiusMeters,
+    },
+    monetization: entitlement(),
+  };
+}
+
+function sanitizeName(name) {
+  return String(name || '')
+    .trim()
+    .split(/\s+/)[0]
+    .replace(/[^\p{L}\p{N}'-]/gu, '')
+    .slice(0, 28);
+}
+
+function ticketView(ticket) {
+  if (!ticket) return null;
+  const waiting = store.tickets.filter(t => t.status === 'waiting');
+  const waitingIndex = waiting.findIndex(t => t.id === ticket.id);
+  return {
+    id: ticket.id,
+    code: ticket.code,
+    name: ticket.name,
+    status: ticket.status,
+    counter: ticket.counter,
+    waitMin: ticket.waitMin,
+    source: ticket.source,
+    position: waitingIndex >= 0 ? waitingIndex + 1 : 0,
+    ahead: waitingIndex >= 0 ? waitingIndex : 0,
+    etaMin: waitingIndex >= 0 ? Math.max(2, waitingIndex * 4 + 3) : 0,
+  };
+}
+
+function toRad(value) {
+  return value * Math.PI / 180;
+}
+
+function distanceMeters(aLat, aLng, bLat, bLng) {
+  const earth = 6371000;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const s1 = Math.sin(dLat / 2);
+  const s2 = Math.sin(dLng / 2);
+  const a = s1 * s1 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * s2 * s2;
+  return Math.round(earth * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function checkProximity(body) {
+  if (body.qrToken && body.qrToken === store.qrToken) {
+    return { ok: true, method: 'qr', distanceMeters: 0 };
+  }
+  const latitude = Number(body.latitude);
+  const longitude = Number(body.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return { ok: false, method: 'unknown', distanceMeters: null };
+  }
+  const distance = distanceMeters(latitude, longitude, store.latitude, store.longitude);
+  return {
+    ok: distance <= store.proximityRadiusMeters,
+    method: 'gps',
+    distanceMeters: distance,
+  };
+}
+
+function moveTicketBack(ticket, steps) {
+  const waiting = store.tickets.filter(t => t.status === 'waiting');
+  const currentPos = waiting.findIndex(t => t.id === ticket.id);
+  if (currentPos < 0) return ticketView(ticket);
+  const targetPos = Math.min(waiting.length - 1, currentPos + steps);
+  if (targetPos === currentPos) return ticketView(ticket);
+
+  const target = waiting[targetPos];
+  const fromIndex = store.tickets.findIndex(t => t.id === ticket.id);
+  store.tickets.splice(fromIndex, 1);
+  const targetIndex = store.tickets.findIndex(t => t.id === target.id);
+  store.tickets.splice(targetIndex + 1, 0, ticket);
+  ticket.source = 'passou';
+  ticket.passedAt = Date.now();
+  return ticketView(ticket);
 }
 
 function buildState() {
@@ -111,7 +288,13 @@ function buildState() {
       counter: t.counter,
       waitMin: t.waitMin,
       source: t.source,
+      createdAt: t.createdAt,
     })),
+    venueMeta: {
+      slug: store.venueSlug,
+      proximityRadiusMeters: store.proximityRadiusMeters,
+    },
+    monetization: entitlement(),
     hero: hero ? { id: hero.id, code: hero.code, name: hero.name, counter: hero.counter } : null,
     counters,
     log: store.log.slice(0, 7),
@@ -131,6 +314,7 @@ wss.on('connection', (ws) => {
 });
 
 function broadcast(event) {
+  persistStore();
   const state = buildState();
   const msg = JSON.stringify({ type: 'state', data: state, event });
   for (const ws of clients) {
@@ -141,14 +325,24 @@ function broadcast(event) {
 // --------------- REST API ---------------
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime() });
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    version: APP_VERSION,
+    plan: store.plan,
+    websocketClients: clients.size,
+  });
+});
+
+app.get('/api/config', (_req, res) => {
+  res.json(publicConfig());
 });
 
 app.get('/api/state', (_req, res) => {
   res.json(buildState());
 });
 
-app.post('/api/tickets/call-next', (_req, res) => {
+app.post('/api/tickets/call-next', requireOperator, (_req, res) => {
   const next = store.tickets.find(t => t.status === 'waiting');
   if (!next) return res.status(409).json({ error: 'A fila está vazia.' });
   const cn = freeCounter();
@@ -162,7 +356,34 @@ app.post('/api/tickets/call-next', (_req, res) => {
   res.json({ ticket: next, log, message: next.code + ' chamada para o Balcão ' + cn + '.' });
 });
 
-app.post('/api/tickets/:id/call', (req, res) => {
+app.get('/api/tickets/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const t = store.tickets.find(x => x.id === id);
+  if (!t) return res.status(404).json({ error: 'Ticket nao encontrado.' });
+  res.json({ ticket: ticketView(t), state: buildState() });
+});
+
+app.post('/api/tickets/:id/pass', publicTicketLimiter, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const t = store.tickets.find(x => x.id === id);
+  if (!t) return res.status(404).json({ error: 'Ticket nao encontrado.' });
+  if (t.status !== 'waiting') return res.status(409).json({ error: 'So da para passar a vez enquanto voce esta aguardando.' });
+
+  const proximity = checkProximity(req.body || {});
+  if (!proximity.ok) {
+    return res.status(403).json({
+      error: 'Voce precisa estar perto do ponto de entrada para passar a vez.',
+      proximity,
+    });
+  }
+
+  const moved = moveTicketBack(t, 3);
+  pushLog(t.code + ' passou a vez');
+  broadcast({ action: 'passed', ticketId: id, proximity });
+  res.json({ ticket: moved, proximity, message: t.code + ' passou a vez.' });
+});
+
+app.post('/api/tickets/:id/call', requireOperator, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const t = store.tickets.find(x => x.id === id);
   if (!t) return res.status(404).json({ error: 'Ticket não encontrado.' });
@@ -178,7 +399,7 @@ app.post('/api/tickets/:id/call', (req, res) => {
   res.json({ ticket: t });
 });
 
-app.post('/api/tickets/:id/finish', (req, res) => {
+app.post('/api/tickets/:id/finish', requireOperator, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const t = store.tickets.find(x => x.id === id);
   if (!t) return res.status(404).json({ error: 'Ticket não encontrado.' });
@@ -191,7 +412,7 @@ app.post('/api/tickets/:id/finish', (req, res) => {
   res.json({ ticket: t });
 });
 
-app.post('/api/tickets/:id/recall', (req, res) => {
+app.post('/api/tickets/:id/recall', requireOperator, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const t = store.tickets.find(x => x.id === id);
   if (!t) return res.status(404).json({ error: 'Ticket não encontrado.' });
@@ -203,7 +424,7 @@ app.post('/api/tickets/:id/recall', (req, res) => {
   res.json({ ticket: t, message: 'Rechamando ' + t.code + '.' });
 });
 
-app.post('/api/tickets/:id/absent', (req, res) => {
+app.post('/api/tickets/:id/absent', requireOperator, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const t = store.tickets.find(x => x.id === id);
   if (!t) return res.status(404).json({ error: 'Ticket não encontrado.' });
@@ -216,16 +437,17 @@ app.post('/api/tickets/:id/absent', (req, res) => {
   res.json({ ticket: t });
 });
 
-app.post('/api/tickets', (req, res) => {
+app.post('/api/tickets', publicTicketLimiter, (req, res) => {
   const { name, source } = req.body;
-  if (!name) return res.status(400).json({ error: 'Nome é obrigatório.' });
+  const firstName = sanitizeName(name);
+  if (!firstName) return res.status(400).json({ error: 'Nome e obrigatorio.' });
 
   const id = store.nextId++;
   const code = 'M-' + String(id).padStart(3, '0');
   const ticket = {
     id,
     code,
-    name,
+    name: firstName,
     status: 'waiting',
     counter: null,
     waitMin: 0,
@@ -235,7 +457,7 @@ app.post('/api/tickets', (req, res) => {
   store.tickets.push(ticket);
   pushLog(code + ' entrou na fila');
   broadcast({ action: 'joined', ticketId: id });
-  res.status(201).json({ ticket });
+  res.status(201).json({ ticket: ticketView(ticket), config: publicConfig() });
 });
 
 // --------------- Start ---------------

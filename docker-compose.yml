@@ -1,11 +1,32 @@
 services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    restart: unless-stopped
+    profiles:
+      - observability
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime-kuma-data:/app/data
+
   backend:
     build: ./backend
     restart: unless-stopped
     environment:
       - PORT=3000
+      - VENUE_QR_TOKEN=${VENUE_QR_TOKEN:-demo-centro}
+      - VENUE_LAT=${VENUE_LAT:--3.119028}
+      - VENUE_LNG=${VENUE_LNG:--60.021731}
+      - PROXIMITY_RADIUS_METERS=${PROXIMITY_RADIUS_METERS:-120}
+      - PLAN=${PLAN:-free}
+      - ADS_ENABLED=${ADS_ENABLED:-true}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
+      - DATA_FILE=/app/data/store.json
       - VENUE_NAME=Unidade Centro
-      - OPERATOR_NAME=Equipe balcão
+      - OPERATOR_NAME=Equipe balcao
+    volumes:
+      - backend-data:/app/data
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 30s
@@ -22,3 +43,7 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+volumes:
+  backend-data:
+  uptime-kuma-data:

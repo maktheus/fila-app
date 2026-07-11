@@ -1,0 +1,23 @@
+{
+  "name": "Fila App",
+  "short_name": "Fila App",
+  "description": "Web app mobile-first gerado pelo padrao Bateia.",
+  "start_url": "cliente.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#191919",
+  "theme_color": "#191919",
+  "categories": [
+    "business",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "assets/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
