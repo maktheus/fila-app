@@ -212,11 +212,11 @@
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js').catch(function() {});
+    navigator.serviceWorker.register('sw.js?v=4').catch(function() {});
   });
 }
 </script>
-<script src="config.js"></script>
+<script src="config.js?v=4"></script>
 <script src="ads.js"></script>
 </head>
 <body>
