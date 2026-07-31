@@ -45,7 +45,7 @@ As 3 telas do MVP (protótipo `project/Fila Virtual.dc.html` é a fonte visual):
 | 1 | App do cliente: entrar via QR + status ao vivo | `frontend/cliente.html` novo; `POST /api/tickets` (ligar a token de unidade); WS |
 | 2 | Passar a vez + proximidade | endpoint `POST /api/tickets/:id/pass`; Geolocation no front; coords da unidade no store |
 | 3 | ✅ **Auth do admin + hardening** (Sprint 1, 30/07) | login com sessão expirável, CORS por env, rate limit por IP real, expurgo LGPD, nomes só para o operador, cliente na raiz, 24 testes + CI |
-| 4 | Persistência + multi-unidade | ✅ Postgres via Docker (base pronta); falta: schema multi-unidade, QR token por unidade, limpeza de tickets (LGPD) |
+| 4 | ✅ **Persistência + multi-unidade** (Sprint 2, 30/07) | Postgres via Docker, schema multi-tenant, cadastro self-service (`cadastro.html` → `POST /api/venues`), QR PNG gerado por unidade, limites do plano free aplicados, expurgo LGPD |
 | 5 | Monetização B2B | assinatura Cakto/Pix por unidade; onboarding da clínica (gera QR na hora) |
 
 ### Prompt de construção do Bloco 1 (planejar com Opus, executar com Sonnet)
@@ -88,4 +88,4 @@ Checkout: **assinatura recorrente Pix via Cakto** (alternativas Stripe/Mercado P
 
 ## Próxima ação única
 
-**Sprint 2 — multi-unidade** (`docs/kanban.html`): schema multi-tenant no Postgres, cadastro self-service de estabelecimento e QR gerado por unidade. É o que falta para uma instância atender mais de uma clínica.
+**Sprint 3 — monetização** (`docs/kanban.html`): checkout de assinatura Pix, webhook que ativa/suspende o premium sozinho e e-mails transacionais. É o que falta para o produto cobrar sem ninguém no meio — o plano free já está limitado e pedindo upgrade.

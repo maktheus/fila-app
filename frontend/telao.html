@@ -90,7 +90,7 @@
   </header>
   <section class="grid" id="counterGrid"></section>
   <footer class="footer">
-    <a class="qr" href="./?token=demo-centro" aria-label="Abrir app do cliente"><img src="assets/fila-cliente-qr.png" alt="QR code para entrar na fila"></a>
+    <a class="qr" id="join-link" href="./?token=demo-centro" aria-label="Abrir app do cliente"><img id="join-qr" src="assets/fila-cliente-qr.png" alt="QR code para entrar na fila"></a>
     <div class="footer-copy"><strong>Aponte a câmera para entrar na fila</strong><span>Escolha o atendimento, acompanhe sua posição pelo celular e passe a vez sem perder o lugar.</span></div>
     <div class="footer-meta"><strong id="activeCounters">4 balcões</strong><span>atendimento ativo</span></div>
   </footer>
@@ -100,16 +100,14 @@
   "use strict";
   var API_BASE = window.FILA_API_BASE || "";
   var WS_BASE = window.FILA_WS_BASE || "";
+  // Multi-unidade: ?venue=slug escolhe qual fila o telão exibe.
+  var venueSlug = new URLSearchParams(window.location.search).get("venue") || "";
+  var API_PREFIX = venueSlug ? "/api/venues/" + encodeURIComponent(venueSlug) : "/api";
   var connected = false;
   var state = {
     venue: "Clínica Centro",
     tickets: [],
-    counters: [
-      { number: 1, busy: false, ticketCode: null },
-      { number: 2, busy: false, ticketCode: null },
-      { number: 3, busy: false, ticketCode: null },
-      { number: 4, busy: false, ticketCode: null }
-    ],
+    counters: [{ id: 1, busy: false, ticketCode: null }],
     kpis: { waiting: 0 }
   };
 
@@ -138,21 +136,23 @@
       ? state.kpis.waiting
       : state.tickets.filter(function(ticket) { return ticket.status === "waiting"; }).length;
     document.getElementById("liveDot").classList.toggle("off", !connected);
-    var counters = state.counters && state.counters.length ? state.counters.slice(0, 4) : [];
-    while (counters.length < 4) counters.push({ number: counters.length + 1, busy: false, ticketCode: null });
-    document.getElementById("activeCounters").textContent = counters.length + " balcões";
+    // A API manda exatamente os balcões que o plano da unidade libera.
+    var counters = (state.counters || []).slice(0, 4);
+    if (!counters.length) counters = [{ id: 1, busy: false, ticketCode: null }];
+    document.getElementById("activeCounters").textContent =
+      counters.length + (counters.length === 1 ? " balcão" : " balcões");
     document.getElementById("counterGrid").innerHTML = counters.map(function(counter) {
-      var recent = recentFor(counter.number);
+      var recent = recentFor(counter.id);
       var recentHtml = recent.length ? recent.map(function(ticket) {
         return "<span class=\"recent-item\">" + esc(ticket.code) + " <span>· " + (ticket.status === "absent" ? "ausente" : "atendido") + "</span></span>";
       }).join("") : "<span class=\"recent-item\"><span>Nenhuma chamada anterior</span></span>";
       return [
         "<article class=\"counter-card ", counter.busy ? "calling" : "free", "\">",
-        "<header class=\"counter-head\"><i class=\"signal\"></i><strong class=\"counter-name\">Balcão ", esc(counter.number), "</strong>",
+        "<header class=\"counter-head\"><i class=\"signal\"></i><strong class=\"counter-name\">Balcão ", esc(counter.id), "</strong>",
         "<span class=\"counter-status\">", counter.busy ? "em atendimento" : "disponível", "</span></header>",
         "<div class=\"call\"><span class=\"call-label\">", counter.busy ? "Chamando" : "Aguardando", "</span>",
         "<div class=\"call-main\"><strong class=\"call-code\">", esc(counter.ticketCode || "—"), "</strong>",
-        "<span class=\"counter-number\">Balcão ", esc(counter.number), "</span></div></div>",
+        "<span class=\"counter-number\">Balcão ", esc(counter.id), "</span></div></div>",
         "<div class=\"recent\"><span class=\"recent-label\">Últimas</span><div class=\"recent-list\">", recentHtml, "</div></div></article>"
       ].join("");
     }).join("");
@@ -160,7 +160,7 @@
 
   async function loadState() {
     try {
-      var response = await fetch(API_BASE + "/api/state");
+      var response = await fetch(API_BASE + API_PREFIX + "/state");
       if (!response.ok) return;
       state = await response.json();
       render();
@@ -168,8 +168,10 @@
   }
 
   function wsUrl() {
-    if (WS_BASE) return /\/ws$/.test(WS_BASE) ? WS_BASE : WS_BASE.replace(/\/$/, "") + "/ws";
-    return (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws";
+    var base = WS_BASE
+      ? (/\/ws$/.test(WS_BASE) ? WS_BASE : WS_BASE.replace(/\/$/, "") + "/ws")
+      : (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws";
+    return base + (venueSlug ? "?venue=" + encodeURIComponent(venueSlug) : "");
   }
 
   function connect() {
@@ -192,10 +194,24 @@
     socket.onerror = function() { socket.close(); };
   }
 
+  // Com ?venue=slug o telão mostra o QR real da unidade, gerado pela API.
+  async function applyVenueQr() {
+    if (!venueSlug) return;
+    try {
+      var response = await fetch(API_BASE + API_PREFIX + "/config");
+      if (!response.ok) return;
+      var config = await response.json();
+      document.getElementById("join-qr").src = API_BASE + API_PREFIX + "/qr.png";
+      document.getElementById("join-link").href =
+        "./?venue=" + encodeURIComponent(venueSlug) + "&token=" + encodeURIComponent(config.venue.qrToken);
+    } catch (_error) {}
+  }
+
   document.getElementById("clock").textContent = clockNow();
   setInterval(function() { document.getElementById("clock").textContent = clockNow(); }, 1000);
   render();
   loadState();
+  applyVenueQr();
   connect();
 })();
 </script>

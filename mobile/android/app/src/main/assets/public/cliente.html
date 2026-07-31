@@ -178,6 +178,13 @@ if ("serviceWorker" in navigator) {
   var scannedToken = params.get("token") || params.get("qr");
   var qrToken = scannedToken || localStorage.getItem(TOKEN_KEY) || (isNativeApp ? "" : "demo-centro");
   if (scannedToken) localStorage.setItem(TOKEN_KEY, scannedToken);
+  // Multi-unidade: o QR traz ?venue=slug. Sem ele, cai na unidade padrão da API.
+  var VENUE_KEY = "fila_virtual_venue";
+  var scannedVenue = params.get("venue");
+  if (scannedVenue) localStorage.setItem(VENUE_KEY, scannedVenue);
+  var venueSlug = scannedVenue || localStorage.getItem(VENUE_KEY) || "";
+  var API_PREFIX = venueSlug ? "/api/venues/" + encodeURIComponent(venueSlug) : "/api";
+  function apiPath(path) { return path.replace(/^\/api/, API_PREFIX); }
   var config = { venue: { name: "Clínica Centro", qrToken: qrToken }, monetization: { plan: "free", adsEnabled: true } };
   var state = null;
   var ticket = null;
@@ -204,7 +211,7 @@ if ("serviceWorker" in navigator) {
   }
 
   async function api(method, path, body) {
-    var response = await fetch(API_BASE + path, {
+    var response = await fetch(API_BASE + apiPath(path), {
       method: method,
       headers: body ? { "Content-Type": "application/json" } : {},
       body: body ? JSON.stringify(body) : undefined
@@ -526,7 +533,7 @@ if ("serviceWorker" in navigator) {
     var url = WS_BASE
       ? (/\/ws$/.test(WS_BASE) ? WS_BASE : WS_BASE.replace(/\/$/, "") + "/ws")
       : (proto + "//" + location.host + "/ws");
-    var socket = new WebSocket(url);
+    var socket = new WebSocket(url + (venueSlug ? "?venue=" + encodeURIComponent(venueSlug) : ""));
     socket.onopen = function() { connected = true; render(); };
     socket.onmessage = function(event) {
       try {

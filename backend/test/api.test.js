@@ -276,6 +276,256 @@ describe('API da fila', () => {
   });
 });
 
+describe('multi-unidade', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    server = await startServer({ RATE_LIMIT_SIGNUP: '100' });
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  async function criarUnidade(nome) {
+    const res = await fetch(base + '/api/venues', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nome }),
+    });
+    return { status: res.status, body: await res.json() };
+  }
+
+  test('cadastro self-service cria unidade com slug e senha propria', async () => {
+    const { status, body } = await criarUnidade('Clinica Sao Jose');
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.venue.slug, 'clinica-sao-jose');
+    assert.ok(body.operatorPassword && body.operatorPassword.length >= 6);
+    assert.ok(body.joinUrl.includes('venue=clinica-sao-jose'));
+    assert.ok(body.venue.qrToken);
+  });
+
+  test('nome muito curto e recusado', async () => {
+    const { status } = await criarUnidade('ab');
+    assert.strictEqual(status, 400);
+  });
+
+  test('nomes iguais geram slugs distintos', async () => {
+    const primeira = await criarUnidade('Laboratorio Central');
+    const segunda = await criarUnidade('Laboratorio Central');
+    assert.strictEqual(primeira.body.venue.slug, 'laboratorio-central');
+    assert.strictEqual(segunda.body.venue.slug, 'laboratorio-central-2');
+  });
+
+  test('QR da unidade responde como PNG', async () => {
+    const { body } = await criarUnidade('Otica Vision');
+    const res = await fetch(base + body.qrUrl);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.headers.get('content-type'), 'image/png');
+    const bytes = Buffer.from(await res.arrayBuffer());
+    assert.ok(bytes.length > 100, 'PNG veio vazio');
+    assert.strictEqual(bytes.subarray(1, 4).toString(), 'PNG');
+  });
+
+  test('unidade inexistente responde 404', async () => {
+    const res = await fetch(base + '/api/venues/nao-existe/state');
+    assert.strictEqual(res.status, 404);
+  });
+
+  test('filas de unidades diferentes nao se misturam', async () => {
+    const a = (await criarUnidade('Clinica Alfa')).body;
+    const b = (await criarUnidade('Clinica Beta')).body;
+
+    await fetch(base + `/api/venues/${a.venue.slug}/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Alice' }),
+    });
+
+    const estadoA = await (await fetch(base + `/api/venues/${a.venue.slug}/state`)).json();
+    const estadoB = await (await fetch(base + `/api/venues/${b.venue.slug}/state`)).json();
+    assert.strictEqual(estadoA.kpis.waiting, 1);
+    assert.strictEqual(estadoB.kpis.waiting, 0, 'ticket vazou para a outra unidade');
+  });
+
+  test('sessao de uma unidade nao comanda a fila de outra', async () => {
+    const a = (await criarUnidade('Clinica Gama')).body;
+    const b = (await criarUnidade('Clinica Delta')).body;
+
+    const loginA = await fetch(base + `/api/venues/${a.venue.slug}/operator/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: a.operatorPassword }),
+    });
+    const { token } = await loginA.json();
+
+    await fetch(base + `/api/venues/${b.venue.slug}/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Bruno' }),
+    });
+
+    const invasao = await fetch(base + `/api/venues/${b.venue.slug}/tickets/call-next`, {
+      method: 'POST',
+      headers: authed(token),
+    });
+    assert.strictEqual(invasao.status, 401, 'token de uma unidade comandou outra');
+  });
+
+  test('senha de uma unidade nao serve para outra', async () => {
+    const a = (await criarUnidade('Clinica Epsilon')).body;
+    const b = (await criarUnidade('Clinica Zeta')).body;
+    const res = await fetch(base + `/api/venues/${b.venue.slug}/operator/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: a.operatorPassword }),
+    });
+    assert.strictEqual(res.status, 401);
+  });
+
+  test('rotas legadas continuam servindo a unidade padrao', async () => {
+    const res = await fetch(base + '/api/state');
+    const state = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(state.venueMeta.slug, 'centro');
+  });
+});
+
+describe('limites do plano free', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    server = await startServer({ RATE_LIMIT_SIGNUP: '100', FREE_DAILY_TICKETS: '2', FREE_COUNTERS: '1' });
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  async function novaUnidade(nome) {
+    const res = await fetch(base + '/api/venues', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nome }),
+    });
+    return res.json();
+  }
+
+  function entrar(slug, nome) {
+    return fetch(base + `/api/venues/${slug}/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nome }),
+    });
+  }
+
+  test('bloqueia a entrada apos o limite diario com 402', async () => {
+    const venue = await novaUnidade('Clinica Limite');
+    assert.strictEqual((await entrar(venue.venue.slug, 'Um')).status, 201);
+    assert.strictEqual((await entrar(venue.venue.slug, 'Dois')).status, 201);
+
+    const terceira = await entrar(venue.venue.slug, 'Tres');
+    const body = await terceira.json();
+    assert.strictEqual(terceira.status, 402);
+    assert.match(body.error, /plano gratuito/i);
+  });
+
+  test('plano free expoe apenas um balcao', async () => {
+    const venue = await novaUnidade('Clinica Balcao');
+    const state = await (await fetch(base + `/api/venues/${venue.venue.slug}/state`)).json();
+    assert.strictEqual(state.counters.length, 1);
+    assert.strictEqual(state.monetization.limits.counters, 1);
+  });
+
+  test('segunda chamada simultanea esbarra no limite de balcoes', async () => {
+    const venue = await novaUnidade('Clinica Dois Balcoes');
+    const slug = venue.venue.slug;
+    await entrar(slug, 'Ana');
+    await entrar(slug, 'Bia');
+
+    const login = await fetch(base + `/api/venues/${slug}/operator/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: venue.operatorPassword }),
+    });
+    const { token } = await login.json();
+
+    const primeira = await fetch(base + `/api/venues/${slug}/tickets/call-next`, {
+      method: 'POST', headers: authed(token),
+    });
+    const segunda = await fetch(base + `/api/venues/${slug}/tickets/call-next`, {
+      method: 'POST', headers: authed(token),
+    });
+    assert.strictEqual(primeira.status, 200);
+    assert.strictEqual(segunda.status, 409, 'plano free deixou abrir um segundo balcao');
+  });
+});
+
+describe('jornada completa da unidade nova', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    server = await startServer({ RATE_LIMIT_SIGNUP: '100' });
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  test('do cadastro ao atendimento concluido', async () => {
+    // 1. o dono cria a unidade e recebe QR + senha
+    const signup = await (await fetch(base + '/api/venues', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Clinica Jornada', operatorName: 'Recepcao' }),
+    })).json();
+    const slug = signup.venue.slug;
+    assert.ok(signup.operatorPassword);
+
+    // 2. o QR do balcao aponta para a fila da unidade
+    assert.ok(signup.joinUrl.includes(`venue=${slug}`));
+    assert.ok(signup.joinUrl.includes(`token=${signup.venue.qrToken}`));
+
+    // 3. o cliente escaneia e entra na fila
+    const entrada = await (await fetch(base + `/api/venues/${slug}/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Pedro', qrToken: signup.venue.qrToken }),
+    })).json();
+    assert.strictEqual(entrada.ticket.code, 'M-001', 'numeracao deve comecar do zero na unidade nova');
+    assert.strictEqual(entrada.ticket.position, 1);
+
+    // 4. o operador entra no painel com a senha recebida
+    const login = await (await fetch(base + `/api/venues/${slug}/operator/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: signup.operatorPassword }),
+    })).json();
+    assert.ok(login.token);
+
+    // 5. chama o proximo
+    const chamada = await (await fetch(base + `/api/venues/${slug}/tickets/call-next`, {
+      method: 'POST', headers: authed(login.token),
+    })).json();
+    assert.strictEqual(chamada.ticket.status, 'calling');
+    assert.strictEqual(chamada.ticket.counter, 1);
+
+    // 6. o cliente ve a propria chamada
+    const acompanhando = await (await fetch(base + `/api/venues/${slug}/tickets/${entrada.ticket.id}`)).json();
+    assert.strictEqual(acompanhando.ticket.status, 'calling');
+
+    // 7. conclui o atendimento
+    const fim = await fetch(base + `/api/venues/${slug}/tickets/${entrada.ticket.id}/finish`, {
+      method: 'POST', headers: authed(login.token),
+    });
+    assert.strictEqual(fim.status, 200);
+
+    const estadoFinal = await (await fetch(base + `/api/venues/${slug}/state`)).json();
+    assert.strictEqual(estadoFinal.kpis.servedToday, 1);
+    assert.strictEqual(estadoFinal.kpis.waiting, 0);
+  });
+});
+
 describe('rate limit', () => {
   let server;
 
