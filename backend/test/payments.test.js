@@ -243,6 +243,137 @@ describe('o valor da cobranca nao e negociavel', () => {
   });
 });
 
+describe('cobranca no cartao', () => {
+  const ORDEM_CARTAO = {
+    corpo: {
+      id: 'ORD01CARTAO',
+      status: 'processed',
+      external_reference: 'clinica-teste',
+      transactions: {
+        payments: [{ id: 'PAY02', status: 'processed', status_detail: 'accredited' }],
+      },
+    },
+  };
+
+  test('monta o pagamento com token, bandeira e parcelas', async () => {
+    const { servidor, chamadas, base } = await subirStub(() => ORDEM_CARTAO);
+    const mp = carregarMP({ MP_API_BASE: base, MP_ACCESS_TOKEN: 'token-de-teste' });
+
+    const r = await mp.criarCobrancaCartao({
+      referencia: 'clinica-teste',
+      valorCentavos: 9900,
+      email: 'dono@clinica.com.br',
+      token: 'tok_do_google_pay',
+      bandeira: 'master',
+      competencia: '2026-07',
+    });
+
+    const pagamento = chamadas[0].corpo.transactions.payments[0];
+    assert.strictEqual(pagamento.payment_method.type, 'credit_card');
+    assert.strictEqual(pagamento.payment_method.token, 'tok_do_google_pay');
+    assert.strictEqual(pagamento.payment_method.id, 'master');
+    assert.strictEqual(pagamento.payment_method.installments, 1);
+    assert.strictEqual(chamadas[0].corpo.total_amount, '99.00');
+    assert.strictEqual(r.aprovado, true);
+    servidor.close();
+  });
+
+  test('o numero do cartao nunca sai daqui — so o token', async () => {
+    const { servidor, chamadas, base } = await subirStub(() => ORDEM_CARTAO);
+    const mp = carregarMP({ MP_API_BASE: base, MP_ACCESS_TOKEN: 'x' });
+    await mp.criarCobrancaCartao({
+      referencia: 'a', valorCentavos: 9900, email: 'a@b.co', token: 'tok_x', bandeira: 'visa',
+    });
+    const enviado = JSON.stringify(chamadas[0].corpo);
+    assert.ok(!/card_number|"number"|cvv|security_code/i.test(enviado));
+    servidor.close();
+  });
+
+  test('cobranca sem token e recusada antes de sair', async () => {
+    const mp = carregarMP({ MP_ACCESS_TOKEN: 'x' });
+    await assert.rejects(
+      () => mp.criarCobrancaCartao({ referencia: 'a', valorCentavos: 9900, email: 'a@b.co' }),
+      /sem token/,
+    );
+  });
+
+  test('recusa do emissor vira aprovado=false, nao excecao', async () => {
+    const { servidor, base } = await subirStub(() => ({
+      corpo: {
+        id: 'ORD03',
+        transactions: { payments: [{ status: 'rejected', status_detail: 'cc_rejected_high_risk' }] },
+      },
+    }));
+    const mp = carregarMP({ MP_API_BASE: base, MP_ACCESS_TOKEN: 'x' });
+    const r = await mp.criarCobrancaCartao({
+      referencia: 'a', valorCentavos: 9900, email: 'a@b.co', token: 'tok_x',
+    });
+    assert.strictEqual(r.aprovado, false);
+    assert.strictEqual(r.status, 'rejected');
+    servidor.close();
+  });
+
+  test('a chave de idempotencia do cartao nao colide com a do Pix', () => {
+    const mp = carregarMP({ MP_ACCESS_TOKEN: 'x' });
+    assert.notStrictEqual(
+      mp.chaveDeIdempotencia('clinica-teste', '2026-07'),
+      mp.chaveDeIdempotencia('clinica-teste|cartao', '2026-07'),
+    );
+  });
+
+  test('traduz a bandeira do Google para o identificador do MP', () => {
+    const mp = carregarMP({ MP_ACCESS_TOKEN: 'x' });
+    assert.strictEqual(mp.bandeiraDoGoogle('MASTERCARD'), 'master');
+    assert.strictEqual(mp.bandeiraDoGoogle('VISA'), 'visa');
+    assert.strictEqual(mp.bandeiraDoGoogle('visa'), 'visa');
+    assert.strictEqual(mp.bandeiraDoGoogle('BANDEIRA_QUE_NAO_EXISTE'), null);
+    assert.strictEqual(mp.bandeiraDoGoogle(undefined), null);
+  });
+
+  test('billing cobra PRICE_CENTS no cartao, ignorando o que vier junto', async () => {
+    process.env.PLAN_PRICE_CENTS = '9900';
+    process.env.PAYMENT_PROVIDER = 'sandbox';
+    delete require.cache[require.resolve('../billing')];
+    delete require.cache[require.resolve('../payments/sandbox')];
+    const billing = require('../billing');
+
+    const cobranca = await billing.criarCobrancaCartao({
+      venue: { slug: 'clinica-teste', name: 'X', contactEmail: '' },
+      email: 'dono@clinica.com.br',
+      token: 'tok_sandbox',
+      // O totalPrice do Google Pay e exibicao no cliente. Editar isso no
+      // navegador nao pode mudar o que se cobra.
+      valorCentavos: 1,
+      total_amount: '0.01',
+      amount: 1,
+    });
+    assert.strictEqual(cobranca.valorCentavos, 9900);
+    assert.strictEqual(cobranca.valorLabel, 'R$ 99,00');
+    assert.strictEqual(cobranca.aprovado, true);
+  });
+
+  test('config do Google Pay nao expoe segredo e some sem gateway', () => {
+    delete process.env.GPAY_GATEWAY;
+    delete process.env.GPAY_GATEWAY_MERCHANT_ID;
+    delete require.cache[require.resolve('../billing')];
+    const billing = require('../billing');
+
+    const c = billing.googlePayConfig();
+    // Sem gateway confirmado, o botao nao aparece: um botao que quebra no
+    // clique e pior que um botao ausente.
+    assert.strictEqual(c.disponivel, false);
+    const texto = JSON.stringify(c);
+    assert.ok(!/ACCESS_TOKEN|MP_ACCESS|secret|SECRET/i.test(texto));
+
+    process.env.GPAY_GATEWAY = 'algum-gateway';
+    process.env.GPAY_GATEWAY_MERCHANT_ID = 'merchant-123';
+    delete require.cache[require.resolve('../billing')];
+    assert.strictEqual(require('../billing').googlePayConfig().disponivel, true);
+    delete process.env.GPAY_GATEWAY;
+    delete process.env.GPAY_GATEWAY_MERCHANT_ID;
+  });
+});
+
 // A pior mentira possivel aqui: dizer que gerou uma cobranca sem ter gerado.
 // A pessoa fica esperando um Pix que nao existe e some. O qwen2.5:7b escreveu
 // "Ja gerei o Pix... copie esse codigo: [codigo Pix aparece aqui]" sem chamar

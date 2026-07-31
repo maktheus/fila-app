@@ -124,10 +124,65 @@ do MP e decide pelo que a API responde. Corpo forjado não vira premium.
 - Responder 200 em até 22 segundos, senão o MP reenvia (por isso a idempotência
   por recurso no handler)
 
+## Cartão pelo Google Pay
+
+`/assinar.html?venue=<slug>` — a tela de assinatura, com Google Pay e Pix lado a
+lado. O chatbot manda o link quando a pessoa prefere cartão.
+
+**O número do cartão nunca chega ao nosso servidor.** O Google Pay cifra os
+dados para o processador e nos entrega um token opaco; a rota
+`POST /api/venues/:slug/cobranca/cartao` recebe esse token e repassa. Isso não é
+detalhe de implementação: é o que mantém o projeto fora do escopo pesado de PCI
+DSS. Há teste conferindo que nenhum campo tipo `card_number` ou `security_code`
+sai daqui.
+
+O corpo vai para a Orders API como:
+
+```json
+"payment_method": { "id": "master", "type": "credit_card",
+                    "token": "<do Google Pay>", "installments": 1 }
+```
+
+A bandeira que o Google devolve (`MASTERCARD`) não é o identificador do MP
+(`master`) — `bandeiraDoGoogle()` traduz.
+
+**O valor continua não sendo negociável.** O `totalPrice` que aparece na bandeja
+do Google Pay é exibição do lado do cliente: quem cobra é o servidor, com
+`PRICE_CENTS`. Editar o valor no navegador muda o que a bandeja mostra e não
+muda um centavo do que é cobrado — há teste para isso.
+
+**Cartão libera na hora**, sem esperar webhook, porque a Orders API já responde
+`processed`/`accredited` na própria chamada. Recusa do emissor volta 402 com uma
+mensagem que oferece o Pix, em vez de virar exceção.
+
+### O que falta para funcionar de verdade
+
+Dois identificadores, e eles não são nossos:
+
+```json
+{ "type": "PAYMENT_GATEWAY",
+  "parameters": { "gateway": "???", "gatewayMerchantId": "???" } }
+```
+
+O Google cifra o cartão **para um processador específico**. Pesquisando a
+documentação do Google e a do Mercado Pago, não encontrei o MP declarado como
+gateway do Google Pay com identificador público. Precisa vir do suporte deles.
+
+Enquanto `GPAY_GATEWAY` e `GPAY_GATEWAY_MERCHANT_ID` estiverem vazios, **o botão
+não aparece** — de propósito. Um botão de pagamento que quebra no clique custa
+mais confiança que um botão ausente. Em `PAYMENT_PROVIDER=sandbox` a tela mostra
+um botão equivalente que exercita exatamente o mesmo caminho de servidor, para
+a jornada ser testável sem conta no Google.
+
+Detalhes e plano B em [PENDENCIAS.md](PENDENCIAS.md#5).
+
 ## Recorrência: o que existe e o que não
 
-Hoje é **Pix avulso por ciclo**. Não há débito automático nem cartão salvo. A
-cada mês sai uma cobrança nova por e-mail, e cancelar é não pagar.
+Hoje é **avulso por ciclo**, tanto no Pix quanto no cartão. Não guardamos o
+cartão e não há débito automático — a cada mês sai uma cobrança nova por
+e-mail, e cancelar é não pagar. Aceitar cartão melhorou a conversão (libera na
+hora, um toque), mas **não** resolveu a recorrência: para isso é preciso o
+preapproval do MP ou o Pix Automático.
 
 Pix recorrente de verdade só existe via **Pix Automático**, o rail do Banco
 Central no ar desde junho de 2025 e em rollout ao longo de 2026. A documentação
@@ -179,12 +234,21 @@ curl -X POST http://localhost/api/cobrancas/SBX-XXXX/confirmar-sandbox
 | `MP_PIX_EXPIRA_MINUTOS` | `1440` | Validade do Pix (30 a 43200) |
 | `MP_TIMEOUT_MS` | `15000` | Teto de espera da API do MP |
 | `PLAN_PRICE_CENTS` | `9900` | **A única fonte do valor cobrado** |
+| `GPAY_GATEWAY` | — | Identificador do processador — confirmar com o MP |
+| `GPAY_GATEWAY_MERCHANT_ID` | — | Idem. Vazio = botão não aparece |
+| `GPAY_MERCHANT_ID` | — | Do Google Pay Business Console (só em PRODUCTION) |
+| `GPAY_ENVIRONMENT` | `TEST` | `TEST` não cobra de verdade |
+| `GPAY_CARD_NETWORKS` | `MASTERCARD,VISA,AMEX,ELO` | Bandeiras aceitas |
 | `RATE_LIMIT_COBRANCA` | `10` | Cobranças por hora por IP |
 
 ## O que ainda falta
 
-- **Cobrança do ciclo seguinte.** Hoje a primeira cobrança é gerada; a renovação
-  mensal automática por e-mail ainda não existe. Sem ela, ninguém paga o
-  segundo mês.
-- **Cancelamento self-service.** Obrigação do CDC e ainda não construído.
-- **Pix Automático**, quando estabilizar.
+Tudo catalogado em **[PENDENCIAS.md](PENDENCIAS.md)**, com o custo de deixar
+como está e o caminho de cada um. Os que tocam pagamento:
+
+- **Cobrança do ciclo seguinte** — a primeira sai, a renovação não existe. Sem
+  ela ninguém paga o segundo mês.
+- **Cancelamento self-service** — obrigação do CDC, não escolha de produto.
+- **Os dois identificadores do Google Pay** — precisam vir do suporte do MP.
+- **Os e-mails transacionais não saem** — `MAIL_ENABLED` está `false`, e todo o
+  resto do funil pressupõe que eles chegam.

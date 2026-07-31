@@ -145,6 +145,67 @@ async function criarCobrancaPix({ venue, email, competencia }) {
   };
 }
 
+// Cobranca no cartao a partir de um token de carteira (Google Pay) ou da
+// tokenizacao do proprio provedor.
+//
+// O `totalPrice` que a bandeja do Google Pay mostra e exibicao do lado do
+// cliente. Quem cobra e este servidor, com PRICE_CENTS. Se alguem editar o
+// valor no navegador, a bandeja mostra outro numero e a cobranca sai igual.
+async function criarCobrancaCartao({ venue, email, token, bandeira, parcelas, competencia }) {
+  const destino = String(email || venue.contactEmail || '').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(destino)) {
+    throw new Error('E-mail invalido para a cobranca.');
+  }
+  if (!token) throw new Error('Cobranca no cartao sem token.');
+
+  const adaptador = PROVIDER === 'mercadopago' ? mercadopago : sandbox;
+  if (!adaptador.configurado()) {
+    throw new Error('Provedor de pagamento nao configurado.');
+  }
+
+  const cobranca = await adaptador.criarCobrancaCartao({
+    referencia: venue.slug,
+    valorCentavos: PRICE_CENTS,
+    email: destino,
+    descricao: `Fila Virtual premium — ${venue.name || venue.slug}`,
+    token,
+    bandeira,
+    parcelas,
+    competencia: competencia || new Date().toISOString().slice(0, 7),
+  });
+
+  return {
+    ...cobranca,
+    provider: adaptador.nome,
+    valorLabel: 'R$ ' + (PRICE_CENTS / 100).toFixed(2).replace('.', ','),
+  };
+}
+
+// Config publica do Google Pay. So o que a bandeja precisa — nunca segredo.
+//
+// O `gateway` e o `gatewayMerchantId` precisam ser confirmados com o suporte
+// do Mercado Pago: sem o identificador certo, o token que o Google gera nao e
+// decifravel por eles e a cobranca falha na hora. Por isso o botao so aparece
+// quando isso esta configurado, em vez de aparecer e quebrar no clique.
+function googlePayConfig() {
+  const gateway = process.env.GPAY_GATEWAY || '';
+  const gatewayMerchantId = process.env.GPAY_GATEWAY_MERCHANT_ID || '';
+  return {
+    disponivel: !!(gateway && gatewayMerchantId),
+    ambiente: process.env.GPAY_ENVIRONMENT || 'TEST',
+    merchantId: process.env.GPAY_MERCHANT_ID || '',
+    merchantName: process.env.GPAY_MERCHANT_NAME || 'Fila Virtual',
+    gateway,
+    gatewayMerchantId,
+    bandeiras: (process.env.GPAY_CARD_NETWORKS || 'MASTERCARD,VISA,AMEX,ELO')
+      .split(',').map(s => s.trim()).filter(Boolean),
+    precoCentavos: PRICE_CENTS,
+    precoLabel: 'R$ ' + (PRICE_CENTS / 100).toFixed(2).replace('.', ','),
+    moeda: 'BRL',
+    pais: 'BR',
+  };
+}
+
 function alreadyProcessed(eventId) {
   if (!eventId) return false;
   const now = Date.now();
@@ -203,6 +264,8 @@ module.exports = {
   alreadyProcessed,
   applyEvent,
   criarCobrancaPix,
+  criarCobrancaCartao,
+  googlePayConfig,
   mercadopago,
   sandbox,
 };

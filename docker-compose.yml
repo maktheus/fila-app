@@ -51,6 +51,14 @@ services:
       - MP_WEBHOOK_SECRET=${MP_WEBHOOK_SECRET:-}
       - MP_PIX_EXPIRA_MINUTOS=${MP_PIX_EXPIRA_MINUTOS:-1440}
       - RATE_LIMIT_COBRANCA=${RATE_LIMIT_COBRANCA:-10}
+      # Google Pay: gateway e gatewayMerchantId precisam ser confirmados com
+      # o suporte do MP. Vazios = botao nao aparece.
+      - GPAY_GATEWAY=${GPAY_GATEWAY:-}
+      - GPAY_GATEWAY_MERCHANT_ID=${GPAY_GATEWAY_MERCHANT_ID:-}
+      - GPAY_MERCHANT_ID=${GPAY_MERCHANT_ID:-}
+      - GPAY_MERCHANT_NAME=${GPAY_MERCHANT_NAME:-Fila Virtual}
+      - GPAY_ENVIRONMENT=${GPAY_ENVIRONMENT:-TEST}
+      - GPAY_CARD_NETWORKS=${GPAY_CARD_NETWORKS:-MASTERCARD,VISA,AMEX,ELO}
       - CHAT_PROVIDER=${CHAT_PROVIDER:-local}
       # O runtime local roda na maquina host, fora do compose. Dentro do
       # container, "localhost" e o proprio container — por isso host.docker.internal.

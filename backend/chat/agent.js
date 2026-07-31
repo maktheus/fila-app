@@ -67,7 +67,7 @@ function blocoDeFatos(fatos) {
 Preço do plano premium: ${fatos.precoLabel} por mês, por unidade de atendimento.
 Teste grátis: ${fatos.diasDeTeste} dias, com tudo liberado e sem pedir cartão.
 Plano gratuito: ${fatos.limiteDiario || 50} entradas por dia, ${fatos.balcoes || 1} balcão, com anúncios.
-Pagamento: Pix, sem fidelidade. A cobranca e mensal e chega por e-mail a cada ciclo — nao ha debito automatico nem cartao cadastrado.
+Pagamento: Pix ou cartao pelo Google Pay, sem fidelidade. No cartao o premium libera na hora; no Pix, assim que o pagamento cai. A cobranca e mensal e chega por e-mail a cada ciclo — nao guardamos o cartao nem ha debito automatico.
 </fatos>`;
 }
 

@@ -49,6 +49,27 @@ async function criarCobrancaPix({ referencia, valorCentavos, email, competencia 
   return { ...cobranca, email: undefined };
 }
 
+// Cartao de mentira. Aprova por padrao; um token comecando com "recusar"
+// devolve recusa, para a tela de erro ser testavel tambem — caminho de falha
+// que ninguem exercita e caminho que quebra em producao.
+async function criarCobrancaCartao({ referencia, valorCentavos, token, bandeira }) {
+  const externalId = 'SBXC-' + crypto.randomBytes(8).toString('hex').toUpperCase();
+  const recusado = String(token || '').startsWith('recusar');
+
+  const cobranca = {
+    externalId,
+    pagamentoId: externalId,
+    valorCentavos,
+    bandeira: bandeira || 'master',
+    status: recusado ? 'rejected' : 'processed',
+    statusDetalhe: recusado ? 'cc_rejected_other_reason' : 'accredited',
+    aprovado: !recusado,
+    referencia,
+  };
+  if (!recusado) cobrancas.set(externalId, cobranca);
+  return cobranca;
+}
+
 function buscar(externalId) {
   return cobrancas.get(String(externalId)) || null;
 }
@@ -61,6 +82,7 @@ module.exports = {
   nome: 'sandbox',
   configurado,
   criarCobrancaPix,
+  criarCobrancaCartao,
   buscar,
   esquecer,
   EXPIRA_MINUTOS,

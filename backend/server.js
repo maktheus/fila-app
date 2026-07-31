@@ -687,6 +687,78 @@ app.post('/api/venues/:slug/cobranca', cobrancaLimiter, async (req, res) => {
   }
 });
 
+// Config publica do checkout. So o que a tela precisa para desenhar os
+// botoes — nenhum segredo passa por aqui.
+app.get('/api/pagamento/config', (_req, res) => {
+  const gpay = billing.googlePayConfig();
+  res.json({
+    provider: billing.PROVIDER,
+    sandbox: billing.PROVIDER === 'sandbox',
+    precoLabel: 'R$ ' + (billing.PRICE_CENTS / 100).toFixed(2).replace('.', ','),
+    pix: { disponivel: true },
+    // Em sandbox o botao aparece para a jornada ser testavel sem conta no
+    // Google; em producao so aparece com gateway configurado, porque um botao
+    // que quebra no clique e pior que um botao ausente.
+    googlePay: billing.PROVIDER === 'sandbox'
+      ? { ...gpay, disponivel: true, simulado: true }
+      : gpay,
+  });
+});
+
+// Cobranca no cartao. Recebe um TOKEN, nunca o numero do cartao — dado de
+// cartao nao passa por este servidor, e e o que nos mantem fora do escopo
+// pesado de PCI DSS.
+//
+// Como no Pix, nao existe campo de valor. O `totalPrice` que o Google Pay
+// mostra na bandeja e exibicao do lado do cliente; quem cobra e o servidor.
+app.post('/api/venues/:slug/cobranca/cartao', cobrancaLimiter, async (req, res) => {
+  const venue = venues.get(String(req.params.slug || ''));
+  if (!venue) return res.status(404).json({ error: 'Unidade nao encontrada.' });
+
+  const body = req.body || {};
+  const email = String(body.email || '').trim().slice(0, 120);
+  const token = String(body.token || '').slice(0, 4000);
+  const bandeira = billing.mercadopago.bandeiraDoGoogle(body.bandeira);
+
+  try {
+    const cobranca = await billing.criarCobrancaCartao({ venue, email, token, bandeira });
+
+    if (!cobranca.aprovado) {
+      notify.track('cartao_recusado', { venue: venue.slug });
+      return res.status(402).json({
+        error: 'O cartão não foi aprovado. Tente outro cartão ou pague por Pix.',
+        status: cobranca.status,
+      });
+    }
+
+    // Cartao aprovado libera na hora: nao ha espera de compensacao como no Pix.
+    const result = billing.applyEvent(venue, {
+      type: 'payment.confirmed',
+      id: cobranca.externalId,
+      subscriptionId: cobranca.externalId,
+    });
+    venue.plan = result.plan;
+    venue.pendingCharge = null;
+    if (email) venue.contactEmail = email;
+    pushLog(venue, 'Assinatura: pagamento no cartao confirmado');
+    notify.track('cartao_aprovado', { venue: venue.slug });
+    notify.sendEmail(result.email, venue, { priceLabel: billing.subscriptionView(venue).priceLabel });
+    broadcast(venue, { action: 'subscription', status: venue.subscription.status });
+    persistStore();
+
+    res.json({
+      ok: true,
+      valorLabel: cobranca.valorLabel,
+      plan: venue.plan,
+      status: venue.subscription.status,
+      provider: cobranca.provider,
+    });
+  } catch (error) {
+    console.warn('[cobranca cartao] falhou:', error.message);
+    res.status(502).json({ error: error.message });
+  }
+});
+
 // Confirma uma cobranca de mentira. So existe fora de producao e so com o
 // provedor sandbox — e o que permite testar a jornada inteira sem conta em
 // banco. Em producao quem confirma e o webhook do provedor.

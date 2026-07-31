@@ -35,7 +35,7 @@ const TRECHOS = [
   {
     id: 'pagamento',
     titulo: 'Como se paga',
-    texto: `O pagamento é por Pix. Ao contratar, o assistente gera o código copia-e-cola na hora e o premium libera assim que o pagamento cai. A cada mês chega uma nova cobrança por e-mail — não existe débito automático, cartão cadastrado nem fidelidade, então parar é só não pagar o próximo ciclo. Não emitimos boleto nem aceitamos cartão hoje.`,
+    texto: `O pagamento é por Pix ou cartão. No Pix, o assistente gera o código copia-e-cola na hora e o premium libera assim que o pagamento cai. No cartão é pelo Google Pay, na página de assinatura, e o premium libera na hora — o número do cartão não passa pelos nossos servidores, só um token do provedor de pagamento. A cada mês chega uma nova cobrança por e-mail: não guardamos o cartão, não existe débito automático nem fidelidade, então parar é só não pagar o próximo ciclo. Não emitimos boleto.`,
   },
   {
     id: 'segmentos',

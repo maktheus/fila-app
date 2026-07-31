@@ -146,7 +146,7 @@ const HANDLERS = {
         entradas_por_dia: 'ilimitadas',
         balcoes: 'todos',
         com_anuncios: false,
-        forma_de_pagamento: 'Pix, cobrado a cada mes por e-mail. Sem debito automatico, sem cartao, sem fidelidade',
+        forma_de_pagamento: 'Pix ou cartao pelo Google Pay, cobrado a cada mes por e-mail. Nao guardamos o cartao, sem debito automatico, sem fidelidade',
       },
       pagina_de_planos: `${APP_BASE}/planos.html`,
     };
@@ -252,10 +252,12 @@ const HANDLERS = {
       return {
         pix_gerado: true,
         valor: cobranca.valorLabel,
+        link_para_cartao: `${APP_BASE}/assinar.html?venue=${slug}`,
         instrucao: 'O bloco de pagamento com o código Pix JÁ apareceu na tela para a pessoa. ' +
           'NÃO escreva o código na sua resposta — você não o recebeu. Diga em uma frase que o Pix ' +
           'está aí na tela, com o valor, e que o premium libera assim que o pagamento cair. ' +
-          'Não prometa prazo de compensação.',
+          'Não prometa prazo de compensação. Se ela preferir cartão, mande o link_para_cartao: ' +
+          'lá tem Google Pay e o premium libera na hora.',
       };
     } catch (erro) {
       if (erro.status === 404) return { erro: 'Não encontrei essa unidade.' };

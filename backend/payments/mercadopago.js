@@ -135,6 +135,77 @@ async function criarCobrancaPix({ referencia, valorCentavos, email, descricao, c
   };
 }
 
+/**
+ * Cobranca no cartao. O token vem do cliente — do Google Pay ou da
+ * tokenizacao do proprio MP — e NUNCA o numero do cartao. Dado de cartao nao
+ * passa por este servidor em momento nenhum, e e o que nos mantem fora do
+ * escopo pesado de PCI DSS.
+ *
+ * O valor continua saindo daqui. O `totalPrice` que o Google Pay mostra na
+ * bandeja e so exibicao: quem cobra e este request.
+ */
+async function criarCobrancaCartao({ referencia, valorCentavos, email, descricao, token, bandeira, parcelas, competencia }) {
+  if (!configurado()) throw new Error('MP_ACCESS_TOKEN nao configurado.');
+  if (!referencia) throw new Error('Cobranca sem referencia da unidade.');
+  if (!Number.isFinite(valorCentavos) || valorCentavos <= 0) {
+    throw new Error('Valor de cobranca invalido.');
+  }
+  if (!email) throw new Error('Mercado Pago exige o e-mail do pagador.');
+  if (!token) throw new Error('Cobranca no cartao sem token.');
+
+  const valor = reais(valorCentavos);
+  const dados = await chamar('/v1/orders', {
+    metodo: 'POST',
+    idempotencia: chaveDeIdempotencia(`${referencia}|cartao`, competencia || new Date().toISOString().slice(0, 7)),
+    corpo: {
+      type: 'online',
+      processing_mode: 'automatic',
+      total_amount: valor,
+      external_reference: referencia,
+      description: descricao || 'Fila Virtual — plano premium',
+      payer: { email },
+      transactions: {
+        payments: [{
+          amount: valor,
+          payment_method: {
+            // A bandeira vem do que o Google Pay devolve; sem ela o MP ainda
+            // resolve pelo token na maioria dos casos.
+            id: bandeira || 'master',
+            type: 'credit_card',
+            token,
+            installments: Number(parcelas) || 1,
+          },
+        }],
+      },
+    },
+  });
+
+  const pagamento = ((dados.transactions || {}).payments || [])[0] || {};
+  return {
+    externalId: String(dados.id || ''),
+    pagamentoId: String(pagamento.id || ''),
+    valorCentavos,
+    status: pagamento.status || dados.status || 'unknown',
+    statusDetalhe: pagamento.status_detail || dados.status_detail || '',
+    aprovado: traduzirStatus(pagamento.status || dados.status, pagamento.status_detail) === 'payment.confirmed',
+  };
+}
+
+// A bandeira que o Google Pay devolve ("VISA", "MASTERCARD") nao e o
+// identificador que o MP usa ("visa", "master").
+const BANDEIRAS = {
+  VISA: 'visa',
+  MASTERCARD: 'master',
+  AMEX: 'amex',
+  ELO: 'elo',
+  HIPERCARD: 'hipercard',
+  DISCOVER: 'discover',
+};
+
+function bandeiraDoGoogle(rede) {
+  return BANDEIRAS[String(rede || '').toUpperCase()] || null;
+}
+
 async function consultarOrder(id) {
   return chamar(`/v1/orders/${encodeURIComponent(id)}`);
 }
@@ -200,6 +271,8 @@ module.exports = {
   nome: 'mercadopago',
   configurado,
   criarCobrancaPix,
+  criarCobrancaCartao,
+  bandeiraDoGoogle,
   consultarOrder,
   consultarPagamento,
   verificarAssinatura,
