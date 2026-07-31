@@ -30,7 +30,7 @@ Cortado do MVP (explicitamente): seleção de unidade, busca por senha/nome, his
 
 ## MVP — o que falta construir (em blocos)
 
-Estado atual: ✅ painel do operador (`frontend/index.html`), ✅ backend com ações de operador (`backend/server.js`), ✅ landing, ✅ protótipos de design (`project/*.dc.html`). **Falta o app do cliente — o coração da ideia original (`chats/chat1.md`).**
+Estado atual (2026-07-30): ✅ Bloco 1 (app do cliente `frontend/cliente.html`), ✅ Bloco 2 (passar a vez + proximidade), ✅ Bloco 3 parcial (token de operador, CORS por env, rate limit — falta inverter rotas e expurgo LGPD), ✅ persistência em **Postgres via Docker** (`backend/db.js`, decisão de 2026-07-30: Postgres no lugar de SQLite/Supabase), ✅ deploy VPS + GitHub Pages, ✅ app Android WebView. Roadmap completo até o go-live: `docs/kanban.html`.
 
 As 3 telas do MVP (protótipo `project/Fila Virtual.dc.html` é a fonte visual):
 
@@ -45,7 +45,7 @@ As 3 telas do MVP (protótipo `project/Fila Virtual.dc.html` é a fonte visual):
 | 1 | App do cliente: entrar via QR + status ao vivo | `frontend/cliente.html` novo; `POST /api/tickets` (ligar a token de unidade); WS |
 | 2 | Passar a vez + proximidade | endpoint `POST /api/tickets/:id/pass`; Geolocation no front; coords da unidade no store |
 | 3 | **Auth do admin + hardening** (pré-requisito de qualquer deploy real) | token de operador nos endpoints de ação; CORS restrito; rate limit |
-| 4 | Persistência + multi-unidade | SQLite ou Supabase; QR token por unidade; limpeza de tickets (LGPD) |
+| 4 | Persistência + multi-unidade | ✅ Postgres via Docker (base pronta); falta: schema multi-unidade, QR token por unidade, limpeza de tickets (LGPD) |
 | 5 | Monetização B2B | assinatura Cakto/Pix por unidade; onboarding da clínica (gera QR na hora) |
 
 ### Prompt de construção do Bloco 1 (planejar com Opus, executar com Sonnet)

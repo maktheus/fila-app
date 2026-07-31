@@ -12,6 +12,8 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 const APP_VERSION = process.env.APP_VERSION || '0.1.0';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data', 'store.json');
+const USE_POSTGRES = !!process.env.DATABASE_URL;
+const db = USE_POSTGRES ? require('./db') : null;
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map(origin => origin.trim())
@@ -67,8 +69,6 @@ const store = {
   ],
 };
 
-loadPersistedStore();
-
 // --------------- Helpers ---------------
 
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -121,31 +121,49 @@ function updateWaitTimes() {
   });
 }
 
-function loadPersistedStore() {
+function applyPersistedData(data) {
+  if (!data) return;
+  if (Number.isFinite(data.servedToday)) store.servedToday = data.servedToday;
+  if (Number.isFinite(data.lastCalled)) store.lastCalled = data.lastCalled;
+  if (Number.isFinite(data.nextId)) store.nextId = data.nextId;
+  if (Array.isArray(data.tickets) && data.tickets.length) store.tickets = data.tickets;
+  if (Array.isArray(data.log) && data.log.length) store.log = data.log;
+}
+
+async function loadPersistedStore() {
+  if (USE_POSTGRES) {
+    await db.ensureSchema();
+    applyPersistedData(await db.loadStore());
+    return;
+  }
   try {
     if (!fs.existsSync(DATA_FILE)) return;
-    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    if (Number.isFinite(data.servedToday)) store.servedToday = data.servedToday;
-    if (Number.isFinite(data.lastCalled)) store.lastCalled = data.lastCalled;
-    if (Number.isFinite(data.nextId)) store.nextId = data.nextId;
-    if (Array.isArray(data.tickets)) store.tickets = data.tickets;
-    if (Array.isArray(data.log)) store.log = data.log;
+    applyPersistedData(JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')));
   } catch (error) {
     console.warn('Nao foi possivel carregar persistencia local:', error.message);
   }
 }
 
+function snapshot() {
+  return {
+    servedToday: store.servedToday,
+    lastCalled: store.lastCalled,
+    nextId: store.nextId,
+    tickets: store.tickets,
+    log: store.log,
+  };
+}
+
 function persistStore() {
+  if (USE_POSTGRES) {
+    db.saveStore(snapshot()).catch(error => {
+      console.warn('Nao foi possivel salvar no Postgres:', error.message);
+    });
+    return;
+  }
   try {
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify({
-      servedToday: store.servedToday,
-      lastCalled: store.lastCalled,
-      nextId: store.nextId,
-      tickets: store.tickets,
-      log: store.log,
-      savedAt: new Date().toISOString(),
-    }, null, 2));
+    fs.writeFileSync(DATA_FILE, JSON.stringify({ ...snapshot(), savedAt: new Date().toISOString() }, null, 2));
   } catch (error) {
     console.warn('Nao foi possivel salvar persistencia local:', error.message);
   }
@@ -484,7 +502,16 @@ app.post('/api/tickets', publicTicketLimiter, (req, res) => {
 // --------------- Start ---------------
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Fila Virtual API running on port ${PORT}`);
-  console.log(`WebSocket available at ws://0.0.0.0:${PORT}/ws`);
-});
+
+loadPersistedStore()
+  .then(() => {
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`Fila Virtual API running on port ${PORT}`);
+      console.log(`Persistencia: ${USE_POSTGRES ? 'Postgres' : 'arquivo JSON (' + DATA_FILE + ')'}`);
+      console.log(`WebSocket available at ws://0.0.0.0:${PORT}/ws`);
+    });
+  })
+  .catch(error => {
+    console.error('Falha ao carregar persistencia:', error.message);
+    process.exit(1);
+  });

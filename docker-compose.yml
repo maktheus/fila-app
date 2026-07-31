@@ -9,11 +9,27 @@ services:
     volumes:
       - uptime-kuma-data:/app/data
 
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-fila}
+      - POSTGRES_USER=${POSTGRES_USER:-fila}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-fila-dev-password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fila} -d ${POSTGRES_DB:-fila}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build: ./backend
     restart: unless-stopped
     environment:
       - PORT=3000
+      - DATABASE_URL=postgres://${POSTGRES_USER:-fila}:${POSTGRES_PASSWORD:-fila-dev-password}@postgres:5432/${POSTGRES_DB:-fila}
       - VENUE_QR_TOKEN=${VENUE_QR_TOKEN:-demo-centro}
       - VENUE_LAT=${VENUE_LAT:--3.119028}
       - VENUE_LNG=${VENUE_LNG:--60.021731}
@@ -22,13 +38,13 @@ services:
       - ADS_ENABLED=${ADS_ENABLED:-true}
       - CORS_ORIGIN=${CORS_ORIGIN:-}
       - ADMIN_TOKEN=${ADMIN_TOKEN:-}
-      - DATA_FILE=/app/data/store.json
       - VENUE_NAME=Unidade Centro
       - OPERATOR_NAME=Equipe balcao
-    volumes:
-      - backend-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -45,5 +61,5 @@ services:
         condition: service_healthy
 
 volumes:
-  backend-data:
+  postgres-data:
   uptime-kuma-data:

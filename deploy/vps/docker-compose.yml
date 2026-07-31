@@ -1,6 +1,32 @@
 name: fila-app
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fila-app-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fila}
+      POSTGRES_USER: ${POSTGRES_USER:-fila}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    volumes:
+      - fila-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fila} -d ${POSTGRES_DB:-fila}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 384m
+    cpus: 0.50
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
   backend:
     build:
       context: ../../backend
@@ -12,11 +38,12 @@ services:
       - .env
     environment:
       PORT: 3000
-      DATA_FILE: /app/data/store.json
+      DATABASE_URL: postgres://${POSTGRES_USER:-fila}:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}@postgres:5432/${POSTGRES_DB:-fila}
     ports:
       - "172.18.0.1:40006:3000"
-    volumes:
-      - fila-backend-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 30s
@@ -39,4 +66,4 @@ services:
         max-file: "3"
 
 volumes:
-  fila-backend-data:
+  fila-postgres-data:
