@@ -53,14 +53,21 @@ Se a pessoa pedir para ver funcionando e já tiver dito o nome do estabeleciment
 
 criar_demonstracao cria uma fila real, com QR e painel. Depois de chamá-la, entregue os links e diga que ela já pode testar no balcão.
 
-O mesmo vale para as outras ferramentas: quando a resposta depende de um dado do sistema, busque o dado em vez de anunciar que vai buscar.`;
+O mesmo vale para as outras ferramentas: quando a resposta depende de um dado do sistema, busque o dado em vez de anunciar que vai buscar.
+
+## Fechar a venda
+Se a pessoa disser que quer contratar, assinar ou pagar, use gerar_pix_da_assinatura. Ela precisa ter uma unidade (crie a demonstração antes se não tiver) e um e-mail — peça o e-mail se ela ainda não deu, e só ele.
+
+O código Pix aparece sozinho na tela, num bloco com botão de copiar — você não o recebe e não deve escrevê-lo. Sua resposta é uma frase curta dizendo que o Pix está aí, com o valor que a ferramenta devolveu.
+
+Nunca diga que a cobrança é automática, que renova sozinha ou que o cartão fica salvo — nada disso existe. A cada mês chega uma nova cobrança por e-mail, e parar é só não pagar. Não prometa prazo de compensação do Pix.`;
 
 function blocoDeFatos(fatos) {
   return `<fatos>
 Preço do plano premium: ${fatos.precoLabel} por mês, por unidade de atendimento.
 Teste grátis: ${fatos.diasDeTeste} dias, com tudo liberado e sem pedir cartão.
 Plano gratuito: ${fatos.limiteDiario || 50} entradas por dia, ${fatos.balcoes || 1} balcão, com anúncios.
-Pagamento: Pix recorrente, sem fidelidade.
+Pagamento: Pix, sem fidelidade. A cobranca e mensal e chega por e-mail a cada ciclo — nao ha debito automatico nem cartao cadastrado.
 </fatos>`;
 }
 
@@ -78,7 +85,7 @@ function montarSystem({ trechos, fatos, sinalDeInjecao }) {
 
 // --------------- Provedores ---------------
 
-async function rodarLocal({ system, historico, pergunta, diagnostico }) {
+async function rodarLocal({ system, historico, pergunta, diagnostico, contexto }) {
   const mensagens = [
     ...historico.map(m => ({ role: m.role, content: local.achatarConteudo(m.content) })),
     { role: 'user', content: pergunta },
@@ -94,7 +101,7 @@ async function rodarLocal({ system, historico, pergunta, diagnostico }) {
 
     const resultados = [];
     for (const chamada of ultima.chamadas) {
-      const saida = await executar(chamada.nome, chamada.entrada);
+      const saida = await executar(chamada.nome, chamada.entrada, contexto);
       diagnostico.ferramentas.push({ nome: chamada.nome, entrada: chamada.entrada, saida });
       resultados.push({ id: chamada.id, saida });
     }
@@ -104,7 +111,7 @@ async function rodarLocal({ system, historico, pergunta, diagnostico }) {
   return ultima.texto;
 }
 
-async function rodarClaude({ system, historico, pergunta, diagnostico }) {
+async function rodarClaude({ system, historico, pergunta, diagnostico, contexto }) {
   const Anthropic = require('@anthropic-ai/sdk');
   const cliente = new Anthropic();
   const mensagens = [...historico, { role: 'user', content: pergunta }];
@@ -136,7 +143,7 @@ async function rodarClaude({ system, historico, pergunta, diagnostico }) {
 
     const resultados = [];
     for (const chamada of chamadas) {
-      const saida = await executar(chamada.name, chamada.input);
+      const saida = await executar(chamada.name, chamada.input, contexto);
       diagnostico.ferramentas.push({ nome: chamada.name, entrada: chamada.input, saida });
       resultados.push({
         type: 'tool_result',
@@ -169,7 +176,7 @@ function configurado(preferido) {
   return true; // o local só falha na hora da chamada, e o erro é explicado
 }
 
-async function responder({ mensagem, historico = [], fatos, provedor }) {
+async function responder({ mensagem, historico = [], fatos, provedor, contexto = {} }) {
   const inicio = Date.now();
   const escolhido = provedorAtivo(provedor);
   const diagnostico = {
@@ -234,8 +241,8 @@ async function responder({ mensagem, historico = [], fatos, provedor }) {
   let bruto = '';
   try {
     bruto = escolhido === 'claude'
-      ? await rodarClaude({ system, historico, pergunta: entrada.texto, diagnostico })
-      : await rodarLocal({ system, historico, pergunta: entrada.texto, diagnostico });
+      ? await rodarClaude({ system, historico, pergunta: entrada.texto, diagnostico, contexto })
+      : await rodarLocal({ system, historico, pergunta: entrada.texto, diagnostico, contexto });
   } catch (erro) {
     diagnostico.erro = erro.message;
     diagnostico.ms = Date.now() - inicio;
@@ -271,7 +278,11 @@ async function responder({ mensagem, historico = [], fatos, provedor }) {
     };
   }
 
-  const verificado = guardrails.validarSaida(bruto, fatos);
+  // O guardrail confere a afirmacao contra o que o sistema fez neste turno:
+  // dizer que gerou um Pix sem ter gerado deixa a pessoa esperando.
+  const verificado = guardrails.validarSaida(bruto, fatos, {
+    pagamentoGerado: !!contexto.pagamento,
+  });
   diagnostico.guardrailSaida = {
     ok: verificado.ok,
     problemas: verificado.problemas || [],

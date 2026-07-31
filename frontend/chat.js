@@ -7,6 +7,9 @@
   var HISTORICO_MAX = 20;
   var historico = [];
   var enviando = false;
+  // Estado que o servidor devolve e nós ecoamos: hoje, qual unidade esta
+  // conversa criou. É de lá que sai a cobrança, não do que o modelo escreveu.
+  var sessao = {};
 
   var CSS = [
     '.fv-chat-abrir{position:fixed;right:20px;bottom:20px;z-index:60;display:flex;align-items:center;gap:9px;',
@@ -38,6 +41,15 @@
     '.fv-chat-pe button{border:0;border-radius:10px;padding:0 16px;background:#ED2C27;color:#fff;font:inherit;font-weight:700;cursor:pointer}',
     '.fv-chat-pe button:disabled{opacity:.5;cursor:default}',
     '.fv-aviso{padding:8px 14px;font-size:11.5px;color:#8C857A;text-align:center;background:#fff;border-top:1px solid #E8E6DF}',
+    '.fv-pix{align-self:flex-start;max-width:86%;background:#fff;border:1px solid #DBD4C9;border-radius:13px;padding:13px;display:flex;flex-direction:column;gap:9px}',
+    '.fv-pix-topo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:15px;color:#191919}',
+    '.fv-pix-teste{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8A5B12;background:#FBEBCF;padding:2px 7px;border-radius:99px}',
+    '.fv-pix-qr{width:150px;height:150px;align-self:center;border-radius:8px;background:#fff}',
+    '.fv-pix-codigo{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.45;color:#4A4742;background:#F0EFEB;border:1px solid #DBD4C9;border-radius:8px;padding:8px 9px;word-break:break-all;max-height:76px;overflow-y:auto;user-select:all}',
+    '.fv-pix-copiar{border:0;border-radius:9px;padding:10px;background:#191919;color:#fff;font:inherit;font-weight:700;font-size:13.5px;cursor:pointer}',
+    '.fv-pix-copiar:hover{background:#34322E}',
+    '.fv-pix-link{text-align:center;font-size:13px;color:#ED2C27}',
+    '.fv-pix-nota{font-size:11.5px;color:#8C857A;text-align:center}',
     '@media(prefers-reduced-motion:reduce){.fv-pensando i{animation:none;opacity:.6}}'
   ].join("");
 
@@ -78,6 +90,60 @@
     return el;
   }
 
+  // O bloco de pagamento vem do servidor em campo estruturado, nunca do texto
+  // do modelo: um LLM não copia string opaca longa sem corromper, e um Pix
+  // com um caractere a mais é um Pix que o banco recusa.
+  function blocoDePagamento(pix) {
+    var el = document.createElement("div");
+    el.className = "fv-pix";
+
+    var partes = [];
+    partes.push('<div class="fv-pix-topo"><strong>Pix de ' + esc(pix.valorLabel) + "</strong>" +
+      (pix.sandbox ? '<span class="fv-pix-teste">ambiente de teste</span>' : "") + "</div>");
+    if (pix.qrBase64) {
+      partes.push('<img class="fv-pix-qr" alt="QR code do Pix" src="data:image/png;base64,' + esc(pix.qrBase64) + '">');
+    }
+    partes.push('<div class="fv-pix-codigo" ></div>');
+    partes.push('<button type="button" class="fv-pix-copiar">Copiar código</button>');
+    if (pix.ticketUrl) {
+      partes.push('<a class="fv-pix-link" href="' + esc(pix.ticketUrl) + '" target="_blank" rel="noopener">Abrir no banco</a>');
+    }
+    partes.push('<div class="fv-pix-nota">O premium libera assim que o pagamento cair.</div>');
+    el.innerHTML = partes.join("");
+
+    // textContent, não innerHTML: o código é dado, não marcação.
+    el.querySelector(".fv-pix-codigo").textContent = pix.copiaECola;
+
+    var botaoCopiar = el.querySelector(".fv-pix-copiar");
+    botaoCopiar.addEventListener("click", function () {
+      var pronto = function () {
+        botaoCopiar.textContent = "Copiado";
+        setTimeout(function () { botaoCopiar.textContent = "Copiar código"; }, 2000);
+        if (window.FilaAnalytics) FilaAnalytics.track("chat:pix_copiado");
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(pix.copiaECola).then(pronto, function () {
+          selecionar(el.querySelector(".fv-pix-codigo"));
+        });
+      } else {
+        selecionar(el.querySelector(".fv-pix-codigo"));
+      }
+    });
+
+    corpo.appendChild(el);
+    corpo.scrollTop = corpo.scrollHeight;
+    if (window.FilaAnalytics) FilaAnalytics.track("chat:pix_gerado");
+  }
+
+  // Sem permissão de clipboard, ao menos deixamos o código selecionado.
+  function selecionar(no) {
+    var faixa = document.createRange();
+    faixa.selectNodeContents(no);
+    var selecao = window.getSelection();
+    selecao.removeAllRanges();
+    selecao.addRange(faixa);
+  }
+
   function pensando(ligar) {
     var existente = document.getElementById("fv-pensando");
     if (!ligar) { if (existente) existente.remove(); return; }
@@ -104,7 +170,7 @@
       var res = await fetch(API_BASE + "/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: texto, history: historico })
+        body: JSON.stringify({ message: texto, history: historico, sessao: sessao })
       });
       var dados = await res.json();
       pensando(false);
@@ -115,6 +181,8 @@
       }
 
       bolha(dados.resposta, "bot");
+      if (dados.sessao) sessao = dados.sessao;
+      if (dados.pagamento) blocoDePagamento(dados.pagamento);
       historico.push({ role: "user", content: texto });
       historico.push({ role: "assistant", content: dados.resposta });
       if (historico.length > HISTORICO_MAX) historico = historico.slice(-HISTORICO_MAX);

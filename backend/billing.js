@@ -2,6 +2,8 @@
 // O provedor real (Cakto, Mercado Pago) entra por env; sem credenciais o
 // modulo opera em modo sandbox, que permite testar o fluxo inteiro local.
 const crypto = require('crypto');
+const mercadopago = require('./payments/mercadopago');
+const sandbox = require('./payments/sandbox');
 
 const TRIAL_DAYS = Number(process.env.TRIAL_DAYS || 14);
 const PRICE_CENTS = Number(process.env.PLAN_PRICE_CENTS || 9900);
@@ -96,6 +98,53 @@ function verifySignature(rawBody, signature, isProduction) {
   return crypto.timingSafeEqual(a, b);
 }
 
+// O Mercado Pago nao assina o corpo cru: ele manda `x-signature: ts=..,v1=..`
+// e espera um manifesto remontado a partir do id do recurso, do x-request-id
+// e do ts. Conferir com o esquema generico acima recusaria todo webhook
+// legitimo — e a assinatura paga do cliente nunca ativaria o premium.
+function verifyWebhook({ rawBody, headers, query, isProduction }) {
+  if (PROVIDER === 'mercadopago') {
+    const r = mercadopago.verificarAssinatura({
+      assinatura: headers['x-signature'] || '',
+      requestId: headers['x-request-id'] || '',
+      dataId: (query && (query['data.id'] || query.id)) || '',
+    });
+    return r.ok;
+  }
+  const assinatura = headers['x-signature'] || headers['x-webhook-signature'] || '';
+  return verifySignature(rawBody || '', assinatura, isProduction);
+}
+
+// --------------- Cobranca Pix ---------------
+
+// O valor sai daqui, de PRICE_CENTS, e de lugar nenhum mais. Nenhuma rota,
+// ferramenta de chat ou corpo de requisicao escolhe quanto se cobra.
+async function criarCobrancaPix({ venue, email, competencia }) {
+  const destino = String(email || venue.contactEmail || '').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(destino)) {
+    throw new Error('E-mail invalido para a cobranca.');
+  }
+
+  const adaptador = PROVIDER === 'mercadopago' ? mercadopago : sandbox;
+  if (!adaptador.configurado()) {
+    throw new Error('Provedor de pagamento nao configurado.');
+  }
+
+  const cobranca = await adaptador.criarCobrancaPix({
+    referencia: venue.slug,
+    valorCentavos: PRICE_CENTS,
+    email: destino,
+    descricao: `Fila Virtual premium — ${venue.name || venue.slug}`,
+    competencia: competencia || new Date().toISOString().slice(0, 7),
+  });
+
+  return {
+    ...cobranca,
+    provider: adaptador.nome,
+    valorLabel: 'R$ ' + (PRICE_CENTS / 100).toFixed(2).replace('.', ','),
+  };
+}
+
 function alreadyProcessed(eventId) {
   if (!eventId) return false;
   const now = Date.now();
@@ -149,7 +198,11 @@ module.exports = {
   subscriptionView,
   checkoutUrl,
   verifySignature,
+  verifyWebhook,
   signPayload,
   alreadyProcessed,
   applyEvent,
+  criarCobrancaPix,
+  mercadopago,
+  sandbox,
 };

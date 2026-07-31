@@ -46,6 +46,11 @@ services:
       - TRIAL_DAYS=${TRIAL_DAYS:-14}
       - PAYMENT_PROVIDER=${PAYMENT_PROVIDER:-sandbox}
       - PAYMENT_WEBHOOK_SECRET=${PAYMENT_WEBHOOK_SECRET:-}
+      # Mercado Pago: so usados com PAYMENT_PROVIDER=mercadopago
+      - MP_ACCESS_TOKEN=${MP_ACCESS_TOKEN:-}
+      - MP_WEBHOOK_SECRET=${MP_WEBHOOK_SECRET:-}
+      - MP_PIX_EXPIRA_MINUTOS=${MP_PIX_EXPIRA_MINUTOS:-1440}
+      - RATE_LIMIT_COBRANCA=${RATE_LIMIT_COBRANCA:-10}
       - CHAT_PROVIDER=${CHAT_PROVIDER:-local}
       # O runtime local roda na maquina host, fora do compose. Dentro do
       # container, "localhost" e o proprio container — por isso host.docker.internal.

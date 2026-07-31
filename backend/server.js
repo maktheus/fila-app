@@ -644,8 +644,131 @@ app.post('/api/venues', signupLimiter, (req, res) => {
 
 // --------------- Pagamentos ---------------
 
-// Webhook do provedor. Fora das rotas por unidade porque a unidade vem no
-// corpo do evento (campo reference).
+const cobrancaLimiter = createRateLimit(60 * 60 * 1000, Number(process.env.RATE_LIMIT_COBRANCA || 10));
+
+// Gera o Pix da assinatura de uma unidade.
+//
+// Repare no que NAO existe aqui: nenhum campo de valor. O preco sai de
+// billing.PRICE_CENTS e nada no corpo da requisicao muda isso. E a diferenca
+// entre um chatbot que fecha venda e um chatbot que alguem convence a vender
+// por R$ 1,00.
+app.post('/api/venues/:slug/cobranca', cobrancaLimiter, async (req, res) => {
+  const venue = venues.get(String(req.params.slug || ''));
+  if (!venue) return res.status(404).json({ error: 'Unidade nao encontrada.' });
+
+  const email = String((req.body || {}).email || '').trim().slice(0, 120);
+  try {
+    const cobranca = await billing.criarCobrancaPix({ venue, email });
+
+    // Guardamos so o que precisamos para reconciliar o webhook depois.
+    venue.pendingCharge = {
+      externalId: cobranca.externalId,
+      valorCentavos: cobranca.valorCentavos,
+      criadaEm: Date.now(),
+      expiraEm: cobranca.expiraEm,
+    };
+    if (email) venue.contactEmail = email;
+    persistStore();
+
+    notify.track('cobranca_gerada', { venue: venue.slug });
+    res.json({
+      externalId: cobranca.externalId,
+      copiaECola: cobranca.copiaECola,
+      qrBase64: cobranca.qrBase64,
+      ticketUrl: cobranca.ticketUrl,
+      valorLabel: cobranca.valorLabel,
+      expiraEm: cobranca.expiraEm,
+      provider: cobranca.provider,
+      sandbox: cobranca.provider === 'sandbox',
+    });
+  } catch (error) {
+    console.warn('[cobranca] falhou:', error.message);
+    res.status(502).json({ error: error.message });
+  }
+});
+
+// Confirma uma cobranca de mentira. So existe fora de producao e so com o
+// provedor sandbox — e o que permite testar a jornada inteira sem conta em
+// banco. Em producao quem confirma e o webhook do provedor.
+app.post('/api/cobrancas/:id/confirmar-sandbox', (req, res) => {
+  if (IS_PRODUCTION || billing.PROVIDER !== 'sandbox') {
+    return res.status(404).json({ error: 'Indisponivel.' });
+  }
+  const cobranca = billing.sandbox.buscar(req.params.id);
+  if (!cobranca) return res.status(404).json({ error: 'Cobranca nao encontrada.' });
+
+  const venue = venues.get(cobranca.referencia);
+  if (!venue) return res.status(404).json({ error: 'Unidade nao encontrada.' });
+
+  const result = billing.applyEvent(venue, {
+    type: 'payment.confirmed',
+    id: cobranca.externalId,
+  });
+  venue.plan = result.plan;
+  venue.pendingCharge = null;
+  billing.sandbox.esquecer(cobranca.externalId);
+  pushLog(venue, 'Assinatura: pagamento confirmado (sandbox)');
+  notify.track(result.email, { venue: venue.slug });
+  broadcast(venue, { action: 'subscription', status: venue.subscription.status });
+  persistStore();
+
+  res.json({ ok: true, plan: venue.plan, status: venue.subscription.status });
+});
+
+// Webhook do Mercado Pago. O corpo so traz o id do recurso: quem manda no
+// estado da assinatura e o que a API do MP responde quando perguntamos, nao o
+// que chegou pela rede. Um corpo forjado nao vira premium.
+app.post('/api/webhooks/mercadopago', async (req, res) => {
+  const ok = billing.verifyWebhook({
+    rawBody: req.rawBody,
+    headers: { 'x-signature': req.get('x-signature') || '', 'x-request-id': req.get('x-request-id') || '' },
+    query: req.query,
+    isProduction: IS_PRODUCTION,
+  });
+  if (!ok) return res.status(401).json({ error: 'Assinatura invalida.' });
+
+  const corpo = req.body || {};
+  const tipo = String(corpo.type || corpo.topic || '');
+  const id = String((corpo.data && corpo.data.id) || req.query['data.id'] || '');
+  if (!id) return res.json({ ok: true, ignored: 'sem id' });
+
+  // O MP reenvia o mesmo evento ate receber 200. Idempotencia por recurso.
+  if (billing.alreadyProcessed(`mp:${tipo}:${id}`)) {
+    return res.json({ ok: true, duplicated: true });
+  }
+
+  try {
+    const recurso = tipo.startsWith('order')
+      ? await billing.mercadopago.consultarOrder(id)
+      : await billing.mercadopago.consultarPagamento(id);
+
+    const slug = String(recurso.external_reference || '');
+    const venue = venues.get(slug);
+    if (!venue) return res.json({ ok: true, ignored: 'unidade desconhecida' });
+
+    const evento = billing.mercadopago.traduzirStatus(recurso.status, recurso.status_detail);
+    if (!evento) return res.json({ ok: true, pending: recurso.status });
+
+    const result = billing.applyEvent(venue, { type: evento, id, subscriptionId: id });
+    if (!result) return res.json({ ok: true, ignored: evento });
+
+    venue.plan = result.plan;
+    if (evento === 'payment.confirmed') venue.pendingCharge = null;
+    pushLog(venue, `Assinatura: ${evento}`);
+    notify.track(result.email, { venue: venue.slug });
+    notify.sendEmail(result.email, venue, { priceLabel: billing.subscriptionView(venue).priceLabel });
+    broadcast(venue, { action: 'subscription', status: venue.subscription.status });
+    persistStore();
+
+    res.json({ ok: true, plan: venue.plan, status: venue.subscription.status });
+  } catch (error) {
+    console.warn('[webhook mp] falhou:', error.message);
+    // 500 faz o MP reenviar — melhor que engolir um pagamento confirmado.
+    res.status(500).json({ error: 'Nao consegui consultar o recurso.' });
+  }
+});
+
+// Webhook generico (Cakto e afins). Aqui a unidade vem no corpo do evento.
 app.post('/api/webhooks/payments', (req, res) => {
   const signature = req.get('x-signature') || req.get('x-webhook-signature') || '';
   if (!billing.verifySignature(req.rawBody || '', signature, IS_PRODUCTION)) {
@@ -678,6 +801,7 @@ app.post('/api/webhooks/payments', (req, res) => {
 // --------------- Chatbot de vendas ---------------
 
 const chatAgent = require('./chat/agent');
+const chatTools = require('./chat/tools');
 const chatLimiter = createRateLimit(60 * 1000, Number(process.env.RATE_LIMIT_CHAT || 12));
 
 function fatosDoPlano() {
@@ -704,16 +828,29 @@ app.get('/api/chat/provedores', async (_req, res) => {
 
 // Mesma execução do chat, mas devolvendo o que aconteceu por dentro:
 // trechos recuperados, chamadas de ferramenta e veredito dos guardrails.
+// Estado da conversa que o cliente devolve a cada mensagem. Hoje guarda so a
+// unidade criada nela — e de onde sai a cobranca, em vez de sair do que o
+// modelo conseguiu transcrever. Vem do cliente, entao passa por normalizacao.
+function contextoDaSessao(sessao) {
+  const unidade = chatTools.normalizarSlug((sessao || {}).unidade);
+  return chatTools.slugValido(unidade) ? { unidade } : {};
+}
+
 app.post('/api/chat/debug', chatLimiter, requireAnalyticsAuth, async (req, res) => {
   const body = req.body || {};
+  const contexto = contextoDaSessao(body.sessao);
   try {
     const resultado = await chatAgent.responder({
       mensagem: body.message,
       historico: Array.isArray(body.history) ? body.history.slice(-20) : [],
       fatos: fatosDoPlano(),
       provedor: body.provider,
+      contexto,
     });
-    res.json({ resposta: resultado.resposta, diagnostico: resultado.diagnostico });
+    // O codigo Pix vai por fora do texto do modelo: ele nao transcreve
+    // string opaca sem corromper. A interface desenha o bloco de pagamento.
+    const { pagamento, ...sessao } = contexto;
+    res.json({ resposta: resultado.resposta, diagnostico: resultado.diagnostico, sessao, pagamento });
   } catch (error) {
     res.status(503).json({ error: error.message });
   }
@@ -722,6 +859,7 @@ app.post('/api/chat/debug', chatLimiter, requireAnalyticsAuth, async (req, res) 
 app.post('/api/chat', chatLimiter, async (req, res) => {
   const body = req.body || {};
   const historico = Array.isArray(body.history) ? body.history.slice(-20) : [];
+  const contexto = contextoDaSessao(body.sessao);
 
   try {
     const resultado = await chatAgent.responder({
@@ -729,6 +867,7 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
       historico,
       fatos: fatosDoPlano(),
       provedor: body.provider,
+      contexto,
     });
 
     notify.track('chat:resposta', {
@@ -744,7 +883,8 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
       console.warn('[chat] guardrail barrou a resposta:', resultado.bloqueado.join('; '));
     }
 
-    res.json({ resposta: resultado.resposta, ferramentas: resultado.ferramentas });
+    const { pagamento, ...sessao } = contexto;
+    res.json({ resposta: resultado.resposta, ferramentas: resultado.ferramentas, sessao, pagamento });
   } catch (error) {
     console.warn('[chat] falha:', error.message);
     notify.track('chat:erro');

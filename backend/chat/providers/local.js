@@ -79,13 +79,134 @@ async function chamar({ system, mensagens, ferramentas }) {
     entrada: analisarArgumentos(c.function && c.function.arguments),
   })).filter(c => c.nome);
 
+  let texto = (mensagem.content || '').trim();
+  let resgatadas = false;
+
+  // Só tentamos o resgate quando o canal certo veio vazio.
+  if (!chamadas.length && texto && ferramentas && ferramentas.length) {
+    const nomes = new Set(ferramentas.map(f => f.name));
+    const resgate = resgatarChamadasDoTexto(texto, nomes);
+    if (resgate.chamadas.length) {
+      chamadas.push(...resgate.chamadas);
+      texto = resgate.texto;
+      resgatadas = true;
+    }
+  }
+
   return {
-    texto: (mensagem.content || '').trim(),
+    texto,
     chamadas,
-    mensagemBruta: mensagem,
+    resgatadas,
+    // Se resgatamos, a mensagem que volta ao histórico precisa carregar as
+    // chamadas no formato certo — senão o modelo não reconhece os resultados.
+    mensagemBruta: resgatadas
+      ? {
+        role: 'assistant',
+        content: texto,
+        tool_calls: chamadas.map(c => ({
+          id: c.id,
+          type: 'function',
+          function: { name: c.nome, arguments: JSON.stringify(c.entrada) },
+        })),
+      }
+      : mensagem,
     uso: dados.usage || null,
     modelo: dados.model || MODELO,
   };
+}
+
+// Resgate de chamada emitida como texto.
+//
+// Modelo pequeno as vezes erra o canal: em vez de emitir tool_calls, ele
+// ESCREVE a chamada no conteudo. O qwen2.5:7b devolveu, como resposta ao
+// visitante:
+//
+//   criar_demonstracao {"nome_do_estabelecimento": "Clinica Confirma Limite"}
+//
+// A intencao estava certa e o argumento tambem — so o envelope estava errado.
+// Descartar isso custa a venda e ainda mostra JSON cru para o cliente. Aqui
+// reconhecemos os tres formatos que aparecem na pratica e executamos a
+// chamada normalmente.
+//
+// So resgatamos ferramenta que existe: texto solto que por acaso pareca uma
+// chamada nao vira execucao.
+// Objetos JSON de chaves balanceadas dentro de um texto. Regex não serve
+// aqui: o objeto de argumentos tem chaves aninhadas, e uma busca preguiçosa
+// para no `}` errado.
+function objetosBalanceados(texto) {
+  const achados = [];
+  for (let i = 0; i < texto.length; i++) {
+    if (texto[i] !== '{') continue;
+    let profundidade = 0;
+    let emString = false;
+    let escapado = false;
+    for (let j = i; j < texto.length && j - i < 2000; j++) {
+      const c = texto[j];
+      if (escapado) { escapado = false; continue; }
+      if (c === '\\') { escapado = true; continue; }
+      if (c === '"') { emString = !emString; continue; }
+      if (emString) continue;
+      if (c === '{') profundidade++;
+      else if (c === '}') {
+        profundidade--;
+        if (profundidade === 0) {
+          achados.push({ texto: texto.slice(i, j + 1), inicio: i, fim: j + 1 });
+          i = j;
+          break;
+        }
+      }
+    }
+  }
+  return achados;
+}
+
+function resgatarChamadasDoTexto(texto, nomesValidos) {
+  const bruto = String(texto || '');
+  const chamadas = [];
+  let limpo = bruto;
+
+  // Os tres formatos se sobrepoem: <tool_call> tambem casa como JSON solto.
+  // Sem dedupe, uma chamada vira duas — e duas demonstracoes criadas.
+  const vistas = new Set();
+
+  function registrar(nome, argumentos, trecho) {
+    if (!nomesValidos.has(nome)) return;
+    const entrada = analisarArgumentos(argumentos);
+    const impressao = nome + '|' + JSON.stringify(entrada);
+    if (vistas.has(impressao)) return;
+    vistas.add(impressao);
+    chamadas.push({
+      id: `resgate_${Math.random().toString(36).slice(2, 10)}`,
+      nome,
+      entrada,
+    });
+    limpo = limpo.replace(trecho, '');
+  }
+
+  // 1. Formato nativo do qwen quando o adaptador nao o converte.
+  const nativo = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
+  for (const achado of bruto.matchAll(nativo)) {
+    const corpo = analisarArgumentos(achado[1]);
+    if (corpo && corpo.name) registrar(corpo.name, corpo.arguments, achado[0]);
+  }
+
+  // 2. JSON solto com {"name": ..., "arguments": {...}}, com ou sem cerca.
+  for (const objeto of objetosBalanceados(bruto)) {
+    const corpo = analisarArgumentos(objeto.texto);
+    if (corpo && corpo.name) registrar(corpo.name, corpo.arguments || corpo.parameters, objeto.texto);
+  }
+
+  // 3. `nome_da_ferramenta {json}` — o formato que apareceu na pratica.
+  for (const objeto of objetosBalanceados(bruto)) {
+    const antes = bruto.slice(0, objeto.inicio);
+    const casado = antes.match(/([a-z][a-z0-9_]{3,40})\s*$/);
+    if (!casado) continue;
+    const nome = casado[1];
+    if (chamadas.some(c => c.nome === nome)) continue;
+    registrar(nome, objeto.texto, bruto.slice(antes.length - casado[0].length, objeto.fim));
+  }
+
+  return { chamadas, texto: limpo.trim() };
 }
 
 // Modelo pequeno às vezes devolve os argumentos como string mal formada.
@@ -140,4 +261,5 @@ module.exports = {
   mensagensDeResultado,
   analisarArgumentos,
   paraFormatoOpenAI,
+  resgatarChamadasDoTexto,
 };

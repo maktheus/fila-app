@@ -58,6 +58,10 @@
   .msg.eu{align-self:flex-end;background:var(--brand);color:#191919;border-bottom-right-radius:4px}
   .msg.bot{align-self:flex-start;background:var(--surface-2);border:1px solid var(--border);border-bottom-left-radius:4px}
   .msg.sistema{align-self:center;font-size:12px;color:var(--fg-3);font-style:italic}
+  .pix{align-self:flex-start;max-width:88%;display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border-2)}
+  .pix-topo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+  .pix-qr{width:132px;height:132px;align-self:center;border-radius:7px;background:#fff}
+  .pix-codigo{font-family:var(--mono);font-size:10.5px;line-height:1.45;color:var(--fg-2);background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px;word-break:break-all;max-height:70px;overflow-y:auto;user-select:all}
   .envio{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border)}
   .envio input{flex:1;padding:10px 13px;border-radius:10px;border:1px solid var(--border-2);background:var(--bg);color:var(--fg-1);font-size:14px}
 
@@ -144,6 +148,7 @@
   var TOKEN_KEY = "fila_lab_token";
   var token = sessionStorage.getItem(TOKEN_KEY) || "";
   var historico = [];
+  var sessao = {};
 
   var login = document.getElementById("login");
   var app = document.getElementById("app");
@@ -223,7 +228,8 @@
       body: JSON.stringify({
         message: mensagem,
         history: comHistorico ? historico : [],
-        provider: document.getElementById("provedor").value
+        provider: document.getElementById("provedor").value,
+        sessao: comHistorico ? sessao : {}
       })
     });
     if (res.status === 401) { sair(); throw new Error("sessao"); }
@@ -241,6 +247,21 @@
     conversa.appendChild(el);
     conversa.scrollTop = conversa.scrollHeight;
     return el;
+  }
+
+  // O código Pix chega em campo estruturado, fora do texto do modelo — ele
+  // corrompe string opaca longa. Aqui mostramos o bloco como o visitante vê.
+  function blocoDePagamento(pix) {
+    var el = document.createElement("div");
+    el.className = "pix";
+    el.innerHTML =
+      '<div class="pix-topo"><strong>Pix de ' + esc(pix.valorLabel) + "</strong>" +
+      (pix.sandbox ? tag("ambiente de teste", "warn") : "") + "</div>" +
+      (pix.qrBase64 ? '<img class="pix-qr" alt="QR do Pix" src="data:image/png;base64,' + esc(pix.qrBase64) + '">' : "") +
+      '<div class="pix-codigo"></div>';
+    el.querySelector(".pix-codigo").textContent = pix.copiaECola;
+    document.getElementById("conversa").appendChild(el);
+    document.getElementById("conversa").scrollTop = 1e6;
   }
 
   function tag(texto, tipo) {
@@ -311,6 +332,8 @@
       var dados = await perguntar(texto, true);
       pensando.remove();
       bolha(dados.resposta, "bot");
+      if (dados.sessao) sessao = dados.sessao;
+      if (dados.pagamento) blocoDePagamento(dados.pagamento);
       historico.push({ role: "user", content: texto });
       historico.push({ role: "assistant", content: dados.resposta });
       if (historico.length > 16) historico = historico.slice(-16);
@@ -446,12 +469,14 @@
   });
   document.getElementById("limpar").addEventListener("click", function () {
     historico = [];
+    sessao = {};
     document.getElementById("conversa").innerHTML = "";
     document.getElementById("diag").innerHTML = '<p class="vazio">Conversa limpa.</p>';
   });
   document.getElementById("rodar-bateria").addEventListener("click", rodarBateria);
   document.getElementById("provedor").addEventListener("change", function () {
     historico = [];
+    sessao = {};
     document.getElementById("conversa").innerHTML = "";
   });
 

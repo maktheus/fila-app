@@ -34,6 +34,47 @@ describe('guardrails de entrada', () => {
     assert.strictEqual(r.foraDeEscopo, 'saude');
   });
 
+  // Fora de escopo e sobre a INTENCAO, nao sobre a palavra aparecer.
+  // A versao anterior casava o radical solto e recusava "quero ver
+  // funcionando na Clinica Diagnostico" como pergunta medica — barrando na
+  // porta exatamente o publico que o produto quer.
+  test('nome de estabelecimento com palavra medica nao e recusado', () => {
+    for (const frase of [
+      'quero ver funcionando na Clinica Diagnostico Sao Lucas',
+      'tenho um Centro de Diagnostico por Imagem, serve?',
+      'a fila do meu consultorio de dermatologia vive cheia',
+      'atendo tratamento capilar, serve pra mim?',
+    ]) {
+      const r = guardrails.validarEntrada(frase, []);
+      assert.strictEqual(r.ok, true, frase);
+    }
+  });
+
+  test('pergunta de compra com palavra financeira passa', () => {
+    for (const frase of ['quanto e o investimento inicial?', 'vale a pena o investimento?']) {
+      assert.strictEqual(guardrails.validarEntrada(frase, []).ok, true, frase);
+    }
+  });
+
+  test('advogado e cartorio como cliente passam', () => {
+    for (const frase of ['trabalho num escritorio de advocacia, da pra usar?', 'meu cartorio tem 3 balcoes']) {
+      assert.strictEqual(guardrails.validarEntrada(frase, []).ok, true, frase);
+    }
+  });
+
+  test('pedido real de conselho medico continua sendo recusado', () => {
+    for (const frase of [
+      'estou com febre, o que faco?',
+      'meus sintomas sao tosse e febre, o que pode ser?',
+      'posso tomar dipirona com antibiotico?',
+      'qual o tratamento para ansiedade?',
+    ]) {
+      const r = guardrails.validarEntrada(frase, []);
+      assert.strictEqual(r.ok, false, frase);
+      assert.strictEqual(r.foraDeEscopo, 'saude');
+    }
+  });
+
   test('assunto juridico sai do escopo', () => {
     const r = guardrails.validarEntrada('posso entrar com uma acao na justica contra o plano?', []);
     assert.strictEqual(r.foraDeEscopo, 'juridico');
@@ -119,6 +160,39 @@ describe('guardrails de saida', () => {
       guardrails.validarSaida('Você não precisa se preocupar com a LGPD.', FATOS).ok,
       false,
     );
+  });
+
+  // Hoje a cobranca e Pix avulso por ciclo. Prometer debito automatico e
+  // vender uma comodidade que o cliente so descobre que nao existe no mes
+  // seguinte, quando o premium cai.
+  test('promessa de cobranca automatica e barrada', () => {
+    for (const frase of [
+      'A cobrança é por débito automático todo mês.',
+      'A assinatura tem renovação automática.',
+      'Você cadastra o cartão e não precisa se preocupar.',
+      'Também aceitamos boleto.',
+    ]) {
+      assert.strictEqual(guardrails.validarSaida(frase, FATOS).ok, false, frase);
+    }
+  });
+
+  test('descrever o Pix avulso como ele e continua passando', () => {
+    const r = guardrails.validarSaida(
+      'O pagamento é por Pix. A cada mês chega uma cobrança nova por e-mail, e para parar é só não pagar.',
+      FATOS,
+    );
+    assert.strictEqual(r.ok, true);
+  });
+
+  // O provedor de pagamento escreve valor com ponto. A versao anterior do
+  // parser lia "R$ 99.00" como 9900 e barrava resposta CERTA.
+  test('preco com ponto decimal e lido igual ao com virgula', () => {
+    assert.strictEqual(guardrails.validarSaida('Custa R$ 99.00 por mês.', FATOS).ok, true);
+    assert.strictEqual(guardrails.valorEmReais('R$ 99.00'), 99);
+    assert.strictEqual(guardrails.valorEmReais('R$ 99,00'), 99);
+    assert.strictEqual(guardrails.valorEmReais('R$ 1.234,56'), 1234.56);
+    // E milhar de verdade continua sendo barrado.
+    assert.strictEqual(guardrails.validarSaida('Custa R$ 9.900,00.', FATOS).ok, false);
   });
 
   test('dizer a verdade sobre o que se coleta continua passando', () => {

@@ -33,6 +33,11 @@ const TRECHOS = [
     texto: `Coletamos apenas o primeiro nome de quem entra na fila, e esse dado é apagado automaticamente poucas horas depois do atendimento. Não pedimos CPF, telefone, e-mail nem qualquer informação de saúde. O telão da sala de espera mostra apenas a senha e o balcão, nunca nomes. A localização usada no "passar a vez" é comparada na hora e não é armazenada.`,
   },
   {
+    id: 'pagamento',
+    titulo: 'Como se paga',
+    texto: `O pagamento é por Pix. Ao contratar, o assistente gera o código copia-e-cola na hora e o premium libera assim que o pagamento cai. A cada mês chega uma nova cobrança por e-mail — não existe débito automático, cartão cadastrado nem fidelidade, então parar é só não pagar o próximo ciclo. Não emitimos boleto nem aceitamos cartão hoje.`,
+  },
+  {
     id: 'segmentos',
     titulo: 'Para quem serve',
     texto: `Clínicas, consultórios, laboratórios, cartórios, barbearias, salões, oficinas e despachantes — qualquer estabelecimento que atenda por ordem de chegada. Funciona igualmente bem para quem tem um balcão só e para quem tem vários.`,

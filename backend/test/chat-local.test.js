@@ -90,6 +90,91 @@ describe('adaptador do modelo local', () => {
     assert.deepStrictEqual(local.analisarArgumentos('{"a":1}'), { a: 1 });
   });
 
+  // O qwen2.5:7b as vezes erra o canal e ESCREVE a chamada no conteudo. A
+  // intencao e o argumento estao certos — so o envelope esta errado.
+  // Descartar isso custa a venda e ainda mostra JSON cru para o visitante.
+  describe('resgate de chamada emitida como texto', () => {
+    const NOMES = new Set(['criar_demonstracao', 'gerar_pix_da_assinatura', 'consultar_planos']);
+    const local = carregarLocal('http://127.0.0.1:1/v1');
+
+    test('formato que apareceu na pratica: nome seguido de JSON', () => {
+      const r = local.resgatarChamadasDoTexto(
+        'criar_demonstracao {"nome_do_estabelecimento": "Clinica Confirma Limite"}',
+        NOMES,
+      );
+      assert.strictEqual(r.chamadas.length, 1);
+      assert.strictEqual(r.chamadas[0].nome, 'criar_demonstracao');
+      assert.strictEqual(r.chamadas[0].entrada.nome_do_estabelecimento, 'Clinica Confirma Limite');
+      assert.strictEqual(r.texto, '', 'o JSON cru nao pode sobrar para o visitante ler');
+    });
+
+    test('formato nativo do qwen', () => {
+      const r = local.resgatarChamadasDoTexto(
+        '<tool_call>{"name": "criar_demonstracao", "arguments": {"nome_do_estabelecimento": "Padaria X"}}</tool_call>',
+        NOMES,
+      );
+      // Os formatos se sobrepoem; sem dedupe seriam duas unidades criadas.
+      assert.strictEqual(r.chamadas.length, 1);
+      assert.strictEqual(r.chamadas[0].entrada.nome_do_estabelecimento, 'Padaria X');
+    });
+
+    test('JSON com chaves aninhadas e extraido inteiro', () => {
+      const r = local.resgatarChamadasDoTexto('Claro! {"name":"consultar_planos","arguments":{}}', NOMES);
+      assert.strictEqual(r.chamadas.length, 1);
+      assert.strictEqual(r.chamadas[0].nome, 'consultar_planos');
+      assert.strictEqual(r.texto, 'Claro!');
+    });
+
+    test('so resgata ferramenta que existe', () => {
+      assert.strictEqual(
+        local.resgatarChamadasDoTexto('ferramenta_inexistente {"x": 1}', NOMES).chamadas.length,
+        0,
+      );
+    });
+
+    test('texto comum com chaves nao vira execucao', () => {
+      for (const frase of ['A fila {aberta} funciona bem.', 'O preço é R$ 99,00 por mês.']) {
+        assert.strictEqual(local.resgatarChamadasDoTexto(frase, NOMES).chamadas.length, 0, frase);
+      }
+    });
+
+    test('o resgate so acontece quando o canal certo veio vazio', async () => {
+      const { servidor, base } = await subir(() => respostaDoModelo(
+        'criar_demonstracao {"nome_do_estabelecimento": "Nao Deve Resgatar"}',
+        [{ id: 'c1', type: 'function', function: { name: 'consultar_planos', arguments: '{}' } }],
+      ));
+      const l = carregarLocal(base);
+      const r = await l.chamar({
+        system: 's',
+        mensagens: [{ role: 'user', content: 'oi' }],
+        ferramentas: tools.DEFINICOES,
+      });
+      assert.strictEqual(r.chamadas.length, 1);
+      assert.strictEqual(r.chamadas[0].nome, 'consultar_planos');
+      assert.strictEqual(r.resgatadas, false);
+      servidor.close();
+    });
+
+    test('chamada resgatada volta ao historico no formato certo', async () => {
+      const { servidor, base } = await subir(() => respostaDoModelo(
+        'criar_demonstracao {"nome_do_estabelecimento": "Padaria Resgate"}',
+      ));
+      const l = carregarLocal(base);
+      const r = await l.chamar({
+        system: 's',
+        mensagens: [{ role: 'user', content: 'oi' }],
+        ferramentas: tools.DEFINICOES,
+      });
+      assert.strictEqual(r.resgatadas, true);
+      assert.strictEqual(r.chamadas.length, 1);
+      // Sem tool_calls na mensagem, o modelo nao reconhece o resultado depois.
+      const [assistente] = l.mensagensDeResultado(r.mensagemBruta, [{ id: r.chamadas[0].id, saida: { ok: 1 } }]);
+      assert.strictEqual(assistente.tool_calls.length, 1);
+      assert.strictEqual(assistente.tool_calls[0].function.name, 'criar_demonstracao');
+      servidor.close();
+    });
+  });
+
   test('manda system e ferramentas, e le a chamada de volta', async () => {
     const { servidor, chamadas, base } = await subir(() => respostaDoModelo('', [{
       id: 'call_1',
