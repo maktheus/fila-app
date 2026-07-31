@@ -687,6 +687,23 @@ app.post('/api/venues/:slug/cobranca', cobrancaLimiter, async (req, res) => {
   }
 });
 
+// --------------- E-mail ---------------
+
+// Diagnostico de envio. Autenticado: o historico traz destinatarios, e a
+// configuracao diz qual provedor de SMTP esta em uso.
+app.get('/api/email/status', requireAnalyticsAuth, (_req, res) => {
+  res.json(notify.statusEmail());
+});
+
+// Manda um e-mail de teste para o endereco informado. E assim que se confere
+// que o SMTP funciona sem precisar esperar um cadastro de verdade.
+const emailTesteLimiter = createRateLimit(60 * 60 * 1000, Number(process.env.RATE_LIMIT_EMAIL_TESTE || 10));
+app.post('/api/email/teste', emailTesteLimiter, requireAnalyticsAuth, async (req, res) => {
+  const r = await notify.enviarTeste(String((req.body || {}).para || '').trim());
+  if (!r.ok) return res.status(400).json(r);
+  res.json(r);
+});
+
 // Config publica do checkout. So o que a tela precisa para desenhar os
 // botoes — nenhum segredo passa por aqui.
 app.get('/api/pagamento/config', (_req, res) => {
@@ -1425,6 +1442,31 @@ loadPersistedStore()
       console.log(`Unidades carregadas: ${[...venues.keys()].join(', ')}`);
       console.log(`Retencao LGPD: ${TICKET_RETENTION_HOURS}h · fila demo: ${SEED_DEMO ? 'ligada' : 'desligada'}`);
       console.log(`WebSocket available at ws://0.0.0.0:${PORT}/ws`);
+
+      // Confere o SMTP falando com o servidor de verdade, e grita se estiver
+      // errado. Falha silenciosa de e-mail e o pior desfecho possivel: o
+      // sistema responde normalmente, ninguem recebe nada e so se descobre
+      // semanas depois, quando os clientes ja sumiram.
+      notify.verificarEmail().then(e => {
+        if (!e.habilitado) {
+          console.warn('E-mail DESLIGADO (MAIL_ENABLED != true): nada sera enviado, so registrado no log.');
+        } else if (e.verificado) {
+          console.log(`E-mail pronto: ${process.env.SMTP_HOST} como ${process.env.MAIL_FROM}`);
+        } else {
+          console.error(`E-mail LIGADO MAS QUEBRADO: ${e.motivo}`);
+        }
+      });
+
+      // Carrega o modelo na memoria antes do primeiro visitante escrever.
+      // Sem isto, quem chega primeiro paga 5,5s em vez de 1s. Roda solto e
+      // falha em silencio: o servidor nao pode depender do runtime local.
+      if (chatAgent.PROVEDOR === 'local' && process.env.LOCAL_LLM_WARMUP !== 'false') {
+        chatAgent.aquecerLocal().then(r => {
+          console.log(r.ok
+            ? 'Modelo local aquecido e residente.'
+            : `Modelo local nao aqueceu (${r.motivo}). O chat avisa se seguir fora do ar.`);
+        });
+      }
     });
   })
   .catch(error => {

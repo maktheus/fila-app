@@ -25,15 +25,15 @@ Ele cataloga os pontos que ainda quebram o objetivo de "funcionar sem o dono
 participar", ordenados por quanto custa deixar como estão. Resumo do que mais
 importa:
 
-- **Os e-mails não saem** (`MAIL_ENABLED=false`) — e todo o funil pressupõe que
-  chegam. Destrava a renovação e a recuperação de senha.
+- ~~Os e-mails não saem~~ — construído em 31/07 (`docs/EMAIL.md`). Falta
+  contratar um SMTP e configurar SPF/DKIM/DMARC no domínio.
 - **Ninguém paga o segundo mês** — a renovação não existe.
 - **Não dá para cancelar sozinho** — obrigação do CDC, não escolha de produto.
 - **Senha perdida = cliente perdido** — não há recuperação.
 - **Google Pay** depende de dois identificadores que só o suporte do Mercado
   Pago pode dar.
 
-Outros documentos: `docs/PAGAMENTOS.md` (Pix, cartão, webhook do MP),
+Outros documentos: `docs/EMAIL.md`, `docs/PAGAMENTOS.md` (Pix, cartão, webhook do MP),
 `docs/CHATBOT.md` (RAG, guardrails, modelo local), `docs/OBSERVABILIDADE.md`,
 `docs/kanban.html` (roadmap).
 

@@ -8,26 +8,36 @@ Ordenado por quanto custa deixar como está, não por dificuldade.
 
 ---
 
-## 1. Os e-mails não saem
+## 1. ✅ Os e-mails — construído em 31/07
 
-**Estado:** os textos existem em `backend/notify.js` — fila criada, teste
-acabando, teste vencido, premium ativado, pagamento falhou, assinatura
-cancelada. Todos funcionam. Mas `MAIL_ENABLED` é `false` por padrão, e sem SMTP
-configurado o `sendEmail` só escreve no log e volta.
+**Estado: o envio funciona.** Testado ponta a ponta contra um SMTP real: o
+cadastro de uma unidade disparou o e-mail sozinho e ele chegou.
 
-**Por que isso é o pior item da lista:** o cliente cria a fila, recebe a senha
-na tela, fecha o navegador e **nunca mais ouve falar de você**. Não é sabotagem
-de conversão, é ausência de conversão. Todo o resto do funil pressupõe que esses
-e-mails chegam.
+O que existia antes era uma armadilha: o `require('nodemailer')` estava no
+código mas a dependência **não estava instalada**. Ligar `MAIL_ENABLED=true`
+faria o `require` estourar, o `catch` engolir, e você veria o sistema
+respondendo normalmente sem nada sair.
 
-**O que fazer:** contratar um SMTP transacional (Resend, Brevo e Amazon SES têm
-faixa gratuita que cobre bem mais que os primeiros meses), preencher
-`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` e virar
-`MAIL_ENABLED=true`. O código não precisa mudar.
+O que foi construído: dependência instalada, um transporte com pool em vez de um
+por mensagem, três tentativas com espera crescente para falha transitória (e
+nenhuma para 5xx, que é recusa definitiva), verificação na subida que **grita no
+log** se estiver ligado e quebrado, `GET /api/email/status` e
+`POST /api/email/teste` para conferir sem esperar um cadastro real, e um coletor
+de e-mail local no compose (`--profile mail`) para ver as mensagens sem
+contratar provedor.
 
-**Antes de virar a chave:** configurar SPF, DKIM e DMARC no domínio. Sem isso o
-e-mail vai para spam e o efeito é o mesmo de não enviar — só que você acha que
-está enviando.
+Procedimento completo em **[EMAIL.md](EMAIL.md)**.
+
+**O que ainda é seu:**
+
+1. **Escolher e contratar um SMTP.** Resend, Brevo, SES e Mailgun têm faixa
+   gratuita que cobre muito mais que os primeiros meses. Não use Gmail nem o
+   SMTP da hospedagem: limite baixo e nenhum relatório de entrega.
+2. **Configurar SPF, DKIM e DMARC** no domínio **antes** de ligar em produção.
+   Domínio novo disparando sem autenticação cai em spam, e o efeito prático é
+   idêntico ao de não enviar. Pior: um domínio queimado leva semanas para
+   recuperar reputação.
+3. **Mandar o teste para um Gmail** e confirmar que caiu na caixa de entrada.
 
 ---
 
@@ -156,9 +166,24 @@ fingir que gerou o Pix.
 
 O `laboratorio.html` mede isso caso a caso — dá para comparar antes de decidir.
 
-**Latência também pesa:** de 3 a 20 segundos por resposta em CPU. Num widget de
-site isso é muito. `qwen2.5:3b` é ~3× mais rápido e os guardrails continuam
-sendo a rede.
+**Latência: resolvida, e não era o modelo.** Medido numa RTX 4060 com
+`qwen2.5:7b`: modelo frio 5,5s, quente 1,0s a ~37 tokens/s. Os "3 a 20 segundos"
+que apareciam eram quase todos custo de recarregar 4,7GB do disco para a VRAM —
+o Ollama descarrega depois de 5 minutos, e num site de baixo tráfego quase todo
+visitante pegava o modelo frio.
+
+Corrigido com `keep_alive` em toda chamada (`LOCAL_LLM_KEEP_ALIVE`, padrão 30m)
+e um aquecimento na subida do servidor. Ficou em **1,1 a 2,5s**.
+
+Vale registrar o que **não** serve aqui: **AirLLM é o contrário do que se
+quer**. Ele fatia o modelo camada por camada para caber num GPU pequeno, e paga
+isso em velocidade — os relatos vão de 0,7 token/s a casos extremos de 100
+segundos por token. É solução de memória, não de latência.
+
+Se um dia a latência voltar a incomodar, o caminho de verdade é **speculative
+decoding** (um modelo-rascunho pequeno propõe tokens e o grande valida em uma
+passada só; pares como Qwen 0.6B → 8B dão ~1.9×) ou um modelo menor. Nada disso
+é necessário hoje.
 
 ---
 
@@ -201,7 +226,7 @@ descobre que ele existe.
 
 ## Ordem que eu seguiria
 
-1. **E-mails** (item 1) — destrava 2 e 4, e é o mais barato.
+1. ~~E-mails (item 1)~~ — feito em 31/07. Falta contratar o SMTP e o DNS.
 2. **Domínio + HTTPS** (item 7) — destrava tudo que é externo.
 3. **Cancelamento** (item 3) — obrigação legal, não escolha.
 4. **Renovação** (item 2) — sem isso não existe receita recorrente.

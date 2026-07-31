@@ -71,6 +71,108 @@ const TEMPLATES = {
 };
 
 const sent = [];
+const MAX_HISTORICO = 200;
+
+// --------------- Transporte ---------------
+//
+// Um transporte so, criado uma vez. Criar um por e-mail joga fora o pool de
+// conexoes e faz cada envio abrir um handshake TLS novo — com volume, o
+// provedor comeca a recusar por rate limit.
+let transporte = null;
+let estado = { habilitado: MAIL_ENABLED, configurado: false, verificado: null, motivo: '', ultimoErro: null };
+
+function faltando() {
+  const faltas = [];
+  if (!process.env.SMTP_HOST) faltas.push('SMTP_HOST');
+  if (!process.env.MAIL_FROM) faltas.push('MAIL_FROM');
+  return faltas;
+}
+
+function obterTransporte() {
+  if (transporte) return transporte;
+  // require aqui dentro para o modulo carregar mesmo sem a dependencia
+  // instalada — util em teste, e o erro aparece explicado em vez de derrubar.
+  const nodemailer = require('nodemailer');
+  transporte = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    // 465 e TLS implicito; 587 e STARTTLS. Errar isso e o motivo mais comum
+    // de "conecta mas nao envia".
+    secure: process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT) === 465,
+    auth: process.env.SMTP_USER
+      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+      : undefined,
+    pool: true,
+    maxConnections: Number(process.env.SMTP_MAX_CONNECTIONS || 3),
+    connectionTimeout: Number(process.env.SMTP_TIMEOUT_MS || 15000),
+  });
+  return transporte;
+}
+
+/**
+ * Confere a configuracao de SMTP falando com o servidor de verdade.
+ *
+ * Isto existe porque a falha silenciosa e o pior desfecho aqui: quem liga
+ * MAIL_ENABLED e ve o sistema respondendo normalmente assume que os e-mails
+ * estao saindo. Se eles nao estiverem, o cliente cria a fila e nunca mais
+ * ouve falar da gente — e ninguem descobre por semanas.
+ */
+async function verificarEmail() {
+  if (!MAIL_ENABLED) {
+    estado = { habilitado: false, configurado: false, verificado: false, motivo: 'MAIL_ENABLED nao esta true', ultimoErro: null };
+    return estado;
+  }
+  const faltas = faltando();
+  if (faltas.length) {
+    estado = { habilitado: true, configurado: false, verificado: false, motivo: `faltam: ${faltas.join(', ')}`, ultimoErro: null };
+    return estado;
+  }
+  try {
+    await obterTransporte().verify();
+    estado = { habilitado: true, configurado: true, verificado: true, motivo: '', ultimoErro: null };
+  } catch (erro) {
+    const dica = /Cannot find module 'nodemailer'/.test(erro.message)
+      ? 'dependencia nodemailer nao instalada — rode npm install'
+      : erro.message;
+    estado = { habilitado: true, configurado: true, verificado: false, motivo: dica, ultimoErro: dica };
+  }
+  return estado;
+}
+
+function statusEmail() {
+  return {
+    ...estado,
+    remetente: MAIL_FROM,
+    host: process.env.SMTP_HOST || '',
+    porta: Number(process.env.SMTP_PORT || 587),
+    // Historico sem o corpo: assunto e destinatario bastam para diagnosticar,
+    // e o corpo pode carregar dado do cliente.
+    ultimos: sent.slice(-20).reverse(),
+  };
+}
+
+// Falha de SMTP costuma ser transitoria (limite momentaneo, conexao caida).
+// Uma tentativa so perde o e-mail; tres com espera crescente resolvem a
+// maioria sem inventar uma fila persistente.
+const TENTATIVAS = Number(process.env.MAIL_RETRIES || 3);
+
+async function entregar(mensagem) {
+  let ultimoErro = null;
+  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+    try {
+      await obterTransporte().sendMail(mensagem);
+      return { ok: true, tentativas: tentativa };
+    } catch (erro) {
+      ultimoErro = erro;
+      // 5xx do SMTP e recusa definitiva: insistir so queima reputacao.
+      if (erro.responseCode && erro.responseCode >= 500 && erro.responseCode < 600) break;
+      if (tentativa < TENTATIVAS) {
+        await new Promise(r => setTimeout(r, 500 * Math.pow(2, tentativa - 1)));
+      }
+    }
+  }
+  return { ok: false, erro: ultimoErro };
+}
 
 async function sendEmail(template, venue, extra = {}) {
   const build = TEMPLATES[template];
@@ -79,30 +181,53 @@ async function sendEmail(template, venue, extra = {}) {
   const data = { name: venue.name, ...extra };
   const { subject, body } = build(data);
   const to = venue.contactEmail || '';
-  const record = { template, to, subject, at: Date.now(), venue: venue.slug };
+  const record = { template, to, subject, at: Date.now(), venue: venue.slug, entregue: null };
   sent.push(record);
-  if (sent.length > 200) sent.shift();
+  if (sent.length > MAX_HISTORICO) sent.shift();
 
   if (!MAIL_ENABLED || !to) {
-    console.log(`[email:${template}] para=${to || 'sem-destinatario'} assunto="${subject}"`);
+    record.entregue = false;
+    record.motivo = !to ? 'unidade sem e-mail de contato' : 'MAIL_ENABLED desligado';
+    console.log(`[email:${template}] para=${to || 'sem-destinatario'} assunto="${subject}" (${record.motivo})`);
     return record;
   }
 
-  try {
-    // SMTP real entra aqui quando MAIL_ENABLED=true. Mantido fora do caminho
-    // critico: falha de e-mail nunca derruba o webhook de pagamento.
-    const nodemailer = require('nodemailer');
-    const transport = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
-    });
-    await transport.sendMail({ from: MAIL_FROM, to, subject, text: body });
-  } catch (error) {
-    console.warn(`[email:${template}] falhou: ${error.message}`);
+  // Fora do caminho critico de proposito: falha de e-mail nunca pode derrubar
+  // o webhook de pagamento nem a criacao de uma unidade.
+  const r = await entregar({ from: MAIL_FROM, to, subject, text: body });
+  record.entregue = r.ok;
+  if (r.ok) {
+    record.tentativas = r.tentativas;
+  } else {
+    record.motivo = (r.erro && r.erro.message) || 'falha desconhecida';
+    estado.ultimoErro = record.motivo;
+    console.warn(`[email:${template}] nao entregue para ${to}: ${record.motivo}`);
   }
   return record;
+}
+
+// Envio de teste, para conferir a configuracao sem esperar um evento real.
+async function enviarTeste(destino) {
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(destino || ''))) {
+    return { ok: false, erro: 'E-mail de destino invalido.' };
+  }
+  if (!MAIL_ENABLED) return { ok: false, erro: 'MAIL_ENABLED nao esta true.' };
+  const faltas = faltando();
+  if (faltas.length) return { ok: false, erro: `Faltam variaveis: ${faltas.join(', ')}` };
+
+  const r = await entregar({
+    from: MAIL_FROM,
+    to: destino,
+    subject: 'Fila Virtual: teste de envio',
+    text: [
+      'Se você está lendo isto, o envio de e-mail está funcionando.',
+      '',
+      'Confira também se caiu na caixa de entrada e não no spam — se caiu no spam,',
+      'faltam SPF, DKIM ou DMARC no domínio, e o efeito prático é o mesmo de não enviar.',
+    ].join('\n'),
+  });
+  if (!r.ok) return { ok: false, erro: (r.erro && r.erro.message) || 'falha desconhecida' };
+  return { ok: true, tentativas: r.tentativas, destino };
 }
 
 // --------------- Eventos de funil ---------------
@@ -127,4 +252,14 @@ function funnelSummary(sinceMs) {
   return { since: from || null, counts, total: events.length };
 }
 
-module.exports = { sendEmail, sentEmails: sent, track, funnelSummary, events };
+module.exports = {
+  sendEmail,
+  sentEmails: sent,
+  verificarEmail,
+  statusEmail,
+  enviarTeste,
+  TEMPLATES,
+  track,
+  funnelSummary,
+  events,
+};

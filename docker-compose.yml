@@ -9,6 +9,22 @@ services:
     volumes:
       - uptime-kuma-data:/app/data
 
+  # Coletor de e-mail local: captura tudo que o backend enviar e mostra numa
+  # caixa de entrada em http://localhost:8025. Nada sai para a internet.
+  # Serve para ver o e-mail de verdade, com formatacao e tudo, sem contratar
+  # provedor nenhum:
+  #   docker compose --profile mail up -d
+  #   MAIL_ENABLED=true SMTP_HOST=mailpit SMTP_PORT=1025 docker compose up -d backend
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    profiles:
+      - mail
+    ports:
+      - "8025:8025"
+    environment:
+      - MP_MAX_MESSAGES=500
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -59,7 +75,18 @@ services:
       - GPAY_MERCHANT_NAME=${GPAY_MERCHANT_NAME:-Fila Virtual}
       - GPAY_ENVIRONMENT=${GPAY_ENVIRONMENT:-TEST}
       - GPAY_CARD_NETWORKS=${GPAY_CARD_NETWORKS:-MASTERCARD,VISA,AMEX,ELO}
+      # E-mail transacional. Sem isto o cliente cria a fila e nunca mais ouve
+      # falar de voce — o servidor grita no log se estiver ligado e quebrado.
+      - MAIL_ENABLED=${MAIL_ENABLED:-false}
+      - MAIL_FROM=${MAIL_FROM:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - MAIL_RETRIES=${MAIL_RETRIES:-3}
       - CHAT_PROVIDER=${CHAT_PROVIDER:-local}
+      - LOCAL_LLM_KEEP_ALIVE=${LOCAL_LLM_KEEP_ALIVE:-30m}
       # O runtime local roda na maquina host, fora do compose. Dentro do
       # container, "localhost" e o proprio container — por isso host.docker.internal.
       - LOCAL_LLM_BASE=${LOCAL_LLM_BASE:-http://host.docker.internal:11434/v1}

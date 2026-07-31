@@ -306,4 +306,5 @@ module.exports = {
   PAPEL,
   PROVEDOR,
   verificarLocal: local.verificar,
+  aquecerLocal: local.aquecer,
 };
