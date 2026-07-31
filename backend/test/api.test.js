@@ -4,6 +4,7 @@ const { spawn } = require('node:child_process');
 const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs');
+const analyticsModule = require('../analytics');
 
 const SERVER = path.join(__dirname, '..', 'server.js');
 const PASSWORD = 'senha-de-teste';
@@ -481,6 +482,159 @@ describe('limites do plano free', () => {
     });
     assert.strictEqual(primeira.status, 200);
     assert.strictEqual(segunda.status, 409, 'plano free deixou abrir um segundo balcao');
+  });
+});
+
+describe('eventos de comportamento', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    server = await startServer({ RATE_LIMIT_EVENTS: '500' });
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  function enviar(payload) {
+    return fetch(base + '/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  test('aceita lote e responde sem corpo', async () => {
+    const res = await enviar({
+      session: 'sessao-1',
+      events: [{ name: 'tela:aberta', surface: 'landing', at: Date.now() }],
+    });
+    assert.strictEqual(res.status, 204);
+  });
+
+  test('lote vazio nao gera erro', async () => {
+    const res = await enviar({ session: 'sessao-1', events: [] });
+    assert.strictEqual(res.status, 204);
+  });
+
+  test('descarta props fora da lista permitida (LGPD)', () => {
+    const limpo = analyticsModule.limparProps({
+      form: 'cadastro',
+      nome: 'Maria Silva',
+      email: 'maria@exemplo.com',
+      senha: 'segredo',
+      status: 402,
+    });
+    assert.deepStrictEqual(limpo, { form: 'cadastro', status: 402 });
+  });
+
+  test('normaliza descartando evento com nome invalido', () => {
+    const eventos = analyticsModule.normalizar({
+      session: 'x',
+      events: [
+        { name: 'tela:aberta', surface: 'landing', at: Date.now() },
+        { name: 'nome com espaco', surface: 'landing', at: Date.now() },
+        { name: '', surface: 'landing', at: Date.now() },
+      ],
+    });
+    assert.strictEqual(eventos.length, 1);
+    assert.strictEqual(eventos[0].name, 'tela:aberta');
+  });
+
+  test('superficie desconhecida vira rotulo generico', () => {
+    const [evento] = analyticsModule.normalizar({
+      session: 'x',
+      events: [{ name: 'tela:aberta', surface: 'inventada', at: Date.now() }],
+    });
+    assert.strictEqual(evento.surface, 'desconhecida');
+  });
+
+  test('corta o lote no limite', () => {
+    const muitos = Array.from({ length: 200 }, (_, i) => ({
+      name: 'evento' + i, surface: 'landing', at: Date.now(),
+    }));
+    const eventos = analyticsModule.normalizar({ session: 'x', events: muitos });
+    assert.strictEqual(eventos.length, analyticsModule.MAX_EVENTS_POR_LOTE);
+  });
+
+  test('carimbo de tempo absurdo do cliente e substituido', () => {
+    const [evento] = analyticsModule.normalizar({
+      session: 'x',
+      events: [{ name: 'tela:aberta', surface: 'landing', at: 1 }],
+    });
+    assert.ok(Math.abs(Date.now() - evento.at) < 5000, 'deveria usar o relogio do servidor');
+  });
+
+  test('funil calcula a queda entre etapas', () => {
+    const funil = analyticsModule.montarFunil(
+      { etapas: [{ name: 'a', rotulo: 'A' }, { name: 'b', rotulo: 'B' }, { name: 'c', rotulo: 'C' }] },
+      { a: 100, b: 40, c: 10 }
+    );
+    assert.strictEqual(funil[0].quedaPercentual, null);
+    assert.strictEqual(funil[1].quedaPercentual, 60);
+    assert.strictEqual(funil[2].quedaPercentual, 75);
+  });
+
+  test('painel de funil exige operador autenticado', async () => {
+    const protegido = await startServer({ OPERATOR_PASSWORD: 'segredo-analitico' });
+    try {
+      const res = await fetch(protegido.base + '/api/analytics/funnel');
+      assert.strictEqual(res.status, 401);
+    } finally {
+      stopServer(protegido);
+    }
+  });
+
+  test('funil devolve os dois caminhos com as sessoes contadas', async () => {
+    // Servidor proprio: os outros testes deste bloco ja mandaram eventos e
+    // poluiriam a contagem.
+    const limpo = await startServer({ RATE_LIMIT_EVENTS: '500' });
+    try {
+      const mandar = (session, events) => fetch(limpo.base + '/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session, events }),
+      });
+
+      await mandar('visitante-a', [
+        { name: 'tela:aberta', surface: 'landing', at: Date.now() },
+        { name: 'clique:criar_fila', surface: 'landing', at: Date.now() },
+      ]);
+      // Mesma sessao repetindo a etapa: precisa continuar contando como uma.
+      await mandar('visitante-a', [{ name: 'tela:aberta', surface: 'landing', at: Date.now() }]);
+      await mandar('visitante-b', [{ name: 'tela:aberta', surface: 'landing', at: Date.now() }]);
+
+      const { body: sessao } = await login(limpo.base);
+      const res = await fetch(limpo.base + '/api/analytics/funnel?hours=1', { headers: authed(sessao.token) });
+      const body = await res.json();
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(body.funis.length, 2);
+
+      const dono = body.funis.find(f => f.id === 'dono');
+      assert.strictEqual(dono.etapas[0].sessoes, 2, 'duas sessoes abriram a landing');
+      assert.strictEqual(dono.etapas[1].sessoes, 1, 'so uma clicou em criar fila');
+      assert.strictEqual(dono.etapas[1].quedaPercentual, 50);
+    } finally {
+      stopServer(limpo);
+    }
+  });
+
+  test('rate limit corta enxurrada de eventos', async () => {
+    const limitado = await startServer({ RATE_LIMIT_EVENTS: '2' });
+    try {
+      const status = [];
+      for (let i = 0; i < 4; i++) {
+        const res = await fetch(limitado.base + '/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session: 's', events: [{ name: 'ev', surface: 'landing', at: Date.now() }] }),
+        });
+        status.push(res.status);
+      }
+      assert.ok(status.includes(429), 'nunca respondeu 429: ' + status.join(','));
+    } finally {
+      stopServer(limitado);
+    }
   });
 });
 

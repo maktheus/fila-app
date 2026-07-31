@@ -158,6 +158,7 @@ if ("serviceWorker" in navigator) {
   }
 </style>
 <script src="config.js?v=5"></script>
+<script src="analytics.js?v=1"></script>
 <script src="ads.js"></script>
 </head>
 <body>
@@ -185,6 +186,7 @@ if ("serviceWorker" in navigator) {
   if (scannedVenue) localStorage.setItem(VENUE_KEY, scannedVenue);
   var venueSlug = scannedVenue || localStorage.getItem(VENUE_KEY) || "";
   var API_PREFIX = venueSlug ? "/api/venues/" + encodeURIComponent(venueSlug) : "/api";
+  FilaAnalytics.init({ surface: "cliente", venue: venueSlug || null });
   function apiPath(path) { return path.replace(/^\/api/, API_PREFIX); }
   var config = { venue: { name: "Clínica Centro", qrToken: qrToken }, monetization: { plan: "free", adsEnabled: true } };
   var state = null;
@@ -398,12 +400,31 @@ if ("serviceWorker" in navigator) {
     ].join("");
   }
 
+  var jaMarcou = {};
+  function marcarUmaVez(nome) {
+    if (jaMarcou[nome]) return;
+    jaMarcou[nome] = true;
+    FilaAnalytics.track(nome);
+  }
+
   function render() {
     ticket = computeTicket();
     syncNativeAds();
     if (!ticket) renderEntry();
     else if (confirmation) renderConfirmation();
     else renderStatus();
+
+    // Marca as etapas do funil uma vez por sessão, para a contagem ser de
+    // pessoas e não de re-renderizações.
+    if (ticket) {
+      marcarUmaVez("fila:acompanhou");
+      if (ticket.status === "calling") marcarUmaVez("fila:chamado");
+    }
+    var campo = document.querySelector("#joinForm input[name=name]");
+    if (campo && !campo.dataset.observado) {
+      campo.dataset.observado = "1";
+      campo.addEventListener("input", function () { marcarUmaVez("form:iniciado"); }, { once: true });
+    }
   }
 
   async function joinQueue(event) {
@@ -418,9 +439,11 @@ if ("serviceWorker" in navigator) {
       localStorage.setItem(TOKEN_KEY, qrToken);
       localStorage.setItem(STORAGE_KEY, String(ticket.id));
       confirmation = true;
+      FilaAnalytics.track("fila:entrou");
       flash(ticket.code + " entrou na fila.");
       showNativeInterstitial("queue_joined");
     } catch (error) {
+      FilaAnalytics.track("fila:entrada_recusada");
       flash(error.message);
     } finally {
       busy = false;

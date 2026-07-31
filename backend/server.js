@@ -8,6 +8,7 @@ const cors = require('cors');
 const QRCode = require('qrcode');
 const billing = require('./billing');
 const notify = require('./notify');
+const analytics = require('./analytics');
 
 const app = express();
 // Atras de nginx/Caddy: sem isto req.ip vira o IP do proxy e o rate limit
@@ -674,6 +675,113 @@ app.post('/api/webhooks/payments', (req, res) => {
   res.json({ ok: true, plan: venue.plan, status: venue.subscription.status });
 });
 
+// --------------- Comportamento (analytics) ---------------
+
+// Sem Postgres os eventos ficam em memoria, so para o dev conseguir ver o
+// funil rodando local.
+const eventosMemoria = [];
+const eventsLimiter = createRateLimit(60 * 1000, Number(process.env.RATE_LIMIT_EVENTS || 120));
+
+app.post('/api/events', eventsLimiter, (req, res) => {
+  const eventos = analytics.normalizar(req.body);
+  if (!eventos.length) return res.status(204).end();
+
+  if (USE_POSTGRES) {
+    db.insertEvents(eventos).catch(error => {
+      console.warn('Nao foi possivel gravar eventos:', error.message);
+    });
+  } else {
+    eventosMemoria.push(...eventos);
+    if (eventosMemoria.length > 5000) eventosMemoria.splice(0, eventosMemoria.length - 5000);
+  }
+  // Telemetria responde rapido e sem corpo: o front nao espera por isso.
+  res.status(204).end();
+});
+
+function requireAnalyticsAuth(req, res, next) {
+  if (isOperatorOf(bearerToken(req), DEFAULT_SLUG)) return next();
+  if (!IS_PRODUCTION && !venues.get(DEFAULT_SLUG).passwordHash && !process.env.ADMIN_TOKEN) return next();
+  return res.status(401).json({ error: 'Operador nao autenticado.' });
+}
+
+function contagensEmMemoria(desde) {
+  const porChave = new Map();
+  for (const evento of eventosMemoria) {
+    if (evento.at < desde) continue;
+    const chave = evento.name + ' ' + evento.surface;
+    if (!porChave.has(chave)) porChave.set(chave, new Set());
+    porChave.get(chave).add(evento.session);
+  }
+  return [...porChave.entries()].map(([chave, sessoes]) => {
+    const [name, surface] = chave.split(' ');
+    return { name, surface, sessoes: sessoes.size };
+  });
+}
+
+// Funil com a queda entre etapas — e onde se enxerga o problema.
+app.get('/api/analytics/funnel', requireAnalyticsAuth, async (req, res) => {
+  const horas = Math.min(Number(req.query.hours || 24), 24 * 90);
+  const desde = Date.now() - horas * 3600 * 1000;
+
+  try {
+    const linhas = USE_POSTGRES
+      ? await db.sessionsByNameAndSurface(desde)
+      : contagensEmMemoria(desde);
+
+    // Indexa por nome e por nome@superficie, para as etapas dos dois formatos.
+    const contagens = {};
+    for (const linha of linhas) {
+      contagens[linha.name] = (contagens[linha.name] || 0) + linha.sessoes;
+      contagens[`${linha.name}@${linha.surface}`] = linha.sessoes;
+    }
+
+    res.json({
+      horas,
+      funis: Object.entries(analytics.FUNIS).map(([id, def]) => ({
+        id,
+        titulo: def.titulo,
+        etapas: analytics.montarFunil(def, contagens),
+      })),
+    });
+  } catch (error) {
+    res.status(503).json({ error: 'Nao foi possivel ler os eventos.' });
+  }
+});
+
+app.get('/api/analytics/events', requireAnalyticsAuth, async (req, res) => {
+  const horas = Math.min(Number(req.query.hours || 24), 24 * 90);
+  const desde = Date.now() - horas * 3600 * 1000;
+  try {
+    if (!USE_POSTGRES) {
+      const agregado = contagensEmMemoria(desde)
+        .sort((a, b) => b.sessoes - a.sessoes)
+        .slice(0, 60)
+        .map(l => ({ name: l.name, total: l.sessoes, sessoes: l.sessoes }));
+      return res.json({ horas, eventos: agregado });
+    }
+    res.json({ horas, eventos: await db.countEventsByName(desde) });
+  } catch (error) {
+    res.status(503).json({ error: 'Nao foi possivel ler os eventos.' });
+  }
+});
+
+app.get('/api/analytics/errors', requireAnalyticsAuth, async (req, res) => {
+  const horas = Math.min(Number(req.query.hours || 24), 24 * 90);
+  const desde = Date.now() - horas * 3600 * 1000;
+  try {
+    if (!USE_POSTGRES) {
+      const erros = eventosMemoria
+        .filter(e => e.at >= desde && e.name.startsWith('erro:'))
+        .slice(-25)
+        .map(e => ({ name: e.name, props: e.props, total: 1 }));
+      return res.json({ horas, erros });
+    }
+    res.json({ horas, erros: await db.recentErrors(desde) });
+  } catch (error) {
+    res.status(503).json({ error: 'Nao foi possivel ler os eventos.' });
+  }
+});
+
 // --------------- Leads ---------------
 
 const leads = [];
@@ -1014,6 +1122,10 @@ loadPersistedStore()
       purgeOldTickets();
       purgeExpiredSessions();
       checkTrials();
+      if (USE_POSTGRES) {
+        const corte = Date.now() - analytics.RETENCAO_DIAS * 86400000;
+        db.purgeEvents(corte).catch(() => {});
+      }
     }, PURGE_INTERVAL_MS).unref();
 
     server.listen(PORT, '0.0.0.0', () => {

@@ -121,7 +121,7 @@
         <img id="qr" alt="QR code para entrar na fila">
       </div>
       <div class="row" style="margin-top:14px">
-        <a class="btn" id="cartaz" href="#">Abrir cartaz para imprimir</a>
+        <a class="btn" id="cartaz" href="#" data-ev="abrir_cartaz">Abrir cartaz para imprimir</a>
         <a class="btn btn-ghost" id="download-qr" download="qr-fila.png" href="#">Baixar só o QR</a>
       </div>
     </div>
@@ -151,6 +151,7 @@
 </main>
 
 <script src="config.js?v=6"></script>
+<script src="analytics.js?v=1"></script>
 <script>
 (function() {
   var API_BASE = window.FILA_API_BASE || "";
@@ -158,6 +159,8 @@
   var alertBox = document.getElementById("alert");
   var submit = document.getElementById("submit");
   var coords = { latitude: null, longitude: null };
+  FilaAnalytics.init({ surface: "cadastro" });
+  FilaAnalytics.watchForm(form, "cadastro");
 
   function showAlert(message) {
     alertBox.textContent = message;
@@ -205,9 +208,12 @@
       });
       var data = await res.json();
       if (!res.ok) {
+        FilaAnalytics.track("cadastro:recusado", { motivo: String(res.status) });
         showAlert(data.error || "Não foi possível criar a fila.");
         return;
       }
+      FilaAnalytics.setVenue(data.venue.slug);
+      FilaAnalytics.track("cadastro:concluido");
       mostrarResultado(data);
     } catch (error) {
       showAlert("Sem conexão com o servidor. Tente de novo em instantes.");

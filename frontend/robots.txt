@@ -3,6 +3,7 @@ Disallow: /operador.html
 Disallow: /telao.html
 Disallow: /checkout-sandbox.html
 Disallow: /cartaz.html
+Disallow: /analitico.html
 Allow: /
 
 # Troque SEU-DOMINIO antes de publicar.

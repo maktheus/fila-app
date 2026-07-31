@@ -70,6 +70,19 @@ async function ensureSchema() {
           text TEXT NOT NULL,
           ts BIGINT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS analytics_events (
+          id BIGSERIAL PRIMARY KEY,
+          session TEXT NOT NULL,
+          name TEXT NOT NULL,
+          surface TEXT NOT NULL,
+          venue_slug TEXT,
+          path TEXT,
+          ref TEXT,
+          props JSONB,
+          at BIGINT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS analytics_at_idx ON analytics_events (at DESC);
+        CREATE INDEX IF NOT EXISTS analytics_name_idx ON analytics_events (name, at DESC);
         CREATE INDEX IF NOT EXISTS tickets_venue_idx ON tickets (venue_slug, sort_order);
         CREATE INDEX IF NOT EXISTS queue_log_venue_idx ON queue_log (venue_slug, ts DESC);
       `);
@@ -194,10 +207,73 @@ async function saveVenues(venues) {
   }
 }
 
+// Eventos ficam fora do saveVenues: sao append-only e volumosos demais para
+// entrar no ciclo de reescrita do estado da fila.
+async function insertEvents(rows) {
+  if (!rows.length) return;
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    for (const e of rows) {
+      await client.query(
+        `INSERT INTO analytics_events (session, name, surface, venue_slug, path, ref, props, at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
+        [e.session, e.name, e.surface, e.venue || null, e.path || null, e.ref || null,
+         JSON.stringify(e.props || {}), e.at]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function countEventsByName(sinceMs) {
+  const res = await getPool().query(
+    `SELECT name, count(*)::int AS total, count(DISTINCT session)::int AS sessoes
+     FROM analytics_events WHERE at >= $1 GROUP BY name ORDER BY total DESC LIMIT 60`,
+    [sinceMs]
+  );
+  return res.rows;
+}
+
+// Sessoes distintas por (evento, superficie) — a base do funil. Contamos
+// sessoes, nao eventos: quem clica tres vezes na mesma etapa conta uma vez.
+async function sessionsByNameAndSurface(sinceMs) {
+  const res = await getPool().query(
+    `SELECT name, surface, count(DISTINCT session)::int AS sessoes
+     FROM analytics_events WHERE at >= $1 GROUP BY name, surface`,
+    [sinceMs]
+  );
+  return res.rows;
+}
+
+async function recentErrors(sinceMs) {
+  const res = await getPool().query(
+    `SELECT name, props, count(*)::int AS total
+     FROM analytics_events
+     WHERE at >= $1 AND name LIKE 'erro:%'
+     GROUP BY name, props ORDER BY total DESC LIMIT 25`,
+    [sinceMs]
+  );
+  return res.rows;
+}
+
+async function purgeEvents(cutoffMs) {
+  const res = await getPool().query('DELETE FROM analytics_events WHERE at < $1', [cutoffMs]);
+  return res.rowCount;
+}
+
 async function ping() {
   const started = Date.now();
   await getPool().query('SELECT 1');
   return Date.now() - started;
 }
 
-module.exports = { ensureSchema, loadVenues, saveVenues, ping };
+module.exports = {
+  ensureSchema, loadVenues, saveVenues, ping,
+  insertEvents, countEventsByName, sessionsByNameAndSurface, recentErrors, purgeEvents,
+};

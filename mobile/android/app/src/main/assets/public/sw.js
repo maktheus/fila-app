@@ -12,6 +12,7 @@ const APP_SHELL = [
   'cartaz.html',
   'manifest.webmanifest',
   'ads.js',
+  'analytics.js',
   'assets/mark-bird.svg',
   'assets/mutum-design-system.css',
   'assets/fila-cliente-qr.png'

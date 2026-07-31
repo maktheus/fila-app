@@ -242,6 +242,7 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <script src="config.js?v=4"></script>
+<script src="analytics.js?v=1"></script>
 <script src="ads.js"></script>
 </head>
 <body>
@@ -259,6 +260,7 @@ if ('serviceWorker' in navigator) {
   const API_PREFIX = venueSlug ? '/api/venues/' + encodeURIComponent(venueSlug) : '/api';
   const apiPath = (path) => path.replace(/^\/api/, API_PREFIX);
   const venueQuery = (prefix) => venueSlug ? prefix + 'venue=' + encodeURIComponent(venueSlug) : '';
+  FilaAnalytics.init({ surface: 'operador', venue: venueSlug || null });
   const SESSION_KEY = 'fila_operator_session' + (venueSlug ? ':' + venueSlug : '');
 
   // ---- STATE ----
@@ -355,6 +357,7 @@ if ('serviceWorker' in navigator) {
         render();
         return;
       }
+      FilaAnalytics.track('operador:login_ok');
       sessionToken = data.token;
       sessionStorage.setItem(SESSION_KEY, sessionToken);
       authed = true;
@@ -375,7 +378,7 @@ if ('serviceWorker' in navigator) {
     endSession('');
   }
 
-  function callNext() { api('POST', '/api/tickets/call-next'); }
+  function callNext() { FilaAnalytics.track('operador:chamou'); api('POST', '/api/tickets/call-next'); }
   function callId(id) { api('POST', '/api/tickets/' + id + '/call'); }
   function finishId(id) { api('POST', '/api/tickets/' + id + '/finish'); }
   function recallId(id) { api('POST', '/api/tickets/' + id + '/recall'); }
@@ -517,6 +520,7 @@ if ('serviceWorker' in navigator) {
   async function startCheckout() {
     const btn = document.getElementById('upgrade-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Abrindo...'; }
+    FilaAnalytics.track('checkout:iniciado');
     const data = await api('POST', '/api/checkout');
     if (data && data.url) {
       window.location.href = data.url;
