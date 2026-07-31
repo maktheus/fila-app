@@ -46,6 +46,9 @@ services:
       - TRIAL_DAYS=${TRIAL_DAYS:-14}
       - PAYMENT_PROVIDER=${PAYMENT_PROVIDER:-sandbox}
       - PAYMENT_WEBHOOK_SECRET=${PAYMENT_WEBHOOK_SECRET:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - CHAT_MODEL=${CHAT_MODEL:-claude-opus-5}
+      - CHAT_EFFORT=${CHAT_EFFORT:-low}
       - VENUE_NAME=Unidade Centro
       - OPERATOR_NAME=Equipe balcao
     depends_on:

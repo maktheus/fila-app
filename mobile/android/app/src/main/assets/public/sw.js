@@ -13,6 +13,7 @@ const APP_SHELL = [
   'manifest.webmanifest',
   'ads.js',
   'analytics.js',
+  'chat.js',
   'assets/mark-bird.svg',
   'assets/mutum-design-system.css',
   'assets/fila-cliente-qr.png'

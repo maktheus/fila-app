@@ -675,6 +675,51 @@ app.post('/api/webhooks/payments', (req, res) => {
   res.json({ ok: true, plan: venue.plan, status: venue.subscription.status });
 });
 
+// --------------- Chatbot de vendas ---------------
+
+const chatAgent = require('./chat/agent');
+const chatLimiter = createRateLimit(60 * 1000, Number(process.env.RATE_LIMIT_CHAT || 12));
+
+app.post('/api/chat', chatLimiter, async (req, res) => {
+  const body = req.body || {};
+  const historico = Array.isArray(body.history) ? body.history.slice(-20) : [];
+
+  try {
+    const venue = venues.get(DEFAULT_SLUG);
+    const assinatura = billing.subscriptionView(venue);
+    const resultado = await chatAgent.responder({
+      mensagem: body.message,
+      historico,
+      fatos: {
+        precoMensal: billing.PRICE_CENTS / 100,
+        precoLabel: assinatura.priceLabel,
+        diasDeTeste: billing.TRIAL_DAYS,
+      },
+    });
+
+    notify.track('chat:resposta', {
+      motivo: resultado.recusado ? 'recusado'
+        : resultado.bloqueado ? 'bloqueado'
+        : resultado.foraDeEscopo ? 'fora-de-escopo'
+        : 'ok',
+    });
+    if (resultado.ferramentas.length) {
+      notify.track('chat:ferramenta', { alvo: resultado.ferramentas.join(',') });
+    }
+    if (resultado.bloqueado) {
+      console.warn('[chat] guardrail barrou a resposta:', resultado.bloqueado.join('; '));
+    }
+
+    res.json({ resposta: resultado.resposta, ferramentas: resultado.ferramentas });
+  } catch (error) {
+    console.warn('[chat] falha:', error.message);
+    notify.track('chat:erro');
+    res.status(503).json({
+      error: 'O assistente está indisponível agora. Você pode criar sua fila em /cadastro.html.',
+    });
+  }
+});
+
 // --------------- Comportamento (analytics) ---------------
 
 // Sem Postgres os eventos ficam em memoria, so para o dev conseguir ver o

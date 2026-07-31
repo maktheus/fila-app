@@ -5,8 +5,10 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
-# Copia todos os módulos: listar arquivo por arquivo já quebrou o build duas vezes.
-COPY *.js ./
+# Copia a árvore inteira do backend. Listar arquivo por arquivo quebrou o build
+# duas vezes, e `COPY *.js` ignorava subdiretórios (chat/) — .dockerignore é
+# quem tira node_modules, testes e o resto.
+COPY . .
 RUN mkdir -p /app/data && chown -R node:node /app/data
 
 EXPOSE 3000
