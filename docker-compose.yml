@@ -42,6 +42,10 @@ services:
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-8}
       - TICKET_RETENTION_HOURS=${TICKET_RETENTION_HOURS:-12}
       - SEED_DEMO=${SEED_DEMO:-true}
+      - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost}
+      - TRIAL_DAYS=${TRIAL_DAYS:-14}
+      - PAYMENT_PROVIDER=${PAYMENT_PROVIDER:-sandbox}
+      - PAYMENT_WEBHOOK_SECRET=${PAYMENT_WEBHOOK_SECRET:-}
       - VENUE_NAME=Unidade Centro
       - OPERATOR_NAME=Equipe balcao
     depends_on:

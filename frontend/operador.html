@@ -92,6 +92,16 @@
   .logout-btn{padding:7px 13px;border-radius:999px;border:1px solid var(--border-strong);background:transparent;color:var(--fg-2);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
   .logout-btn:hover{color:var(--fg-1);border-color:var(--fg-3)}
 
+  .plan-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:16px 0 0;padding:12px 16px;border-radius:12px;border:1px solid var(--border);background:var(--surface)}
+  .plan-bar.trial{border-color:color-mix(in oklch,var(--mutum-amber) 45%,transparent);background:color-mix(in oklch,var(--mutum-amber) 10%,var(--surface))}
+  .plan-bar.limited{border-color:color-mix(in oklch,var(--primary) 45%,transparent);background:color-mix(in oklch,var(--primary) 10%,var(--surface))}
+  .plan-tag{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:4px 10px;border-radius:999px;background:var(--bg);color:var(--fg-2);border:1px solid var(--border-strong)}
+  .plan-bar.premium .plan-tag{background:var(--mutum-forest);color:#fff;border-color:transparent}
+  .plan-text{font-size:13.5px;color:var(--fg-2);flex:1;min-width:200px}
+  .plan-text strong{color:var(--fg-1)}
+  .plan-cta{padding:9px 16px;border-radius:999px;border:0;background:var(--primary);color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+  .plan-cta:disabled{opacity:.6;cursor:default}
+
   .header{display:flex;align-items:center;gap:18px;padding-bottom:22px;border-bottom:1px solid var(--border)}
   .header-brand{display:flex;align-items:center;gap:11px}
   .header-brand-sub{font-family:var(--font-display);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:var(--fg-3)}
@@ -450,6 +460,7 @@ if ('serviceWorker' in navigator) {
     else list = [...calling, ...waiting, ...s.tickets.filter(t => t.status === 'served' || t.status === 'absent').slice().reverse()];
 
     app.innerHTML = renderHeader(s.venue, s.operator, connected) +
+      renderPlanBar(s.monetization) +
       renderKpis(kpis) +
       '<div class="main-grid">' +
         renderQueue(list, s.kpis.waiting) +
@@ -462,6 +473,56 @@ if ('serviceWorker' in navigator) {
       renderToast();
 
     bindEvents();
+  }
+
+  // Barra de plano: mostra o estado da assinatura e o caminho para o upgrade.
+  function renderPlanBar(monetization) {
+    if (!monetization) return '';
+    const sub = monetization.subscription || {};
+    const limits = monetization.limits || {};
+    const usados = (monetization.usage && monetization.usage.ticketsToday) || 0;
+    let classe = '';
+    let tag = 'Plano gratuito';
+    let texto = '';
+    let cta = 'Assinar premium';
+
+    if (sub.status === 'active') {
+      classe = 'premium';
+      tag = 'Premium ativo';
+      texto = 'Fila sem limite diário, todos os balcões liberados e sem anúncios.';
+      cta = '';
+    } else if (sub.status === 'trialing' && sub.trialDaysLeft > 0) {
+      classe = 'trial';
+      tag = 'Teste grátis';
+      texto = '<strong>' + sub.trialDaysLeft + ' dia(s) restantes</strong> com tudo liberado. ' +
+        'Depois a fila continua no plano gratuito, com limite diário e um balcão.';
+    } else if (sub.status === 'past_due') {
+      classe = 'limited';
+      tag = 'Pagamento pendente';
+      texto = 'Não conseguimos confirmar o último pagamento. Atualize para não voltar ao plano gratuito.';
+      cta = 'Regularizar';
+    } else {
+      classe = 'limited';
+      texto = 'Hoje: <strong>' + usados + ' de ' + (limits.dailyTickets || '∞') + '</strong> entradas · ' +
+        (limits.counters || '∞') + ' balcão. ' + (sub.priceLabel ? 'Premium por ' + sub.priceLabel + '/mês.' : '');
+    }
+
+    return '<div class="plan-bar ' + classe + '">' +
+      '<span class="plan-tag">' + esc(tag) + '</span>' +
+      '<span class="plan-text">' + texto + '</span>' +
+      (cta ? '<button class="plan-cta" id="upgrade-btn" type="button">' + esc(cta) + '</button>' : '') +
+    '</div>';
+  }
+
+  async function startCheckout() {
+    const btn = document.getElementById('upgrade-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Abrindo...'; }
+    const data = await api('POST', '/api/checkout');
+    if (data && data.url) {
+      window.location.href = data.url;
+      return;
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Assinar premium'; }
   }
 
   function renderLogin() {
@@ -680,6 +741,8 @@ if ('serviceWorker' in navigator) {
     });
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) logoutBtn.addEventListener('click', logout);
+    const upgradeBtn = document.getElementById('upgrade-btn');
+    if (upgradeBtn) upgradeBtn.addEventListener('click', startCheckout);
   }
 
   // ---- BOOT ----

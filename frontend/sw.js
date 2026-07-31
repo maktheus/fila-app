@@ -6,6 +6,7 @@ const APP_SHELL = [
   'telao.html',
   'landing.html',
   'cadastro.html',
+  'planos.html',
   'manifest.webmanifest',
   'ads.js',
   'assets/mark-bird.svg',

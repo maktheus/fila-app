@@ -396,7 +396,10 @@ describe('limites do plano free', () => {
   let base;
 
   before(async () => {
-    server = await startServer({ RATE_LIMIT_SIGNUP: '100', FREE_DAILY_TICKETS: '2', FREE_COUNTERS: '1' });
+    // TRIAL_DAYS=0: a unidade nasce com o teste ja vencido, ou seja, no free.
+    server = await startServer({
+      RATE_LIMIT_SIGNUP: '100', FREE_DAILY_TICKETS: '2', FREE_COUNTERS: '1', TRIAL_DAYS: '0',
+    });
     base = server.base;
   });
 
@@ -458,6 +461,161 @@ describe('limites do plano free', () => {
     });
     assert.strictEqual(primeira.status, 200);
     assert.strictEqual(segunda.status, 409, 'plano free deixou abrir um segundo balcao');
+  });
+});
+
+describe('assinatura e cobranca', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    server = await startServer({ RATE_LIMIT_SIGNUP: '100', PAYMENT_WEBHOOK_SECRET: 'segredo-de-teste' });
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  async function novaUnidade(nome) {
+    const res = await fetch(base + '/api/venues', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nome, contactEmail: 'dono@exemplo.com' }),
+    });
+    return res.json();
+  }
+
+  async function tokenDe(venue) {
+    const res = await fetch(base + `/api/venues/${venue.venue.slug}/operator/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: venue.operatorPassword }),
+    });
+    return (await res.json()).token;
+  }
+
+  function assinar(payload, secret = 'segredo-de-teste') {
+    const body = JSON.stringify(payload);
+    const signature = require('node:crypto').createHmac('sha256', secret).update(body).digest('hex');
+    return { body, signature };
+  }
+
+  function enviarWebhook(payload, secret) {
+    const { body, signature } = assinar(payload, secret);
+    return fetch(base + '/api/webhooks/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Signature': signature },
+      body,
+    });
+  }
+
+  test('unidade nova comeca em teste gratis com recursos premium', async () => {
+    const venue = await novaUnidade('Clinica Trial');
+    assert.strictEqual(venue.subscription.status, 'trialing');
+    assert.strictEqual(venue.subscription.plan, 'premium');
+    assert.ok(venue.subscription.trialDaysLeft > 0);
+
+    const state = await (await fetch(base + `/api/venues/${venue.venue.slug}/state`)).json();
+    assert.strictEqual(state.monetization.limits.dailyTickets, null, 'trial deveria estar sem limite');
+    assert.strictEqual(state.monetization.adsEnabled, false, 'trial nao deveria mostrar anuncio');
+  });
+
+  test('checkout exige operador autenticado', async () => {
+    const venue = await novaUnidade('Clinica Checkout');
+    const semAuth = await fetch(base + `/api/venues/${venue.venue.slug}/checkout`, { method: 'POST' });
+    assert.strictEqual(semAuth.status, 401);
+
+    const token = await tokenDe(venue);
+    const comAuth = await fetch(base + `/api/venues/${venue.venue.slug}/checkout`, {
+      method: 'POST', headers: authed(token),
+    });
+    const body = await comAuth.json();
+    assert.strictEqual(comAuth.status, 200);
+    assert.ok(body.url.includes(venue.venue.slug));
+  });
+
+  test('webhook sem assinatura valida e recusado', async () => {
+    const venue = await novaUnidade('Clinica Assinatura');
+    const res = await fetch(base + '/api/webhooks/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Signature': 'invalida' },
+      body: JSON.stringify({ id: 'e1', type: 'subscription.paid', reference: venue.venue.slug }),
+    });
+    assert.strictEqual(res.status, 401);
+  });
+
+  test('webhook assinado com segredo errado e recusado', async () => {
+    const venue = await novaUnidade('Clinica Segredo');
+    const res = await enviarWebhook(
+      { id: 'e2', type: 'subscription.paid', reference: venue.venue.slug },
+      'segredo-do-atacante'
+    );
+    assert.strictEqual(res.status, 401);
+  });
+
+  test('pagamento confirmado ativa o premium', async () => {
+    const venue = await novaUnidade('Clinica Paga');
+    const res = await enviarWebhook({ id: 'e3', type: 'subscription.paid', reference: venue.venue.slug });
+    const body = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(body.plan, 'premium');
+    assert.strictEqual(body.status, 'active');
+  });
+
+  test('mesmo evento reenviado nao duplica efeito', async () => {
+    const venue = await novaUnidade('Clinica Duplicada');
+    await enviarWebhook({ id: 'evento-repetido', type: 'subscription.paid', reference: venue.venue.slug });
+    const segunda = await enviarWebhook({ id: 'evento-repetido', type: 'subscription.paid', reference: venue.venue.slug });
+    const body = await segunda.json();
+    assert.strictEqual(body.duplicated, true);
+  });
+
+  test('cancelamento derruba a unidade para o plano gratuito', async () => {
+    const venue = await novaUnidade('Clinica Cancelada');
+    await enviarWebhook({ id: 'e4', type: 'subscription.paid', reference: venue.venue.slug });
+    const res = await enviarWebhook({ id: 'e5', type: 'subscription.canceled', reference: venue.venue.slug });
+    const body = await res.json();
+    assert.strictEqual(body.plan, 'free');
+    assert.strictEqual(body.status, 'canceled');
+
+    const state = await (await fetch(base + `/api/venues/${venue.venue.slug}/state`)).json();
+    assert.strictEqual(state.monetization.limits.counters, 1, 'cancelado deveria voltar aos limites do free');
+  });
+
+  test('pagamento falhado marca a assinatura como pendente', async () => {
+    const venue = await novaUnidade('Clinica Inadimplente');
+    await enviarWebhook({ id: 'e6', type: 'subscription.paid', reference: venue.venue.slug });
+    const res = await enviarWebhook({ id: 'e7', type: 'payment.failed', reference: venue.venue.slug });
+    const body = await res.json();
+    assert.strictEqual(body.status, 'past_due');
+  });
+
+  test('webhook para unidade inexistente responde 404', async () => {
+    const res = await enviarWebhook({ id: 'e8', type: 'subscription.paid', reference: 'nao-existe' });
+    assert.strictEqual(res.status, 404);
+  });
+
+  test('sandbox confirma o pagamento e libera o premium', async () => {
+    const sandbox = await startServer({ RATE_LIMIT_SIGNUP: '100', TRIAL_DAYS: '0' });
+    try {
+      const criada = await (await fetch(sandbox.base + '/api/venues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Clinica Sandbox' }),
+      })).json();
+      const slug = criada.venue.slug;
+
+      const antes = await (await fetch(sandbox.base + `/api/venues/${slug}/state`)).json();
+      assert.strictEqual(antes.monetization.plan, 'free');
+
+      const pago = await fetch(sandbox.base + `/api/venues/${slug}/sandbox/confirm`, { method: 'POST' });
+      assert.strictEqual(pago.status, 200);
+
+      const depois = await (await fetch(sandbox.base + `/api/venues/${slug}/state`)).json();
+      assert.strictEqual(depois.monetization.plan, 'premium');
+      assert.strictEqual(depois.monetization.limits.dailyTickets, null);
+    } finally {
+      stopServer(sandbox);
+    }
   });
 });
 

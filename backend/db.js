@@ -37,8 +37,16 @@ async function ensureSchema() {
           next_id BIGINT NOT NULL DEFAULT 1,
           daily_count INT NOT NULL DEFAULT 0,
           daily_date TEXT,
+          contact_email TEXT,
+          subscription JSONB,
+          trial_warned BOOLEAN NOT NULL DEFAULT FALSE,
+          trial_ended_notified BOOLEAN NOT NULL DEFAULT FALSE,
           created_at BIGINT NOT NULL
         );
+        ALTER TABLE venues ADD COLUMN IF NOT EXISTS contact_email TEXT;
+        ALTER TABLE venues ADD COLUMN IF NOT EXISTS subscription JSONB;
+        ALTER TABLE venues ADD COLUMN IF NOT EXISTS trial_warned BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE venues ADD COLUMN IF NOT EXISTS trial_ended_notified BOOLEAN NOT NULL DEFAULT FALSE;
         CREATE TABLE IF NOT EXISTS tickets (
           venue_slug TEXT NOT NULL REFERENCES venues(slug) ON DELETE CASCADE,
           id BIGINT NOT NULL,
@@ -92,6 +100,10 @@ function rowToVenue(row, tickets, log) {
     nextId: Number(row.next_id),
     dailyCount: row.daily_count,
     dailyDate: row.daily_date || '',
+    contactEmail: row.contact_email || '',
+    subscription: row.subscription || null,
+    trialWarned: !!row.trial_warned,
+    trialEndedNotified: !!row.trial_ended_notified,
     createdAt: Number(row.created_at),
     tickets,
     log,
@@ -147,11 +159,14 @@ async function saveVenues(venues) {
       await client.query(
         `INSERT INTO venues (slug, name, operator_name, qr_token, password_hash, latitude, longitude,
            proximity_radius_meters, counters_total, plan, ads_enabled, served_today, last_called,
-           next_id, daily_count, daily_date, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+           next_id, daily_count, daily_date, contact_email, subscription, trial_warned,
+           trial_ended_notified, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb,$19,$20,$21)`,
         [v.slug, v.name, v.operatorName, v.qrToken, v.passwordHash || null, v.latitude, v.longitude,
          v.proximityRadiusMeters, v.countersTotal, v.plan, v.adsEnabled, v.servedToday, v.lastCalled,
-         v.nextId, v.dailyCount || 0, v.dailyDate || null, v.createdAt]
+         v.nextId, v.dailyCount || 0, v.dailyDate || null, v.contactEmail || null,
+         v.subscription ? JSON.stringify(v.subscription) : null,
+         !!v.trialWarned, !!v.trialEndedNotified, v.createdAt]
       );
       for (let i = 0; i < v.tickets.length; i++) {
         const t = v.tickets[i];

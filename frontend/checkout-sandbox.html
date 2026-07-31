@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Pagamento (simulação) — Fila Virtual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/mutum-design-system.css">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{background:var(--bg);color:var(--fg-1);font-family:var(--font-body);display:grid;place-items:center;padding:24px}
+  button{font:inherit;cursor:pointer}
+  .card{width:min(440px,100%);background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:28px}
+  .warn{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mutum-amber);border:1px solid color-mix(in oklch,var(--mutum-amber) 45%,transparent);background:color-mix(in oklch,var(--mutum-amber) 12%,transparent);border-radius:99px;padding:5px 11px}
+  h1{font-family:var(--font-display);font-size:24px;margin:14px 0 6px}
+  p{font-size:14.5px;line-height:1.55;color:var(--fg-2);margin:0 0 18px}
+  .amount{font-family:var(--font-display);font-size:34px;font-weight:700;margin:6px 0 2px}
+  .amount span{font-size:15px;font-weight:600;color:var(--fg-3)}
+  dl{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;margin:18px 0;font-size:13.5px}
+  dt{color:var(--fg-3)}
+  dd{margin:0;font-family:var(--font-mono)}
+  .btn{width:100%;border:0;border-radius:12px;padding:15px;font-weight:700;font-size:15px;background:var(--primary);color:#fff}
+  .btn:disabled{opacity:.5}
+  .btn-ghost{margin-top:10px;background:transparent;border:1px solid var(--border-strong);color:var(--fg-1)}
+  .ok{margin-top:16px;padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600;background:color-mix(in oklch,var(--mutum-leaf) 14%,transparent);border:1px solid color-mix(in oklch,var(--mutum-leaf) 40%,transparent);color:var(--mutum-forest)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<main class="card">
+  <span class="warn">Ambiente de simulação</span>
+  <h1>Assinatura Fila Virtual</h1>
+  <p>Esta tela substitui o checkout do provedor enquanto a conta de pagamento não está conectada. Nenhuma cobrança é feita.</p>
+
+  <div class="amount" id="amount">R$ 99,00 <span>/mês por unidade</span></div>
+  <dl>
+    <dt>Unidade</dt><dd id="venue">—</dd>
+    <dt>Forma</dt><dd>Pix recorrente</dd>
+  </dl>
+
+  <button class="btn" id="pay">Confirmar pagamento</button>
+  <button class="btn btn-ghost" id="back">Voltar ao painel</button>
+  <div class="ok hidden" id="done"></div>
+</main>
+
+<script src="config.js?v=7"></script>
+<script>
+(function() {
+  var API_BASE = window.FILA_API_BASE || "";
+  var slug = new URLSearchParams(location.search).get("venue") || "";
+  var prefix = slug ? "/api/venues/" + encodeURIComponent(slug) : "/api";
+  document.getElementById("venue").textContent = slug || "unidade padrão";
+
+  fetch(API_BASE + prefix + "/config").then(function(r) { return r.json(); }).then(function(config) {
+    var sub = config.monetization && config.monetization.subscription;
+    if (sub && sub.priceLabel) {
+      document.getElementById("amount").innerHTML =
+        sub.priceLabel + ' <span>/mês por unidade</span>';
+    }
+  }).catch(function() {});
+
+  document.getElementById("back").addEventListener("click", function() {
+    location.href = "operador.html" + (slug ? "?venue=" + encodeURIComponent(slug) : "");
+  });
+
+  document.getElementById("pay").addEventListener("click", async function() {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = "Confirmando...";
+    try {
+      var res = await fetch(API_BASE + prefix + "/sandbox/confirm", { method: "POST" });
+      var data = await res.json();
+      if (!res.ok) {
+        btn.textContent = data.error || "Não foi possível confirmar";
+        return;
+      }
+      var done = document.getElementById("done");
+      done.textContent = "Pagamento confirmado. O plano premium já está ativo.";
+      done.classList.remove("hidden");
+      btn.textContent = "Pagamento confirmado";
+      setTimeout(function() {
+        location.href = "operador.html" + (slug ? "?venue=" + encodeURIComponent(slug) : "");
+      }, 1800);
+    } catch (error) {
+      btn.disabled = false;
+      btn.textContent = "Confirmar pagamento";
+    }
+  });
+})();
+</script>
+</body>
+</html>

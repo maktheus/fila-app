@@ -46,7 +46,7 @@ As 3 telas do MVP (protótipo `project/Fila Virtual.dc.html` é a fonte visual):
 | 2 | Passar a vez + proximidade | endpoint `POST /api/tickets/:id/pass`; Geolocation no front; coords da unidade no store |
 | 3 | ✅ **Auth do admin + hardening** (Sprint 1, 30/07) | login com sessão expirável, CORS por env, rate limit por IP real, expurgo LGPD, nomes só para o operador, cliente na raiz, 24 testes + CI |
 | 4 | ✅ **Persistência + multi-unidade** (Sprint 2, 30/07) | Postgres via Docker, schema multi-tenant, cadastro self-service (`cadastro.html` → `POST /api/venues`), QR PNG gerado por unidade, limites do plano free aplicados, expurgo LGPD |
-| 5 | Monetização B2B | assinatura Cakto/Pix por unidade; onboarding da clínica (gera QR na hora) |
+| 5 | ✅ **Monetização B2B** (Sprint 3, 31/07) | trial de 14 dias, checkout com adapter de provedor, webhook HMAC idempotente que ativa/suspende o premium, e-mails transacionais, eventos de funil, `planos.html`. **Pendente de você**: abrir conta no provedor e comprar a própria assinatura |
 
 ### Prompt de construção do Bloco 1 (planejar com Opus, executar com Sonnet)
 
@@ -88,4 +88,4 @@ Checkout: **assinatura recorrente Pix via Cakto** (alternativas Stripe/Mercado P
 
 ## Próxima ação única
 
-**Sprint 3 — monetização** (`docs/kanban.html`): checkout de assinatura Pix, webhook que ativa/suspende o premium sozinho e e-mails transacionais. É o que falta para o produto cobrar sem ninguém no meio — o plano free já está limitado e pedindo upgrade.
+**Sprint 4 — publicação** (`docs/kanban.html`): domínio próprio com HTTPS e assetlinks, política de privacidade e termos, ficha da loja, `.aab` assinado e teste fechado com 12 testadores. Em paralelo, **abrir a conta no provedor de pagamento** (Cakto ou Mercado Pago), apontar `PAYMENT_PROVIDER`/`CHECKOUT_BASE_URL`/`PAYMENT_WEBHOOK_SECRET` e comprar a própria assinatura para validar o fluxo real.

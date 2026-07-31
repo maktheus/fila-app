@@ -6,6 +6,8 @@ const path = require('path');
 const { WebSocketServer } = require('ws');
 const cors = require('cors');
 const QRCode = require('qrcode');
+const billing = require('./billing');
+const notify = require('./notify');
 
 const app = express();
 // Atras de nginx/Caddy: sem isto req.ip vira o IP do proxy e o rate limit
@@ -48,7 +50,11 @@ app.use(cors({
     return cb(new Error('Origem nao permitida pelo CORS.'));
   },
 }));
-app.use(express.json({ limit: '32kb' }));
+// rawBody fica guardado para conferir a assinatura HMAC do webhook.
+app.use(express.json({
+  limit: '32kb',
+  verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); },
+}));
 
 // --------------- Store multi-unidade ---------------
 
@@ -95,6 +101,10 @@ function createVenue(input) {
     slug: input.slug,
     name: input.name,
     operatorName: input.operatorName || 'Equipe balcão',
+    contactEmail: input.contactEmail || '',
+    subscription: input.subscription || null,
+    trialWarned: false,
+    trialEndedNotified: false,
     qrToken: input.qrToken || crypto.randomBytes(9).toString('base64url'),
     passwordHash: input.passwordHash || '',
     latitude: Number.isFinite(input.latitude) ? input.latitude : null,
@@ -112,6 +122,8 @@ function createVenue(input) {
     tickets: [],
     log: [],
   };
+  if (!venue.subscription) billing.startTrial(venue);
+  venue.plan = billing.effectivePlan(venue);
   venues.set(venue.slug, venue);
   return venue;
 }
@@ -128,8 +140,11 @@ function seedDefaultVenue() {
     latitude: Number(process.env.VENUE_LAT || -3.119028),
     longitude: Number(process.env.VENUE_LNG || -60.021731),
     proximityRadiusMeters: Number(process.env.PROXIMITY_RADIUS_METERS || 120),
-    plan: process.env.PLAN === 'premium' ? 'premium' : 'free',
     adsEnabled: process.env.ADS_ENABLED === 'false' ? false : process.env.PLAN !== 'premium',
+    // PLAN=premium no ambiente vira assinatura ativa sem vencimento.
+    subscription: process.env.PLAN === 'premium'
+      ? { status: 'active', trialEndsAt: null, currentPeriodEnd: null, externalId: null, lastEventAt: null }
+      : null,
   });
   if (SEED_DEMO) {
     venue.tickets = seedTickets();
@@ -234,7 +249,7 @@ function requireOperator(req, res, next) {
 // --------------- Helpers de fila ---------------
 
 function planLimits(venue) {
-  return venue.plan === 'premium'
+  return billing.effectivePlan(venue) === 'premium'
     ? { dailyTickets: null, counters: null }
     : { dailyTickets: FREE_LIMITS.dailyTickets, counters: FREE_LIMITS.counters };
 }
@@ -265,6 +280,28 @@ function updateWaitTimes(venue) {
   });
 }
 
+// Avisa o dono antes do trial acabar e quando ele acaba — cada aviso uma vez.
+function checkTrials() {
+  for (const venue of venues.values()) {
+    const sub = billing.ensureSubscription(venue);
+    if (sub.status !== 'trialing') continue;
+    const daysLeft = billing.trialDaysLeft(venue);
+    const view = billing.subscriptionView(venue);
+
+    if (daysLeft === 0 && !venue.trialEndedNotified) {
+      venue.trialEndedNotified = true;
+      venue.plan = 'free';
+      notify.track('trial_ended', { venue: venue.slug });
+      notify.sendEmail('trial_ended', venue, { priceLabel: view.priceLabel });
+      broadcast(venue, { action: 'trial-ended' });
+    } else if (daysLeft > 0 && daysLeft <= Number(process.env.TRIAL_WARN_DAYS || 3) && !venue.trialWarned) {
+      venue.trialWarned = true;
+      notify.track('trial_ending', { venue: venue.slug, daysLeft });
+      notify.sendEmail('trial_ending', venue, { trialDaysLeft: daysLeft, priceLabel: view.priceLabel });
+    }
+  }
+}
+
 // LGPD: expurga tickets encerrados depois da janela de retencao. Mantem o
 // contador do dia, que e agregado e nao identifica ninguem.
 function purgeOldTickets() {
@@ -287,13 +324,15 @@ function purgeOldTickets() {
 }
 
 function entitlement(venue) {
-  const premium = venue.plan === 'premium';
+  const plan = billing.effectivePlan(venue);
+  const premium = plan === 'premium';
   return {
-    plan: venue.plan,
+    plan,
     adsEnabled: !premium && venue.adsEnabled,
     premiumRemovesAds: true,
     limits: planLimits(venue),
     usage: { ticketsToday: venue.dailyDate === today() ? venue.dailyCount : 0 },
+    subscription: billing.subscriptionView(venue),
   };
 }
 
@@ -572,7 +611,10 @@ app.post('/api/venues', signupLimiter, (req, res) => {
     proximityRadiusMeters: Number(body.proximityRadiusMeters) || 120,
   });
 
+  venue.contactEmail = String(body.contactEmail || '').trim().slice(0, 120);
   pushLog(venue, 'Unidade criada');
+  notify.track('venue_created', { venue: venue.slug });
+  notify.sendEmail('venue_created', venue, { trialDays: billing.TRIAL_DAYS });
   persistStore();
 
   res.status(201).json({
@@ -582,8 +624,50 @@ app.post('/api/venues', signupLimiter, (req, res) => {
     qrUrl: `/api/venues/${venue.slug}/qr.png`,
     operatorUrl: `/operador.html?venue=${venue.slug}`,
     telaoUrl: `/telao.html?venue=${venue.slug}`,
+    subscription: billing.subscriptionView(venue),
     message: 'Unidade criada. Guarde a senha do operador — ela nao sera mostrada de novo.',
   });
+});
+
+// --------------- Pagamentos ---------------
+
+// Webhook do provedor. Fora das rotas por unidade porque a unidade vem no
+// corpo do evento (campo reference).
+app.post('/api/webhooks/payments', (req, res) => {
+  const signature = req.get('x-signature') || req.get('x-webhook-signature') || '';
+  if (!billing.verifySignature(req.rawBody || '', signature, IS_PRODUCTION)) {
+    return res.status(401).json({ error: 'Assinatura invalida.' });
+  }
+
+  const event = req.body || {};
+  const slug = String(event.reference || event.venue || '');
+  const venue = venues.get(slug);
+  if (!venue) return res.status(404).json({ error: 'Unidade nao encontrada.' });
+
+  // O provedor reenvia eventos: processar duas vezes nao pode dobrar o efeito.
+  if (billing.alreadyProcessed(event.id)) {
+    return res.json({ ok: true, duplicated: true });
+  }
+
+  const result = billing.applyEvent(venue, event);
+  if (!result) return res.json({ ok: true, ignored: event.type });
+
+  venue.plan = result.plan;
+  pushLog(venue, `Assinatura: ${event.type}`);
+  notify.track(result.email, { venue: venue.slug });
+  notify.sendEmail(result.email, venue, { priceLabel: billing.subscriptionView(venue).priceLabel });
+  broadcast(venue, { action: 'subscription', status: venue.subscription.status });
+  persistStore();
+
+  res.json({ ok: true, plan: venue.plan, status: venue.subscription.status });
+});
+
+app.get('/api/funnel', (req, res) => {
+  if (!isOperatorOf(bearerToken(req), DEFAULT_SLUG)) {
+    return res.status(401).json({ error: 'Operador nao autenticado.' });
+  }
+  const hours = Number(req.query.hours || 24);
+  res.json(notify.funnelSummary(hours * 3600 * 1000));
 });
 
 // --------------- Handlers por unidade ---------------
@@ -618,6 +702,39 @@ venueRouter.get('/qr.png', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Nao foi possivel gerar o QR code.' });
   }
+});
+
+venueRouter.get('/subscription', requireOperator, (req, res) => {
+  res.json(billing.subscriptionView(req.venue));
+});
+
+// Gera o link de pagamento. Em sandbox aponta para a pagina local de simulacao.
+venueRouter.post('/checkout', requireOperator, (req, res) => {
+  const appUrl = PUBLIC_APP_URL;
+  const checkout = billing.checkoutUrl(req.venue, appUrl);
+  notify.track('checkout_started', { venue: req.venue.slug });
+  res.json({ ...checkout, subscription: billing.subscriptionView(req.venue) });
+});
+
+// Só existe em modo sandbox: simula o provedor confirmando o pagamento para o
+// fluxo poder ser testado inteiro antes de haver conta no provedor.
+venueRouter.post('/sandbox/confirm', (req, res) => {
+  if (billing.PROVIDER !== 'sandbox') {
+    return res.status(404).json({ error: 'Disponivel apenas em modo sandbox.' });
+  }
+  const venue = req.venue;
+  const result = billing.applyEvent(venue, {
+    id: 'sandbox-' + Date.now(),
+    type: 'subscription.paid',
+    reference: venue.slug,
+  });
+  venue.plan = result.plan;
+  pushLog(venue, 'Assinatura ativada (sandbox)');
+  notify.track(result.email, { venue: venue.slug });
+  notify.sendEmail(result.email, venue, { priceLabel: billing.subscriptionView(venue).priceLabel });
+  broadcast(venue, { action: 'subscription', status: venue.subscription.status });
+  persistStore();
+  res.json({ ok: true, plan: venue.plan, subscription: billing.subscriptionView(venue) });
 });
 
 venueRouter.get('/state', (req, res) => {
@@ -670,6 +787,7 @@ venueRouter.post('/tickets', publicTicketLimiter, (req, res) => {
   }
   const limit = planLimits(venue).dailyTickets;
   if (limit && venue.dailyCount >= limit) {
+    notify.track('free_limit_reached', { venue: venue.slug });
     return res.status(402).json({
       error: `Limite do plano gratuito atingido (${limit} entradas por dia). Migre para o premium para liberar a fila.`,
       limits: planLimits(venue),
@@ -692,6 +810,7 @@ venueRouter.post('/tickets', publicTicketLimiter, (req, res) => {
   };
   venue.tickets.push(ticket);
   pushLog(venue, code + ' entrou na fila');
+  notify.track('queue_joined', { venue: venue.slug, source: ticket.source });
   broadcast(venue, { action: 'joined', ticketId: id });
   res.status(201).json({ ticket: ticketView(venue, ticket), config: publicConfig(venue) });
 });
@@ -759,6 +878,7 @@ venueRouter.post('/tickets/call-next', requireOperator, (req, res) => {
   next.counter = cn;
   venue.lastCalled = next.id;
   const log = pushLog(venue, next.code + ' chamada · Balcão ' + cn);
+  notify.track('queue_called', { venue: venue.slug });
   broadcast(venue, { action: 'called', ticketId: next.id, counter: cn });
   res.json({ ticket: next, log, message: next.code + ' chamada para o Balcão ' + cn + '.' });
 });
@@ -835,9 +955,11 @@ const PORT = process.env.PORT || 3000;
 loadPersistedStore()
   .then(() => {
     purgeOldTickets();
+    checkTrials();
     setInterval(() => {
       purgeOldTickets();
       purgeExpiredSessions();
+      checkTrials();
     }, PURGE_INTERVAL_MS).unref();
 
     server.listen(PORT, '0.0.0.0', () => {
