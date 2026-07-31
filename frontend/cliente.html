@@ -63,6 +63,7 @@ if ("serviceWorker" in navigator) {
   .btn-secondary{background:var(--surface);color:var(--fg-1);border:1px solid var(--border-strong)}
   .btn-quiet{background:transparent;color:var(--fg-2);box-shadow:none}
   .privacy{text-align:center;font-size:12px;color:var(--fg-3);margin:10px 0 0}
+  .privacy a{color:var(--fg-2);text-decoration:underline}
   .confirm-body{flex:1;display:flex;flex-direction:column;justify-content:center}
   .success-icon{width:60px;height:60px;border-radius:999px;background:#eaf3ec;color:var(--mutum-forest);display:grid;place-items:center}
   .success-icon svg{width:30px;height:30px}
@@ -157,6 +158,7 @@ if ("serviceWorker" in navigator) {
   }
 </style>
 <script src="config.js?v=5"></script>
+<script src="analytics.js?v=1"></script>
 <script src="ads.js"></script>
 </head>
 <body>
@@ -178,6 +180,14 @@ if ("serviceWorker" in navigator) {
   var scannedToken = params.get("token") || params.get("qr");
   var qrToken = scannedToken || localStorage.getItem(TOKEN_KEY) || (isNativeApp ? "" : "demo-centro");
   if (scannedToken) localStorage.setItem(TOKEN_KEY, scannedToken);
+  // Multi-unidade: o QR traz ?venue=slug. Sem ele, cai na unidade padrão da API.
+  var VENUE_KEY = "fila_virtual_venue";
+  var scannedVenue = params.get("venue");
+  if (scannedVenue) localStorage.setItem(VENUE_KEY, scannedVenue);
+  var venueSlug = scannedVenue || localStorage.getItem(VENUE_KEY) || "";
+  var API_PREFIX = venueSlug ? "/api/venues/" + encodeURIComponent(venueSlug) : "/api";
+  FilaAnalytics.init({ surface: "cliente", venue: venueSlug || null });
+  function apiPath(path) { return path.replace(/^\/api/, API_PREFIX); }
   var config = { venue: { name: "Clínica Centro", qrToken: qrToken }, monetization: { plan: "free", adsEnabled: true } };
   var state = null;
   var ticket = null;
@@ -204,7 +214,7 @@ if ("serviceWorker" in navigator) {
   }
 
   async function api(method, path, body) {
-    var response = await fetch(API_BASE + path, {
+    var response = await fetch(API_BASE + apiPath(path), {
       method: method,
       headers: body ? { "Content-Type": "application/json" } : {},
       body: body ? JSON.stringify(body) : undefined
@@ -280,7 +290,7 @@ if ("serviceWorker" in navigator) {
       "<i class=\"corner tl\"></i><i class=\"corner tr\"></i><i class=\"corner bl\"></i><i class=\"corner br\"></i><i class=\"scan-line\"></i>",
       "<div class=\"recognized\">", scannerLabel, "</div></", scannerClose, "></div>",
       entryAction,
-      "<p class=\"privacy\">Seus dados ficam só no seu aparelho.</p>",
+      "<p class=\"privacy\">Pedimos só o primeiro nome e apagamos depois do atendimento. <a href=\"privacidade.html\">Privacidade</a></p>",
       "<div class=\"ad ", adsEnabled() ? "show" : "", "\" data-ad-slot=\"queue-join-bottom\">Espaço reservado para anúncio</div>",
       "</div>"
     ].join("");
@@ -390,12 +400,31 @@ if ("serviceWorker" in navigator) {
     ].join("");
   }
 
+  var jaMarcou = {};
+  function marcarUmaVez(nome) {
+    if (jaMarcou[nome]) return;
+    jaMarcou[nome] = true;
+    FilaAnalytics.track(nome);
+  }
+
   function render() {
     ticket = computeTicket();
     syncNativeAds();
     if (!ticket) renderEntry();
     else if (confirmation) renderConfirmation();
     else renderStatus();
+
+    // Marca as etapas do funil uma vez por sessão, para a contagem ser de
+    // pessoas e não de re-renderizações.
+    if (ticket) {
+      marcarUmaVez("fila:acompanhou");
+      if (ticket.status === "calling") marcarUmaVez("fila:chamado");
+    }
+    var campo = document.querySelector("#joinForm input[name=name]");
+    if (campo && !campo.dataset.observado) {
+      campo.dataset.observado = "1";
+      campo.addEventListener("input", function () { marcarUmaVez("form:iniciado"); }, { once: true });
+    }
   }
 
   async function joinQueue(event) {
@@ -410,9 +439,11 @@ if ("serviceWorker" in navigator) {
       localStorage.setItem(TOKEN_KEY, qrToken);
       localStorage.setItem(STORAGE_KEY, String(ticket.id));
       confirmation = true;
+      FilaAnalytics.track("fila:entrou");
       flash(ticket.code + " entrou na fila.");
       showNativeInterstitial("queue_joined");
     } catch (error) {
+      FilaAnalytics.track("fila:entrada_recusada");
       flash(error.message);
     } finally {
       busy = false;
@@ -526,7 +557,7 @@ if ("serviceWorker" in navigator) {
     var url = WS_BASE
       ? (/\/ws$/.test(WS_BASE) ? WS_BASE : WS_BASE.replace(/\/$/, "") + "/ws")
       : (proto + "//" + location.host + "/ws");
-    var socket = new WebSocket(url);
+    var socket = new WebSocket(url + (venueSlug ? "?venue=" + encodeURIComponent(venueSlug) : ""));
     socket.onopen = function() { connected = true; render(); };
     socket.onmessage = function(event) {
       try {

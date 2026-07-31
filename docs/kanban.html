@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fila Virtual — Kanban do MVP ao Go-live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --red:#ED2C27; --coral:#EE736E; --blush:#FBE3E1; --cream:#F0EFEB; --cream2:#E8E6DF;
+    --bone:#DBD4C9; --sand:#C9C2B5; --stone:#8C857A; --slate:#4D4943; --ink:#191919;
+    --forest:#1F5D3A; --leaf:#3F8A5B; --amber:#9C6B10;
+  }
+  body{font-family:'Manrope',system-ui,sans-serif;background:var(--cream);color:var(--ink);min-height:100vh}
+  header{padding:28px 24px 16px;max-width:1500px;margin:0 auto}
+  h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(22px,3vw,32px);letter-spacing:-.02em}
+  h1 .dot{color:var(--red)}
+  .sub{color:var(--slate);margin-top:4px;font-size:14px;max-width:70ch}
+  .meta-bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-top:18px}
+  .progress-wrap{flex:1;min-width:220px;max-width:420px}
+  .progress-label{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--slate);margin-bottom:4px}
+  .progress-track{height:8px;background:var(--bone);border-radius:99px;overflow:hidden}
+  .progress-fill{height:100%;background:var(--forest);border-radius:99px;transition:width .3s}
+  .reset-btn{border:1px solid var(--bone);background:#fff;color:var(--slate);font:inherit;font-size:12px;font-weight:700;padding:7px 14px;border-radius:99px;cursor:pointer}
+  .reset-btn:hover{border-color:var(--stone)}
+  .filters{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .chip{border:1px solid var(--bone);background:#fff;color:var(--slate);font:inherit;font-size:12.5px;font-weight:700;padding:7px 14px;border-radius:99px;cursor:pointer;transition:.15s}
+  .chip:hover{border-color:var(--stone)}
+  .chip.active{background:var(--ink);border-color:var(--ink);color:var(--cream)}
+  .chip .n{opacity:.55;font-weight:600;margin-left:4px}
+  .sprint-note{margin-top:10px;font-size:13px;color:var(--slate);min-height:18px}
+  .board{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:10px 24px 48px;max-width:1500px;margin:0 auto;align-items:start}
+  @media(max-width:1000px){.board{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:600px){.board{grid-template-columns:1fr}}
+  .col{background:var(--cream2);border:1px solid var(--bone);border-radius:14px;padding:12px;min-height:180px}
+  .col.drag-over{outline:2px dashed var(--stone);outline-offset:-4px}
+  .col-head{display:flex;align-items:center;gap:8px;padding:2px 4px 10px;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px}
+  .col-head .count{margin-left:auto;font-size:12px;font-weight:700;color:var(--stone);background:#fff;border:1px solid var(--bone);border-radius:99px;padding:2px 9px}
+  .col-dot{width:9px;height:9px;border-radius:50%}
+  .cards{display:flex;flex-direction:column;gap:9px}
+  .card{background:#fff;border:1px solid var(--bone);border-left:4px solid var(--sand);border-radius:10px;padding:11px 12px;cursor:grab;transition:box-shadow .15s}
+  .card:hover{box-shadow:0 3px 12px rgba(25,25,25,.09)}
+  .card.dragging{opacity:.45}
+  .card h3{font-size:13.5px;font-weight:800;line-height:1.35}
+  .card p{font-size:12px;color:var(--slate);margin-top:4px;line-height:1.45}
+  .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .tag{font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:2.5px 8px;border-radius:99px;color:#fff}
+  .tag.sprint{background:#fff;color:var(--slate);border:1px solid var(--bone)}
+  .empty{font-size:12px;color:var(--stone);text-align:center;padding:18px 6px}
+  .card.done h3{text-decoration:line-through;text-decoration-thickness:1.5px;color:var(--slate)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Fila Virtual — do estado atual ao go-live<span class="dot">.</span></h1>
+  <p class="sub">Scrum board: 6 sprints de 2 semanas + trilha contínua de distribuição até o MVP real — multi-unidade com Postgres, assinatura Pix automatizada, Play Store e fluxo de onboarding 100% sem toque humano. Arraste os cards entre colunas; o progresso fica salvo neste navegador.</p>
+  <div class="meta-bar">
+    <div class="progress-wrap">
+      <div class="progress-label"><span id="prog-text">—</span><span id="prog-pct">—</span></div>
+      <div class="progress-track"><div class="progress-fill" id="prog-fill"></div></div>
+    </div>
+    <button class="reset-btn" id="reset">↺ Restaurar plano original</button>
+  </div>
+  <div class="filters" id="sprint-filters"></div>
+  <div class="sprint-note" id="sprint-note"></div>
+</header>
+
+<main class="board" id="board"></main>
+
+<script>
+const STORAGE_KEY = 'fila-kanban-v1';
+
+const SPRINTS = {
+  S0: { label: 'Feito (pré-sprint)', note: 'Entregue até 30/07: blocos 1–3 do GARIMPO + infra de deploy + Postgres.' },
+  S1: { label: 'Sprint 1 · 03–14/ago', note: 'Entregue em 30/07: login com sessão, expurgo LGPD, cliente na raiz, 24 testes de API e CI no GitHub Actions.' },
+  S2: { label: 'Sprint 2 · 17–28/ago', note: 'Entregue em 30/07: schema multi-tenant, cadastro self-service com QR gerado na hora, limites do plano free e 37 testes.' },
+  S3: { label: 'Sprint 3 · 31/ago–11/set', note: 'Entregue em 31/07: trial de 14 dias, checkout, webhook assinado que ativa e suspende o premium sozinho, e-mails e eventos de funil. Falta você comprar a própria assinatura no provedor real.' },
+  S4: { label: 'Sprint 4 · 14–25/set', note: 'Parcial (31/07): privacidade, termos, ficha da loja, assetlinks e pipeline de release prontos. Dependem de você: domínio, keystore, conta no Play Console e o teste fechado de 14 dias.' },
+  S5: { label: 'Sprint 5 · 28/set–09/out', note: 'Parcial (31/07): SEO, captura de leads e cartaz do balcão prontos. Conteúdo e campanha escritos em docs/MARKETING.md, faltando gravar e publicar.' },
+  S6: { label: 'Sprint 6 · 12–23/out', note: 'Vendas & go-live — piloto com 3 estabelecimentos e meta de 3 pagantes a R$ 99/mês.' },
+  SD: { label: 'Distribuição · contínuo', note: 'Canais de aquisição permanentes — começam quando o Sprint 3 liberar o checkout e nunca param. O mais forte: o próprio produto na sala de espera.' },
+};
+
+const AREAS = {
+  dev:        { label: 'Dev',        color: 'var(--forest)' },
+  infra:      { label: 'Infra',      color: 'var(--slate)' },
+  design:     { label: 'Design',     color: 'var(--coral)' },
+  marketing:  { label: 'Marketing',  color: 'var(--amber)' },
+  vendas:     { label: 'Vendas',     color: 'var(--red)' },
+  publicacao: { label: 'Publicação', color: 'var(--ink)' },
+  automacao:  { label: 'Automação',  color: 'var(--leaf)' },
+  juridico:   { label: 'Jurídico',   color: 'var(--stone)' },
+};
+
+const COLUMNS = [
+  { id: 'backlog',  label: 'Backlog',      dot: 'var(--sand)' },
+  { id: 'todo',     label: 'A fazer',      dot: 'var(--coral)' },
+  { id: 'doing',    label: 'Em andamento', dot: 'var(--amber)' },
+  { id: 'done',     label: 'Concluído',    dot: 'var(--forest)' },
+];
+
+// status inicial: S0+S1 = done (Sprint 1 entregue em 30/07) · S2–S6 = backlog
+const CARDS = [
+  // ---- Feito ----
+  { id:'d1', s:'S0', st:'done', a:['dev'], t:'App do cliente (QR → fila → posição ao vivo)', d:'frontend/cliente.html consumindo POST /api/tickets e WebSocket /ws.' },
+  { id:'d2', s:'S0', st:'done', a:['dev'], t:'Passar a vez com proximidade', d:'Geolocation + Haversine no backend, fallback por re-scan do QR.' },
+  { id:'d3', s:'S0', st:'done', a:['dev'], t:'Painel do operador + telão', d:'Chamar, rechamar, finalizar, ausente — tempo real via WS.' },
+  { id:'d4', s:'S0', st:'done', a:['design'], t:'Landing page (design system Mutum)', d:'Página comercial com proposta e CTA.' },
+  { id:'d5', s:'S0', st:'done', a:['infra'], t:'Deploy backend na VPS + front no GitHub Pages', d:'Docker hardening, Caddy, config runtime versionada.' },
+  { id:'d6', s:'S0', st:'done', a:['dev'], t:'App Android WebView de produção', d:'mobile/android empacotando o front.' },
+  { id:'d7', s:'S0', st:'done', a:['infra'], t:'Persistência Postgres via Docker', d:'backend/db.js + serviço postgres nos dois compose (local e VPS). Decisão: Postgres, não Supabase.' },
+
+  // ---- Sprint 1 — Segurança & Qualidade ----
+  { id:'s1a', s:'S1', st:'done', a:['dev'], t:'Inverter rotas públicas', d:'Cliente vira index.html; painel admin sai da raiz e vai para rota própria não óbvia.' },
+  { id:'s1b', s:'S1', st:'done', a:['dev'], t:'Login real do operador', d:'Sessão com expiração no lugar do token fixo em config.js/localStorage.' },
+  { id:'s1c', s:'S1', st:'done', a:['dev','juridico'], t:'Expurgo LGPD automático', d:'Job diário apaga tickets encerrados após retenção configurável; só primeiro nome em todo lugar.' },
+  { id:'s1d', s:'S1', st:'done', a:['dev'], t:'Remover dados seed', d:'Fila inicia vazia em produção; seeds atuais têm nome completo (viola a própria regra LGPD).' },
+  { id:'s1e', s:'S1', st:'done', a:['dev'], t:'Rodar /security-review e corrigir', d:'Skill obrigatória do CLAUDE.md antes de deploy real.' },
+  { id:'s1f', s:'S1', st:'done', a:['dev','automacao'], t:'Testes de API no CI', d:'health, tickets, pass, auth, rate-limit — hoje o repo tem zero testes.' },
+  { id:'s1g', s:'S1', st:'done', a:['automacao'], t:'CI no GitHub Actions bloqueando merge', d:'Lint + testes rodando em todo PR para main.' },
+
+  // ---- Sprint 2 — Multi-unidade ----
+  { id:'s2a', s:'S2', st:'done', a:['dev'], t:'Schema multi-tenant no Postgres', d:'Tabela venues; tickets/telão/painel escopados por unidade; migrações versionadas.' },
+  { id:'s2b', s:'S2', st:'done', a:['dev'], t:'Cadastro self-service de estabelecimento', d:'Nome, endereço e coordenadas (mapa) → cria a unidade sozinho.' },
+  { id:'s2c', s:'S2', st:'done', a:['dev','automacao'], t:'Geração automática do QR por unidade', d:'PNG/PDF pronto para imprimir no balcão, gerado na hora do cadastro.' },
+  { id:'s2d', s:'S2', st:'done', a:['dev'], t:'Painel e telão por unidade', d:'URLs próprias por venue; operador só enxerga a própria fila.' },
+  { id:'s2e', s:'S2', st:'done', a:['dev'], t:'Limites do plano free por unidade', d:'50 tickets/dia e 1 balcão no free — hoje o entitlement existe mas não é aplicado.' },
+  { id:'s2f', s:'S2', st:'done', a:['dev'], t:'Testes e2e da jornada completa', d:'Playwright: cliente entra → operador chama → atendimento, nas duas telas.' },
+
+  // ---- Sprint 3 — Monetização ----
+  { id:'s3a', s:'S3', st:'done', a:['dev','vendas'], t:'Checkout de assinatura Pix', d:'Cakto ou Mercado Pago, R$ 99/unidade/mês, trial de 14 dias.' },
+  { id:'s3b', s:'S3', st:'done', a:['automacao'], t:'Webhook de pagamento → premium automático', d:'Pagou: ativa. Falhou/cancelou: suspende. Zero intervenção manual.' },
+  { id:'s3c', s:'S3', st:'done', a:['design','dev'], t:'Página de planos + upgrade no painel', d:'Free com ads vs. premium; botão de upgrade dentro do painel do operador.' },
+  { id:'s3d', s:'S3', st:'done', a:['automacao'], t:'E-mails transacionais automáticos', d:'Boas-vindas, fim do trial, pagamento falhou, cancelamento.' },
+  { id:'s3e', s:'S3', st:'done', a:['marketing','dev'], t:'Eventos de funil implementados', d:'queue_joined, queue_called, premium_started, ad_slot_viewed… (docs/MONETIZATION_OBSERVABILITY.md).' },
+  { id:'s3f', s:'S3', st:'backlog', a:['vendas'], t:'Comprar a própria assinatura', d:'Validar o fluxo real de ponta a ponta antes de vender (regra do GARIMPO).' },
+
+  // ---- Sprint 4 — Play Store & CI/CD ----
+  { id:'s4a', s:'S4', st:'doing', a:['infra'], t:'Domínio próprio + HTTPS + assetlinks', d:'Script gerar-assetlinks.ps1 e template prontos com o package correto. Falta comprar o domínio e publicar o arquivo.' },
+  { id:'s4b', s:'S4', st:'done', a:['juridico'], t:'Política de privacidade + termos publicados', d:'Obrigatório para Play Store e LGPD; páginas públicas linkadas no app.' },
+  { id:'s4c', s:'S4', st:'doing', a:['design','marketing'], t:'Ficha da loja (ASO)', d:'Descrições e palavras-chave escritas em docs/PLAY_STORE.md. Faltam ícone 512, gráfico de destaque e screenshots.' },
+  { id:'s4d', s:'S4', st:'doing', a:['publicacao'], t:'Build .aab assinado + declarações no Play Console', d:'Workflow de release monta o .aab e a declaração de dados está pronta. Falta gerar a keystore e cadastrar os secrets.' },
+  { id:'s4e', s:'S4', st:'backlog', a:['publicacao'], t:'Teste fechado: 12+ testadores por 14 dias', d:'Requisito do Google para contas pessoais novas antes do release aberto.' },
+  { id:'s4f', s:'S4', st:'done', a:['automacao'], t:'Pipeline CI/CD completo', d:'Tag de release → testes → build web + .aab → deploy automático com rollback.' },
+  { id:'s4g', s:'S4', st:'doing', a:['infra'], t:'Uptime Kuma + alertas em produção', d:'Monitores definidos em docs/MONITORAMENTO.md e health agora responde 503 com o banco fora. Falta configurar no servidor.' },
+
+  // ---- Sprint 5 — Marketing ----
+  { id:'s5a', s:'S5', st:'doing', a:['design'], t:'Identidade final aplicada', d:'Cartaz A4 do balcão pronto (cartaz.html, com o QR real da unidade). Faltam ícone 512 e splash do app.' },
+  { id:'s5b', s:'S5', st:'done', a:['marketing'], t:'SEO da landing', d:'Meta, Open Graph, JSON-LD (SoftwareApplication + FAQ), canonical, sitemap.xml e robots. Falta o domínio para publicar.' },
+  { id:'s5c', s:'S5', st:'doing', a:['marketing'], t:'Vídeo demo de 60s', d:'Roteiro cena a cena em docs/MARKETING.md, com versão curta de 15s para anúncio. Falta gravar.' },
+  { id:'s5d', s:'S5', st:'doing', a:['marketing'], t:'Perfis + 3 conteúdos de lançamento', d:'Os três conteúdos escritos em docs/MARKETING.md. Falta criar os perfis e publicar.' },
+  { id:'s5e', s:'S5', st:'doing', a:['marketing'], t:'Campanha Google Ads local', d:'Estrutura, palavras-chave, negativas e criativos em docs/MARKETING.md. Falta criar a conta e subir.' },
+  { id:'s5f', s:'S5', st:'done', a:['automacao','marketing'], t:'Captura de leads automatizada', d:'POST /api/leads com validação e rate limit, formulário na landing e e-mail automático oferecendo o autoatendimento.' },
+
+  // ---- Sprint 6 — Vendas & Go-live ----
+  { id:'s6a', s:'S6', st:'backlog', a:['vendas'], t:'Lista de 50 estabelecimentos-alvo', d:'Clínicas, laboratórios e serviços de bairro em Manaus, com contato.' },
+  { id:'s6b', s:'S6', st:'backlog', a:['vendas'], t:'Script de venda + demo roteirizada', d:'Pitch de 5 min com QR impresso: o dono entra na fila na frente do vendedor.' },
+  { id:'s6c', s:'S6', st:'backlog', a:['vendas'], t:'Piloto com 3 estabelecimentos', d:'30 dias grátis, check-in semanal, coleta de depoimento.' },
+  { id:'s6d', s:'S6', st:'backlog', a:['automacao'], t:'Onboarding 100% sem toque humano', d:'Assinou → conta criada → QR gerado → kit por e-mail. Ninguém da equipe no meio.' },
+  { id:'s6e', s:'S6', st:'backlog', a:['publicacao'], t:'Release aberto na Play Store', d:'Promover o teste fechado para produção após os 14 dias.' },
+  { id:'s6f', s:'S6', st:'backlog', a:['vendas'], t:'Meta de validação: 3 pagantes', d:'3 assinaturas de R$ 99/mês ativas = MVP validado; só então pensar em escalar.' },
+
+  { id:'sda', s:'SD', st:'backlog', a:['dev','marketing'], t:'Loop viral na tela do cliente', d:'No plano free, rodapé "Fila Virtual — leve para o seu negócio" com link rastreado: quem espera na fila é o próximo comprador. O canal nº 1 cresce sozinho com cada fila ativa.' },
+  { id:'sdb', s:'SD', st:'backlog', a:['marketing','automacao'], t:'Canal WhatsApp completo', d:'WhatsApp Business + anúncios click-to-WhatsApp + bot que responde com uma fila demo ao vivo. No Brasil, dono de clínica fecha negócio pelo WhatsApp, não por e-mail.' },
+  { id:'sdc', s:'SD', st:'backlog', a:['vendas','automacao'], t:'Programa de indicação entre estabelecimentos', d:'1 mês grátis por indicação que virar assinante, com tracking automático no checkout. Dono de clínica conhece outros donos de clínica.' },
+  { id:'sdd', s:'SD', st:'backlog', a:['vendas'], t:'Parcerias com quem já atende clínicas', d:'Contadores, agências de marketing médico e revendas de software de saúde indicam por 20% de comissão recorrente. Um parceiro = dezenas de clientes de uma vez.' },
+  { id:'sde', s:'SD', st:'backlog', a:['marketing','automacao'], t:'Prospecção minerada no Google Maps', d:'Coletar clínicas/labs de Manaus com reviews reclamando de espera → lista qualificada com a dor comprovada → cadência de contato citando a própria review.' },
+  { id:'sdf', s:'SD', st:'backlog', a:['vendas'], t:'Associações e comunidades locais', d:'CDL Manaus, sindicatos e grupos de gestores de clínica: demo ao vivo de 10 min (a plateia entra na fila pelo QR no telão).' },
+  { id:'sdg', s:'SD', st:'backlog', a:['marketing'], t:'Case em vídeo do piloto', d:'Depoimento do primeiro cliente com números reais (tempo de espera, ausências, avaliação). Prova social local vale mais que qualquer anúncio.' },
+];
+
+let statusOverride = {};
+try { statusOverride = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) {}
+
+let activeSprint = 'all';
+
+function cardStatus(c) { return statusOverride[c.id] || c.st; }
+
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(statusOverride)); }
+
+function render() {
+  // filtros
+  const filters = document.getElementById('sprint-filters');
+  filters.innerHTML = '';
+  const mkChip = (key, label, count) => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (activeSprint === key ? ' active' : '');
+    b.innerHTML = label + '<span class="n">' + count + '</span>';
+    b.onclick = () => { activeSprint = key; render(); };
+    return b;
+  };
+  filters.appendChild(mkChip('all', 'Tudo', CARDS.length));
+  for (const [key, s] of Object.entries(SPRINTS)) {
+    filters.appendChild(mkChip(key, s.label, CARDS.filter(c => c.s === key).length));
+  }
+  document.getElementById('sprint-note').textContent = activeSprint === 'all' ? '' : SPRINTS[activeSprint].note;
+
+  // board
+  const visible = CARDS.filter(c => activeSprint === 'all' || c.s === activeSprint);
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  for (const col of COLUMNS) {
+    const cards = visible.filter(c => cardStatus(c) === col.id);
+    const el = document.createElement('section');
+    el.className = 'col';
+    el.dataset.col = col.id;
+    el.innerHTML = '<div class="col-head"><span class="col-dot" style="background:' + col.dot + '"></span>' +
+      col.label + '<span class="count">' + cards.length + '</span></div>';
+    const list = document.createElement('div');
+    list.className = 'cards';
+    if (!cards.length) list.innerHTML = '<div class="empty">— vazio —</div>';
+    for (const c of cards) {
+      const card = document.createElement('article');
+      card.className = 'card' + (col.id === 'done' ? ' done' : '');
+      card.draggable = true;
+      card.dataset.id = c.id;
+      card.style.borderLeftColor = AREAS[c.a[0]].color;
+      const tags = ['<span class="tag sprint">' + SPRINTS[c.s].label.split(' · ')[0] + '</span>']
+        .concat(c.a.map(a => '<span class="tag" style="background:' + AREAS[a].color + '">' + AREAS[a].label + '</span>'));
+      card.innerHTML = '<h3>' + c.t + '</h3><p>' + c.d + '</p><div class="tags">' + tags.join('') + '</div>';
+      card.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', c.id);
+        card.classList.add('dragging');
+      });
+      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+      list.appendChild(card);
+    }
+    el.appendChild(list);
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      const id = e.dataTransfer.getData('text/plain');
+      if (id) { statusOverride[id] = col.id; save(); render(); }
+    });
+    board.appendChild(el);
+  }
+
+  // progresso
+  const doneCount = CARDS.filter(c => cardStatus(c) === 'done').length;
+  const pct = Math.round(doneCount / CARDS.length * 100);
+  document.getElementById('prog-text').textContent = doneCount + ' de ' + CARDS.length + ' atividades concluídas';
+  document.getElementById('prog-pct').textContent = pct + '%';
+  document.getElementById('prog-fill').style.width = pct + '%';
+}
+
+document.getElementById('reset').onclick = () => {
+  if (confirm('Restaurar o plano original? Suas movimentações neste navegador serão perdidas.')) {
+    statusOverride = {};
+    localStorage.removeItem(STORAGE_KEY);
+    render();
+  }
+};
+
+render();
+</script>
+</body>
+</html>

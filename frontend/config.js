@@ -1,6 +1,5 @@
 window.FILA_API_BASE = window.FILA_API_BASE || '';
 window.FILA_WS_BASE = window.FILA_WS_BASE || '';
-window.FILA_ADMIN_TOKEN = window.FILA_ADMIN_TOKEN || '';
 window.FILA_ADS_ENABLED = window.FILA_ADS_ENABLED ?? true;
 window.FILA_PLATFORM = window.FILA_PLATFORM || 'web';
 

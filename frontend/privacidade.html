@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de Privacidade — Fila Virtual</title>
+<meta name="description" content="Como o Fila Virtual trata os dados de quem entra na fila e de quem opera o painel.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/mutum-design-system.css">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{background:var(--bg);color:var(--fg-1);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:720px;margin:0 auto;padding:32px 22px 72px}
+  .brand{display:flex;align-items:center;gap:9px;margin-bottom:28px}
+  .brand img{width:24px;height:30px;object-fit:contain}
+  .brand strong{font-family:var(--font-display);font-size:14px;font-weight:600}
+  h1{font-family:var(--font-display);font-weight:700;font-size:clamp(26px,5vw,34px);line-height:1.12;margin:0 0 8px}
+  .updated{font-size:13px;color:var(--fg-3);margin:0 0 30px}
+  h2{font-family:var(--font-display);font-weight:700;font-size:19px;margin:34px 0 10px}
+  h3{font-family:var(--font-display);font-weight:600;font-size:15.5px;margin:20px 0 6px}
+  p,li{font-size:15px;line-height:1.62;color:var(--fg-2)}
+  p{margin:0 0 14px}
+  ul{margin:0 0 14px;padding-left:20px;display:grid;gap:7px}
+  strong{color:var(--fg-1)}
+  a{color:var(--primary)}
+  table{width:100%;border-collapse:collapse;margin:6px 0 18px;font-size:14px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{font-family:var(--font-display);font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3)}
+  td{color:var(--fg-2)}
+  .callout{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin:18px 0}
+  .callout p:last-child{margin-bottom:0}
+  .scroll{overflow-x:auto}
+  footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--border);font-size:13.5px;color:var(--fg-3)}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="brand"><img src="assets/mark-bird.svg" alt=""><strong>Fila virtual</strong></div>
+
+  <h1>Política de Privacidade</h1>
+  <p class="updated">Última atualização: 31 de julho de 2026</p>
+
+  <p>Esta política explica quais dados o <strong>Fila Virtual</strong> coleta, por que coleta e por quanto tempo guarda. Ela vale para as três telas do produto: o app de quem entra na fila, o painel de quem opera o balcão e o telão da sala de espera.</p>
+
+  <div class="callout">
+    <p><strong>Em uma frase:</strong> pedimos apenas o seu primeiro nome para chamar você pelo nome, e apagamos esse dado poucas horas depois do atendimento.</p>
+  </div>
+
+  <h2>1. Quem é o responsável pelos dados</h2>
+  <p>O <strong>estabelecimento</strong> que exibe o QR code (a clínica, o laboratório, o cartório) é o controlador dos dados de quem entra na sua fila: é ele quem decide usar o serviço e para quê. O Fila Virtual atua como <strong>operador</strong>, tratando os dados em nome dele e apenas para fazer a fila funcionar.</p>
+
+  <h2>2. Que dados coletamos</h2>
+
+  <h3>De quem entra na fila</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Dado</th><th>Para quê</th><th>Por quanto tempo</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Primeiro nome</strong></td>
+          <td>Identificar você na chamada do balcão</td>
+          <td>Apagado automaticamente algumas horas após o fim do atendimento</td>
+        </tr>
+        <tr>
+          <td><strong>Senha da fila</strong> (ex.: M-042) e horário de entrada</td>
+          <td>Calcular sua posição e o tempo estimado de espera</td>
+          <td>Igual ao anterior</td>
+        </tr>
+        <tr>
+          <td><strong>Localização aproximada</strong></td>
+          <td>Confirmar que você está perto do local ao usar "passar a vez"</td>
+          <td>Não é armazenada: comparamos com o endereço do estabelecimento e descartamos</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Só pedimos o primeiro nome. Se você digitar o nome completo, o sistema guarda apenas a primeira palavra. Não pedimos CPF, telefone, e-mail, data de nascimento nem qualquer informação de saúde.</p>
+
+  <h3>De quem opera o painel</h3>
+  <p>Do estabelecimento guardamos o nome da unidade, o e-mail de contato, a localização informada no cadastro e os dados da assinatura. A senha do operador é guardada apenas como <strong>hash</strong> — nem nós conseguimos lê-la.</p>
+
+  <h2>3. Localização</h2>
+  <p>O acesso à localização só é solicitado quando você toca em <strong>"passar a vez"</strong>, e serve para uma única verificação: confirmar que você continua perto do estabelecimento. A coordenada é comparada na hora com o endereço do local e <strong>não é gravada</strong>.</p>
+  <p>Você pode recusar. Nesse caso, é possível confirmar sua presença lendo de novo o QR code do balcão — sem usar GPS.</p>
+
+  <h2>4. Prazo de retenção e descarte</h2>
+  <p>Senhas encerradas (atendidas ou marcadas como ausentes) são <strong>apagadas automaticamente</strong> pelo sistema depois de uma janela curta, configurada pelo estabelecimento e limitada a poucas horas. O descarte é definitivo: nome e horário somem do banco de dados.</p>
+  <p>Continuam existindo apenas números agregados — como "47 pessoas atendidas hoje" — que não identificam ninguém.</p>
+
+  <h2>5. Com quem compartilhamos</h2>
+  <p>Não vendemos dados e não os usamos para publicidade dirigida. O compartilhamento se limita a:</p>
+  <ul>
+    <li><strong>O próprio estabelecimento</strong>, que vê a fila no painel do balcão;</li>
+    <li><strong>Provedor de pagamento</strong>, apenas para a assinatura do estabelecimento (nunca dados de quem está na fila);</li>
+    <li><strong>Autoridades</strong>, quando houver obrigação legal.</li>
+  </ul>
+  <p>O telão da sala de espera mostra apenas a senha e o número do balcão — <strong>não exibe nomes</strong>.</p>
+
+  <h2>6. Medição de uso do aplicativo</h2>
+  <p>Registramos como as telas são usadas para descobrir onde as pessoas travam — por exemplo, quantas abriram a fila, quantas chegaram a entrar e em que ponto uma tela deu erro. Isso não identifica ninguém:</p>
+  <ul>
+    <li>A sessão recebe um <strong>código aleatório</strong> que não é ligado a você e é descartado quando a aba fecha;</li>
+    <li>Guardamos <strong>qual campo foi preenchido, nunca o que foi digitado</strong>;</li>
+    <li>Não gravamos endereço IP, nome, e-mail nem telefone junto desses registros;</li>
+    <li>Esses dados de uso são apagados automaticamente após o período de retenção configurado.</li>
+  </ul>
+
+  <h2>7. Anúncios</h2>
+  <p>No plano gratuito, o app pode exibir anúncios. Eles são carregados por redes de publicidade que podem usar identificadores do seu dispositivo conforme as políticas delas. Nós não enviamos a essas redes o seu nome nem a sua posição na fila. No plano pago, não há anúncios.</p>
+
+  <h2>8. Seus direitos (LGPD)</h2>
+  <p>A Lei Geral de Proteção de Dados garante a você confirmar a existência de tratamento, acessar seus dados, corrigi-los, solicitar anonimização ou eliminação, e revogar consentimento.</p>
+  <p>Na prática, como o dado é mínimo e some sozinho em poucas horas, o caminho mais rápido para eliminá-lo é <strong>sair da fila pelo próprio app</strong>. Para os demais pedidos, fale com o estabelecimento onde você entrou na fila ou escreva para o contato abaixo.</p>
+
+  <h2>9. Segurança</h2>
+  <p>O acesso ao painel exige senha e a sessão expira sozinha. Nomes trafegam apenas para o painel autenticado do estabelecimento — nunca para telas públicas. Em produção, a comunicação é feita por HTTPS.</p>
+
+  <h2>10. Crianças</h2>
+  <p>O serviço é feito para uso do público de estabelecimentos em geral e não é dirigido a crianças. Quando um responsável coloca uma criança na fila, vale a mesma regra: apenas o primeiro nome.</p>
+
+  <h2>11. Mudanças nesta política</h2>
+  <p>Se algo mudar, atualizamos esta página e a data no topo. Mudanças relevantes serão comunicadas aos estabelecimentos assinantes por e-mail.</p>
+
+  <h2>12. Contato</h2>
+  <p>Dúvidas ou pedidos relacionados a dados pessoais: <a href="mailto:contato@fila.app">contato@fila.app</a>.</p>
+
+  <footer>
+    <p><a href="landing.html">Voltar ao site</a> · <a href="termos.html">Termos de Uso</a></p>
+  </footer>
+</main>
+</body>
+</html>

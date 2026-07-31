@@ -1,0 +1,989 @@
+const { test, before, after, describe } = require('node:test');
+const assert = require('node:assert');
+const { spawn } = require('node:child_process');
+const path = require('node:path');
+const os = require('node:os');
+const fs = require('node:fs');
+const analyticsModule = require('../analytics');
+const { portaLivre } = require('./porta');
+
+const SERVER = path.join(__dirname, '..', 'server.js');
+const PASSWORD = 'senha-de-teste';
+
+// Sobe uma instancia isolada do servidor (persistencia em arquivo temporario,
+// sem Postgres) e espera o /api/health responder.
+async function startServer(extraEnv = {}) {
+  const port = await portaLivre();
+  const dataFile = path.join(os.tmpdir(), `fila-test-${port}-${Date.now()}.json`);
+  const child = spawn(process.execPath, [SERVER], {
+    env: {
+      ...process.env,
+      PORT: String(port),
+      DATA_FILE: dataFile,
+      DATABASE_URL: '',
+      NODE_ENV: 'test',
+      SEED_DEMO: 'true',
+      OPERATOR_PASSWORD: PASSWORD,
+      ADMIN_TOKEN: '',
+      RATE_LIMIT_TICKETS: '500',
+      RATE_LIMIT_LOGIN: '500',
+      ...extraEnv,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  const base = `http://127.0.0.1:${port}`;
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(base + '/api/health');
+      if (res.ok) return { child, base, dataFile };
+    } catch (e) { /* ainda subindo */ }
+    await new Promise(r => setTimeout(r, 150));
+  }
+  child.kill();
+  throw new Error('Servidor de teste nao respondeu em 15s');
+}
+
+function stopServer(server) {
+  if (!server) return;
+  server.child.kill();
+  try { fs.unlinkSync(server.dataFile); } catch (e) { /* ja removido */ }
+}
+
+async function login(base, password = PASSWORD) {
+  const res = await fetch(base + '/api/operator/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  return { status: res.status, body: await res.json() };
+}
+
+function authed(token) {
+  return { Authorization: 'Bearer ' + token };
+}
+
+describe('API da fila', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    server = await startServer();
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  test('health responde ok com versao e tipo de armazenamento', async () => {
+    const res = await fetch(base + '/api/health');
+    const body = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(body.status, 'ok');
+    assert.ok(body.version);
+    assert.ok(['postgres', 'file'].includes(body.storage));
+  });
+
+  test('health degradado quando o banco nao responde', async () => {
+    // Aponta para uma porta sem Postgres: o endpoint precisa falhar, senao o
+    // monitor de producao ficaria verde com a fila fora do ar.
+    const quebrado = await startServer({
+      DATABASE_URL: 'postgres://fila:fila@127.0.0.1:59999/fila',
+      PG_CONNECT_RETRIES: '1',
+    }).catch(() => null);
+
+    if (!quebrado) return; // servidor nem sobe sem banco: comportamento aceitavel
+    try {
+      const res = await fetch(quebrado.base + '/api/health');
+      assert.strictEqual(res.status, 503);
+      const body = await res.json();
+      assert.strictEqual(body.status, 'degraded');
+    } finally {
+      stopServer(quebrado);
+    }
+  });
+
+  test('config publica nao vaza segredo do operador', async () => {
+    const res = await fetch(base + '/api/config');
+    const body = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.ok(body.venue.name);
+    const serialized = JSON.stringify(body);
+    assert.ok(!serialized.includes(PASSWORD), 'config expos a senha do operador');
+  });
+
+  describe('entrada na fila', () => {
+    test('guarda apenas o primeiro nome (LGPD)', async () => {
+      const res = await fetch(base + '/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Maria Silva Santos' }),
+      });
+      const body = await res.json();
+      assert.strictEqual(res.status, 201);
+      assert.strictEqual(body.ticket.name, 'Maria');
+      assert.match(body.ticket.code, /^M-\d{3}$/);
+      assert.strictEqual(body.ticket.status, 'waiting');
+    });
+
+    test('rejeita nome vazio', async () => {
+      const res = await fetch(base + '/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: '   ' }),
+      });
+      assert.strictEqual(res.status, 400);
+    });
+
+    test('remove caracteres de script do nome', async () => {
+      const res = await fetch(base + '/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: '<script>alert(1)</script>' }),
+      });
+      const body = await res.json();
+      assert.strictEqual(res.status, 201);
+      assert.ok(!body.ticket.name.includes('<'), 'nome manteve caractere perigoso');
+      assert.ok(!body.ticket.name.includes('>'), 'nome manteve caractere perigoso');
+    });
+  });
+
+  describe('autenticacao do operador', () => {
+    test('acao de operador sem token responde 401', async () => {
+      const res = await fetch(base + '/api/tickets/call-next', { method: 'POST' });
+      assert.strictEqual(res.status, 401);
+    });
+
+    test('senha errada responde 401 e nao devolve token', async () => {
+      const { status, body } = await login(base, 'senha-errada');
+      assert.strictEqual(status, 401);
+      assert.ok(!body.token);
+    });
+
+    test('senha correta abre sessao com expiracao', async () => {
+      const { status, body } = await login(base);
+      assert.strictEqual(status, 200);
+      assert.ok(body.token && body.token.length >= 32);
+      assert.ok(body.expiresAt > Date.now());
+    });
+
+    test('sessao valida autoriza chamar o proximo', async () => {
+      const { body } = await login(base);
+      const res = await fetch(base + '/api/tickets/call-next', {
+        method: 'POST',
+        headers: authed(body.token),
+      });
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.ticket.status, 'calling');
+    });
+
+    test('token invalido responde 401', async () => {
+      const res = await fetch(base + '/api/tickets/call-next', {
+        method: 'POST',
+        headers: authed('token-inventado'),
+      });
+      assert.strictEqual(res.status, 401);
+    });
+
+    test('logout invalida a sessao', async () => {
+      const { body } = await login(base);
+      await fetch(base + '/api/operator/logout', { method: 'POST', headers: authed(body.token) });
+      const res = await fetch(base + '/api/operator/session', { headers: authed(body.token) });
+      assert.strictEqual(res.status, 401);
+    });
+  });
+
+  describe('minimizacao de dados pessoais (LGPD)', () => {
+    test('estado publico nao expoe nomes da fila', async () => {
+      await fetch(base + '/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Fernanda' }),
+      });
+      const res = await fetch(base + '/api/state');
+      const state = await res.json();
+      assert.ok(state.tickets.length > 0, 'estado veio vazio, teste inconclusivo');
+      const comNome = state.tickets.filter(t => t.name);
+      assert.strictEqual(comNome.length, 0, 'estado publico vazou nomes');
+      assert.ok(!JSON.stringify(state).includes('Fernanda'), 'nome apareceu no payload publico');
+    });
+
+    test('operador autenticado continua vendo os nomes', async () => {
+      const { body } = await login(base);
+      const res = await fetch(base + '/api/state', { headers: authed(body.token) });
+      const state = await res.json();
+      assert.ok(state.tickets.some(t => t.name), 'operador nao recebeu os nomes');
+    });
+  });
+
+  describe('passar a vez com proximidade', () => {
+    async function novoTicket(nome) {
+      const res = await fetch(base + '/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nome }),
+      });
+      return (await res.json()).ticket;
+    }
+
+    test('sem coordenada nem QR responde 403', async () => {
+      const ticket = await novoTicket('Joana');
+      const res = await fetch(base + `/api/tickets/${ticket.id}/pass`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      assert.strictEqual(res.status, 403);
+    });
+
+    test('coordenada distante responde 403', async () => {
+      const ticket = await novoTicket('Lucas');
+      const res = await fetch(base + `/api/tickets/${ticket.id}/pass`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ latitude: -23.55, longitude: -46.63 }),
+      });
+      const body = await res.json();
+      assert.strictEqual(res.status, 403);
+      assert.ok(body.proximity.distanceMeters > 120);
+    });
+
+    test('QR token da unidade autoriza passar a vez', async () => {
+      const ticket = await novoTicket('Bianca');
+      await novoTicket('Rodrigo'); // alguem atras para receber a vez
+      const posicaoAntes = ticket.position;
+      const res = await fetch(base + `/api/tickets/${ticket.id}/pass`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrToken: 'demo-centro' }),
+      });
+      const body = await res.json();
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(body.proximity.method, 'qr');
+      assert.strictEqual(body.ticket.source, 'passou');
+      assert.ok(body.ticket.position > posicaoAntes, 'a posicao deveria ter aumentado');
+    });
+
+    test('ultimo da fila recebe 409 em vez de sucesso falso', async () => {
+      const ticket = await novoTicket('Ultimo');
+      const res = await fetch(base + `/api/tickets/${ticket.id}/pass`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrToken: 'demo-centro' }),
+      });
+      const body = await res.json();
+      assert.strictEqual(res.status, 409);
+      assert.match(body.error, /ultimo da fila/i);
+    });
+
+    test('ticket inexistente responde 404', async () => {
+      const res = await fetch(base + '/api/tickets/999999/pass', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrToken: 'demo-centro' }),
+      });
+      assert.strictEqual(res.status, 404);
+    });
+
+    test('confirmar presenca exige o QR correto', async () => {
+      const ticket = await novoTicket('Renato');
+      const res = await fetch(base + `/api/tickets/${ticket.id}/presence`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrToken: 'token-de-outro-lugar' }),
+      });
+      assert.strictEqual(res.status, 403);
+    });
+  });
+});
+
+describe('multi-unidade', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    server = await startServer({ RATE_LIMIT_SIGNUP: '100' });
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  async function criarUnidade(nome) {
+    const res = await fetch(base + '/api/venues', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nome }),
+    });
+    return { status: res.status, body: await res.json() };
+  }
+
+  test('cadastro self-service cria unidade com slug e senha propria', async () => {
+    const { status, body } = await criarUnidade('Clinica Sao Jose');
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.venue.slug, 'clinica-sao-jose');
+    assert.ok(body.operatorPassword && body.operatorPassword.length >= 6);
+    assert.ok(body.joinUrl.includes('venue=clinica-sao-jose'));
+    assert.ok(body.venue.qrToken);
+  });
+
+  test('nome muito curto e recusado', async () => {
+    const { status } = await criarUnidade('ab');
+    assert.strictEqual(status, 400);
+  });
+
+  test('nomes iguais geram slugs distintos', async () => {
+    const primeira = await criarUnidade('Laboratorio Central');
+    const segunda = await criarUnidade('Laboratorio Central');
+    assert.strictEqual(primeira.body.venue.slug, 'laboratorio-central');
+    assert.strictEqual(segunda.body.venue.slug, 'laboratorio-central-2');
+  });
+
+  test('QR da unidade responde como PNG', async () => {
+    const { body } = await criarUnidade('Otica Vision');
+    const res = await fetch(base + body.qrUrl);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.headers.get('content-type'), 'image/png');
+    const bytes = Buffer.from(await res.arrayBuffer());
+    assert.ok(bytes.length > 100, 'PNG veio vazio');
+    assert.strictEqual(bytes.subarray(1, 4).toString(), 'PNG');
+  });
+
+  test('unidade inexistente responde 404', async () => {
+    const res = await fetch(base + '/api/venues/nao-existe/state');
+    assert.strictEqual(res.status, 404);
+  });
+
+  test('filas de unidades diferentes nao se misturam', async () => {
+    const a = (await criarUnidade('Clinica Alfa')).body;
+    const b = (await criarUnidade('Clinica Beta')).body;
+
+    await fetch(base + `/api/venues/${a.venue.slug}/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Alice' }),
+    });
+
+    const estadoA = await (await fetch(base + `/api/venues/${a.venue.slug}/state`)).json();
+    const estadoB = await (await fetch(base + `/api/venues/${b.venue.slug}/state`)).json();
+    assert.strictEqual(estadoA.kpis.waiting, 1);
+    assert.strictEqual(estadoB.kpis.waiting, 0, 'ticket vazou para a outra unidade');
+  });
+
+  test('sessao de uma unidade nao comanda a fila de outra', async () => {
+    const a = (await criarUnidade('Clinica Gama')).body;
+    const b = (await criarUnidade('Clinica Delta')).body;
+
+    const loginA = await fetch(base + `/api/venues/${a.venue.slug}/operator/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: a.operatorPassword }),
+    });
+    const { token } = await loginA.json();
+
+    await fetch(base + `/api/venues/${b.venue.slug}/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Bruno' }),
+    });
+
+    const invasao = await fetch(base + `/api/venues/${b.venue.slug}/tickets/call-next`, {
+      method: 'POST',
+      headers: authed(token),
+    });
+    assert.strictEqual(invasao.status, 401, 'token de uma unidade comandou outra');
+  });
+
+  test('senha de uma unidade nao serve para outra', async () => {
+    const a = (await criarUnidade('Clinica Epsilon')).body;
+    const b = (await criarUnidade('Clinica Zeta')).body;
+    const res = await fetch(base + `/api/venues/${b.venue.slug}/operator/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: a.operatorPassword }),
+    });
+    assert.strictEqual(res.status, 401);
+  });
+
+  test('rotas legadas continuam servindo a unidade padrao', async () => {
+    const res = await fetch(base + '/api/state');
+    const state = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(state.venueMeta.slug, 'centro');
+  });
+});
+
+describe('limites do plano free', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    // TRIAL_DAYS=0: a unidade nasce com o teste ja vencido, ou seja, no free.
+    server = await startServer({
+      RATE_LIMIT_SIGNUP: '100', FREE_DAILY_TICKETS: '2', FREE_COUNTERS: '1', TRIAL_DAYS: '0',
+    });
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  async function novaUnidade(nome) {
+    const res = await fetch(base + '/api/venues', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nome }),
+    });
+    return res.json();
+  }
+
+  function entrar(slug, nome) {
+    return fetch(base + `/api/venues/${slug}/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nome }),
+    });
+  }
+
+  test('bloqueia a entrada apos o limite diario com 402', async () => {
+    const venue = await novaUnidade('Clinica Limite');
+    assert.strictEqual((await entrar(venue.venue.slug, 'Um')).status, 201);
+    assert.strictEqual((await entrar(venue.venue.slug, 'Dois')).status, 201);
+
+    const terceira = await entrar(venue.venue.slug, 'Tres');
+    const body = await terceira.json();
+    assert.strictEqual(terceira.status, 402);
+    assert.match(body.error, /plano gratuito/i);
+  });
+
+  test('plano free expoe apenas um balcao', async () => {
+    const venue = await novaUnidade('Clinica Balcao');
+    const state = await (await fetch(base + `/api/venues/${venue.venue.slug}/state`)).json();
+    assert.strictEqual(state.counters.length, 1);
+    assert.strictEqual(state.monetization.limits.counters, 1);
+  });
+
+  test('segunda chamada simultanea esbarra no limite de balcoes', async () => {
+    const venue = await novaUnidade('Clinica Dois Balcoes');
+    const slug = venue.venue.slug;
+    await entrar(slug, 'Ana');
+    await entrar(slug, 'Bia');
+
+    const login = await fetch(base + `/api/venues/${slug}/operator/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: venue.operatorPassword }),
+    });
+    const { token } = await login.json();
+
+    const primeira = await fetch(base + `/api/venues/${slug}/tickets/call-next`, {
+      method: 'POST', headers: authed(token),
+    });
+    const segunda = await fetch(base + `/api/venues/${slug}/tickets/call-next`, {
+      method: 'POST', headers: authed(token),
+    });
+    assert.strictEqual(primeira.status, 200);
+    assert.strictEqual(segunda.status, 409, 'plano free deixou abrir um segundo balcao');
+  });
+});
+
+describe('eventos de comportamento', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    server = await startServer({ RATE_LIMIT_EVENTS: '500' });
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  function enviar(payload) {
+    return fetch(base + '/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  test('aceita lote e responde sem corpo', async () => {
+    const res = await enviar({
+      session: 'sessao-1',
+      events: [{ name: 'tela:aberta', surface: 'landing', at: Date.now() }],
+    });
+    assert.strictEqual(res.status, 204);
+  });
+
+  test('lote vazio nao gera erro', async () => {
+    const res = await enviar({ session: 'sessao-1', events: [] });
+    assert.strictEqual(res.status, 204);
+  });
+
+  test('descarta props fora da lista permitida (LGPD)', () => {
+    const limpo = analyticsModule.limparProps({
+      form: 'cadastro',
+      nome: 'Maria Silva',
+      email: 'maria@exemplo.com',
+      senha: 'segredo',
+      status: 402,
+    });
+    assert.deepStrictEqual(limpo, { form: 'cadastro', status: 402 });
+  });
+
+  test('normaliza descartando evento com nome invalido', () => {
+    const eventos = analyticsModule.normalizar({
+      session: 'x',
+      events: [
+        { name: 'tela:aberta', surface: 'landing', at: Date.now() },
+        { name: 'nome com espaco', surface: 'landing', at: Date.now() },
+        { name: '', surface: 'landing', at: Date.now() },
+      ],
+    });
+    assert.strictEqual(eventos.length, 1);
+    assert.strictEqual(eventos[0].name, 'tela:aberta');
+  });
+
+  test('superficie desconhecida vira rotulo generico', () => {
+    const [evento] = analyticsModule.normalizar({
+      session: 'x',
+      events: [{ name: 'tela:aberta', surface: 'inventada', at: Date.now() }],
+    });
+    assert.strictEqual(evento.surface, 'desconhecida');
+  });
+
+  test('corta o lote no limite', () => {
+    const muitos = Array.from({ length: 200 }, (_, i) => ({
+      name: 'evento' + i, surface: 'landing', at: Date.now(),
+    }));
+    const eventos = analyticsModule.normalizar({ session: 'x', events: muitos });
+    assert.strictEqual(eventos.length, analyticsModule.MAX_EVENTS_POR_LOTE);
+  });
+
+  test('carimbo de tempo absurdo do cliente e substituido', () => {
+    const [evento] = analyticsModule.normalizar({
+      session: 'x',
+      events: [{ name: 'tela:aberta', surface: 'landing', at: 1 }],
+    });
+    assert.ok(Math.abs(Date.now() - evento.at) < 5000, 'deveria usar o relogio do servidor');
+  });
+
+  test('funil calcula a queda entre etapas', () => {
+    const funil = analyticsModule.montarFunil(
+      { etapas: [{ name: 'a', rotulo: 'A' }, { name: 'b', rotulo: 'B' }, { name: 'c', rotulo: 'C' }] },
+      { a: 100, b: 40, c: 10 }
+    );
+    assert.strictEqual(funil[0].quedaPercentual, null);
+    assert.strictEqual(funil[1].quedaPercentual, 60);
+    assert.strictEqual(funil[2].quedaPercentual, 75);
+  });
+
+  test('painel de funil exige operador autenticado', async () => {
+    const protegido = await startServer({ OPERATOR_PASSWORD: 'segredo-analitico' });
+    try {
+      const res = await fetch(protegido.base + '/api/analytics/funnel');
+      assert.strictEqual(res.status, 401);
+    } finally {
+      stopServer(protegido);
+    }
+  });
+
+  test('funil devolve os dois caminhos com as sessoes contadas', async () => {
+    // Servidor proprio: os outros testes deste bloco ja mandaram eventos e
+    // poluiriam a contagem.
+    const limpo = await startServer({ RATE_LIMIT_EVENTS: '500' });
+    try {
+      const mandar = (session, events) => fetch(limpo.base + '/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session, events }),
+      });
+
+      await mandar('visitante-a', [
+        { name: 'tela:aberta', surface: 'landing', at: Date.now() },
+        { name: 'clique:criar_fila', surface: 'landing', at: Date.now() },
+      ]);
+      // Mesma sessao repetindo a etapa: precisa continuar contando como uma.
+      await mandar('visitante-a', [{ name: 'tela:aberta', surface: 'landing', at: Date.now() }]);
+      await mandar('visitante-b', [{ name: 'tela:aberta', surface: 'landing', at: Date.now() }]);
+
+      const { body: sessao } = await login(limpo.base);
+      const res = await fetch(limpo.base + '/api/analytics/funnel?hours=1', { headers: authed(sessao.token) });
+      const body = await res.json();
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(body.funis.length, 2);
+
+      const dono = body.funis.find(f => f.id === 'dono');
+      assert.strictEqual(dono.etapas[0].sessoes, 2, 'duas sessoes abriram a landing');
+      assert.strictEqual(dono.etapas[1].sessoes, 1, 'so uma clicou em criar fila');
+      assert.strictEqual(dono.etapas[1].quedaPercentual, 50);
+    } finally {
+      stopServer(limpo);
+    }
+  });
+
+  test('rate limit corta enxurrada de eventos', async () => {
+    const limitado = await startServer({ RATE_LIMIT_EVENTS: '2' });
+    try {
+      const status = [];
+      for (let i = 0; i < 4; i++) {
+        const res = await fetch(limitado.base + '/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session: 's', events: [{ name: 'ev', surface: 'landing', at: Date.now() }] }),
+        });
+        status.push(res.status);
+      }
+      assert.ok(status.includes(429), 'nunca respondeu 429: ' + status.join(','));
+    } finally {
+      stopServer(limitado);
+    }
+  });
+});
+
+describe('captura de leads', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    server = await startServer({ RATE_LIMIT_LEADS: '50' });
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  function enviarLead(payload) {
+    return fetch(base + '/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  test('lead valido e aceito e devolve o caminho de autoatendimento', async () => {
+    const res = await enviarLead({ name: 'Carla', email: 'carla@lab.com.br', segment: 'laboratorio' });
+    const body = await res.json();
+    assert.strictEqual(res.status, 201);
+    assert.ok(body.signupUrl.includes('cadastro.html'));
+  });
+
+  test('recusa e-mail invalido', async () => {
+    const res = await enviarLead({ name: 'Carla', email: 'nao-e-email' });
+    assert.strictEqual(res.status, 400);
+  });
+
+  test('recusa nome vazio', async () => {
+    const res = await enviarLead({ name: '', email: 'ok@exemplo.com' });
+    assert.strictEqual(res.status, 400);
+  });
+
+  test('lista de leads exige operador autenticado', async () => {
+    const res = await fetch(base + '/api/leads');
+    assert.strictEqual(res.status, 401);
+  });
+
+  test('rate limit corta enxurrada de envios', async () => {
+    const limitado = await startServer({ RATE_LIMIT_LEADS: '2' });
+    try {
+      const status = [];
+      for (let i = 0; i < 4; i++) {
+        const res = await fetch(limitado.base + '/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Teste' + i, email: `t${i}@exemplo.com` }),
+        });
+        status.push(res.status);
+      }
+      assert.ok(status.includes(429), 'nunca respondeu 429: ' + status.join(','));
+    } finally {
+      stopServer(limitado);
+    }
+  });
+});
+
+describe('assinatura e cobranca', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    server = await startServer({ RATE_LIMIT_SIGNUP: '100', PAYMENT_WEBHOOK_SECRET: 'segredo-de-teste' });
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  async function novaUnidade(nome) {
+    const res = await fetch(base + '/api/venues', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nome, contactEmail: 'dono@exemplo.com' }),
+    });
+    return res.json();
+  }
+
+  async function tokenDe(venue) {
+    const res = await fetch(base + `/api/venues/${venue.venue.slug}/operator/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: venue.operatorPassword }),
+    });
+    return (await res.json()).token;
+  }
+
+  function assinar(payload, secret = 'segredo-de-teste') {
+    const body = JSON.stringify(payload);
+    const signature = require('node:crypto').createHmac('sha256', secret).update(body).digest('hex');
+    return { body, signature };
+  }
+
+  function enviarWebhook(payload, secret) {
+    const { body, signature } = assinar(payload, secret);
+    return fetch(base + '/api/webhooks/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Signature': signature },
+      body,
+    });
+  }
+
+  test('unidade nova comeca em teste gratis com recursos premium', async () => {
+    const venue = await novaUnidade('Clinica Trial');
+    assert.strictEqual(venue.subscription.status, 'trialing');
+    assert.strictEqual(venue.subscription.plan, 'premium');
+    assert.ok(venue.subscription.trialDaysLeft > 0);
+
+    const state = await (await fetch(base + `/api/venues/${venue.venue.slug}/state`)).json();
+    assert.strictEqual(state.monetization.limits.dailyTickets, null, 'trial deveria estar sem limite');
+    assert.strictEqual(state.monetization.adsEnabled, false, 'trial nao deveria mostrar anuncio');
+  });
+
+  test('checkout exige operador autenticado', async () => {
+    const venue = await novaUnidade('Clinica Checkout');
+    const semAuth = await fetch(base + `/api/venues/${venue.venue.slug}/checkout`, { method: 'POST' });
+    assert.strictEqual(semAuth.status, 401);
+
+    const token = await tokenDe(venue);
+    const comAuth = await fetch(base + `/api/venues/${venue.venue.slug}/checkout`, {
+      method: 'POST', headers: authed(token),
+    });
+    const body = await comAuth.json();
+    assert.strictEqual(comAuth.status, 200);
+    assert.ok(body.url.includes(venue.venue.slug));
+  });
+
+  test('webhook sem assinatura valida e recusado', async () => {
+    const venue = await novaUnidade('Clinica Assinatura');
+    const res = await fetch(base + '/api/webhooks/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Signature': 'invalida' },
+      body: JSON.stringify({ id: 'e1', type: 'subscription.paid', reference: venue.venue.slug }),
+    });
+    assert.strictEqual(res.status, 401);
+  });
+
+  test('webhook assinado com segredo errado e recusado', async () => {
+    const venue = await novaUnidade('Clinica Segredo');
+    const res = await enviarWebhook(
+      { id: 'e2', type: 'subscription.paid', reference: venue.venue.slug },
+      'segredo-do-atacante'
+    );
+    assert.strictEqual(res.status, 401);
+  });
+
+  test('pagamento confirmado ativa o premium', async () => {
+    const venue = await novaUnidade('Clinica Paga');
+    const res = await enviarWebhook({ id: 'e3', type: 'subscription.paid', reference: venue.venue.slug });
+    const body = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(body.plan, 'premium');
+    assert.strictEqual(body.status, 'active');
+  });
+
+  test('mesmo evento reenviado nao duplica efeito', async () => {
+    const venue = await novaUnidade('Clinica Duplicada');
+    await enviarWebhook({ id: 'evento-repetido', type: 'subscription.paid', reference: venue.venue.slug });
+    const segunda = await enviarWebhook({ id: 'evento-repetido', type: 'subscription.paid', reference: venue.venue.slug });
+    const body = await segunda.json();
+    assert.strictEqual(body.duplicated, true);
+  });
+
+  test('cancelamento derruba a unidade para o plano gratuito', async () => {
+    const venue = await novaUnidade('Clinica Cancelada');
+    await enviarWebhook({ id: 'e4', type: 'subscription.paid', reference: venue.venue.slug });
+    const res = await enviarWebhook({ id: 'e5', type: 'subscription.canceled', reference: venue.venue.slug });
+    const body = await res.json();
+    assert.strictEqual(body.plan, 'free');
+    assert.strictEqual(body.status, 'canceled');
+
+    const state = await (await fetch(base + `/api/venues/${venue.venue.slug}/state`)).json();
+    assert.strictEqual(state.monetization.limits.counters, 1, 'cancelado deveria voltar aos limites do free');
+  });
+
+  test('pagamento falhado marca a assinatura como pendente', async () => {
+    const venue = await novaUnidade('Clinica Inadimplente');
+    await enviarWebhook({ id: 'e6', type: 'subscription.paid', reference: venue.venue.slug });
+    const res = await enviarWebhook({ id: 'e7', type: 'payment.failed', reference: venue.venue.slug });
+    const body = await res.json();
+    assert.strictEqual(body.status, 'past_due');
+  });
+
+  test('webhook para unidade inexistente responde 404', async () => {
+    const res = await enviarWebhook({ id: 'e8', type: 'subscription.paid', reference: 'nao-existe' });
+    assert.strictEqual(res.status, 404);
+  });
+
+  test('sandbox confirma o pagamento e libera o premium', async () => {
+    const sandbox = await startServer({ RATE_LIMIT_SIGNUP: '100', TRIAL_DAYS: '0' });
+    try {
+      const criada = await (await fetch(sandbox.base + '/api/venues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Clinica Sandbox' }),
+      })).json();
+      const slug = criada.venue.slug;
+
+      const antes = await (await fetch(sandbox.base + `/api/venues/${slug}/state`)).json();
+      assert.strictEqual(antes.monetization.plan, 'free');
+
+      const pago = await fetch(sandbox.base + `/api/venues/${slug}/sandbox/confirm`, { method: 'POST' });
+      assert.strictEqual(pago.status, 200);
+
+      const depois = await (await fetch(sandbox.base + `/api/venues/${slug}/state`)).json();
+      assert.strictEqual(depois.monetization.plan, 'premium');
+      assert.strictEqual(depois.monetization.limits.dailyTickets, null);
+    } finally {
+      stopServer(sandbox);
+    }
+  });
+});
+
+describe('jornada completa da unidade nova', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    server = await startServer({ RATE_LIMIT_SIGNUP: '100' });
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  test('do cadastro ao atendimento concluido', async () => {
+    // 1. o dono cria a unidade e recebe QR + senha
+    const signup = await (await fetch(base + '/api/venues', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Clinica Jornada', operatorName: 'Recepcao' }),
+    })).json();
+    const slug = signup.venue.slug;
+    assert.ok(signup.operatorPassword);
+
+    // 2. o QR do balcao aponta para a fila da unidade
+    assert.ok(signup.joinUrl.includes(`venue=${slug}`));
+    assert.ok(signup.joinUrl.includes(`token=${signup.venue.qrToken}`));
+
+    // 3. o cliente escaneia e entra na fila
+    const entrada = await (await fetch(base + `/api/venues/${slug}/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Pedro', qrToken: signup.venue.qrToken }),
+    })).json();
+    assert.strictEqual(entrada.ticket.code, 'M-001', 'numeracao deve comecar do zero na unidade nova');
+    assert.strictEqual(entrada.ticket.position, 1);
+
+    // 4. o operador entra no painel com a senha recebida
+    const login = await (await fetch(base + `/api/venues/${slug}/operator/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: signup.operatorPassword }),
+    })).json();
+    assert.ok(login.token);
+
+    // 5. chama o proximo
+    const chamada = await (await fetch(base + `/api/venues/${slug}/tickets/call-next`, {
+      method: 'POST', headers: authed(login.token),
+    })).json();
+    assert.strictEqual(chamada.ticket.status, 'calling');
+    assert.strictEqual(chamada.ticket.counter, 1);
+
+    // 6. o cliente ve a propria chamada
+    const acompanhando = await (await fetch(base + `/api/venues/${slug}/tickets/${entrada.ticket.id}`)).json();
+    assert.strictEqual(acompanhando.ticket.status, 'calling');
+
+    // 7. conclui o atendimento
+    const fim = await fetch(base + `/api/venues/${slug}/tickets/${entrada.ticket.id}/finish`, {
+      method: 'POST', headers: authed(login.token),
+    });
+    assert.strictEqual(fim.status, 200);
+
+    const estadoFinal = await (await fetch(base + `/api/venues/${slug}/state`)).json();
+    assert.strictEqual(estadoFinal.kpis.servedToday, 1);
+    assert.strictEqual(estadoFinal.kpis.waiting, 0);
+  });
+});
+
+describe('rate limit', () => {
+  let server;
+
+  before(async () => {
+    server = await startServer({ RATE_LIMIT_TICKETS: '3' });
+  });
+
+  after(() => stopServer(server));
+
+  test('bloqueia com 429 depois do limite de entradas na fila', async () => {
+    const status = [];
+    for (let i = 0; i < 5; i++) {
+      const res = await fetch(server.base + '/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Teste' + i }),
+      });
+      status.push(res.status);
+    }
+    assert.ok(status.filter(s => s === 201).length <= 3, 'passou mais requisicoes que o limite');
+    assert.ok(status.includes(429), 'nunca respondeu 429: ' + status.join(','));
+  });
+});
+
+describe('expurgo LGPD', () => {
+  let server;
+
+  before(async () => {
+    // Retencao zero: tickets encerrados somem ja no boot.
+    server = await startServer({ TICKET_RETENTION_HOURS: '0' });
+  });
+
+  after(() => stopServer(server));
+
+  test('remove tickets encerrados no boot', async () => {
+    const res = await fetch(server.base + '/api/state');
+    const state = await res.json();
+    const encerrados = state.tickets.filter(t => t.status === 'served' || t.status === 'absent');
+    assert.strictEqual(encerrados.length, 0, 'sobraram tickets encerrados apos o expurgo');
+  });
+});
+
+describe('modo producao', () => {
+  let server;
+
+  before(async () => {
+    server = await startServer({ NODE_ENV: 'production', SEED_DEMO: 'false', CORS_ORIGIN: 'https://exemplo.com' });
+  });
+
+  after(() => stopServer(server));
+
+  test('fila inicia vazia, sem dados de demonstracao', async () => {
+    const res = await fetch(server.base + '/api/state');
+    const state = await res.json();
+    assert.strictEqual(state.tickets.length, 0);
+    assert.strictEqual(state.kpis.waiting, 0);
+  });
+
+  test('bloqueia origem nao autorizada no CORS', async () => {
+    const res = await fetch(server.base + '/api/state', { headers: { Origin: 'https://site-malicioso.com' } });
+    assert.strictEqual(res.status, 500, 'origem estranha deveria ser barrada pelo CORS');
+  });
+
+  test('permite a origem configurada', async () => {
+    const res = await fetch(server.base + '/api/state', { headers: { Origin: 'https://exemplo.com' } });
+    assert.strictEqual(res.status, 200);
+  });
+});

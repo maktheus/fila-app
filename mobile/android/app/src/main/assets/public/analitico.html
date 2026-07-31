@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Onde as pessoas travam — Fila Virtual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --ink:#191919; --bg:#191919; --surface:#1F1E1C; --surface-2:#232220;
+    --border:#34322E; --border-strong:#4A4742;
+    --fg-1:#DBD4C9; --fg-2:#B5AFA4; --fg-3:#877F73;
+    --c-ok:#3F8A5B; --c-warn:#C48119; --c-bad:#E86660; --c-info:#3D8CC2;
+    --font-display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif;
+    --font-body:"Manrope",ui-sans-serif,system-ui,sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  body{background:var(--bg);color:var(--fg-1);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+  button,select,input{font:inherit}
+  button{cursor:pointer}
+  button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--c-info);outline-offset:2px}
+  .shell{max-width:1080px;margin:0 auto;padding:26px 24px 60px}
+
+  header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--border)}
+  header h1{font-family:var(--font-display);font-size:19px;font-weight:600;letter-spacing:-.01em}
+  header .sub{font-family:var(--font-display);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.13em;color:var(--fg-3)}
+  .spacer{margin-left:auto}
+  select,.btn{background:var(--surface);border:1px solid var(--border-strong);color:var(--fg-1);border-radius:9px;padding:8px 13px;font-size:13px;font-weight:600}
+  .btn.primary{background:var(--c-info);border-color:var(--c-info);color:#0d0d0d}
+
+  .login{max-width:380px;margin:14vh auto;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:28px;display:grid;gap:13px}
+  .login h2{font-family:var(--font-display);font-size:18px}
+  .login p{font-size:13.5px;color:var(--fg-3);line-height:1.5}
+  .login input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border-strong);background:var(--bg);color:var(--fg-1)}
+  .login .btn{width:100%;text-align:center;background:var(--c-info);border-color:var(--c-info);color:#0d0d0d;padding:12px}
+  .erro{font-size:13px;color:var(--c-bad);font-weight:600}
+
+  section{margin-top:30px}
+  h2.title{font-family:var(--font-display);font-size:16px;font-weight:600;margin-bottom:3px}
+  p.hint{font-size:13px;color:var(--fg-3);margin-bottom:16px;line-height:1.5}
+
+  .funnel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px 22px;margin-bottom:16px}
+  .funnel h3{font-family:var(--font-display);font-size:15px;margin-bottom:16px}
+  .step{display:grid;grid-template-columns:minmax(120px,190px) 1fr auto;gap:14px;align-items:center;padding:7px 0}
+  @media(max-width:640px){.step{grid-template-columns:1fr;gap:5px}}
+  .step-name{font-size:13.5px;font-weight:600}
+  .step-name small{display:block;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-3);font-weight:400;margin-top:1px}
+  .step-track{height:26px;background:var(--surface-2);border-radius:4px;position:relative;display:flex;align-items:center}
+  .step-fill{height:100%;border-radius:0 4px 4px 0;background:var(--c-info);min-width:2px;transition:width .3s}
+  .step-num{font-family:var(--font-mono);font-size:13.5px;font-weight:600;min-width:104px;text-align:right;font-variant-numeric:tabular-nums}
+  .drop{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:8px;white-space:nowrap}
+  .drop.ok{background:color-mix(in oklch,var(--c-ok) 20%,transparent);color:var(--c-ok)}
+  .drop.warn{background:color-mix(in oklch,var(--c-warn) 22%,transparent);color:var(--c-warn)}
+  .drop.bad{background:color-mix(in oklch,var(--c-bad) 20%,transparent);color:var(--c-bad)}
+
+  .destaque{margin-top:16px;padding:13px 16px;border-radius:11px;background:color-mix(in oklch,var(--c-bad) 12%,var(--surface));border:1px solid color-mix(in oklch,var(--c-bad) 35%,transparent);font-size:13.5px;line-height:1.5;color:var(--fg-1)}
+  .destaque strong{color:var(--c-bad)}
+  .destaque.vazio{background:var(--surface-2);border-color:var(--border);color:var(--fg-3)}
+  .destaque.vazio strong{color:var(--fg-2)}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+  th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--border)}
+  th{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--fg-3);background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:0}
+  td.num{font-family:var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+  td code{font-family:var(--font-mono);font-size:12.5px;color:var(--fg-2)}
+  .vazio-tabela{padding:26px;text-align:center;color:var(--fg-3);font-size:13.5px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+
+<div class="login" id="login">
+  <h2>Painel de comportamento</h2>
+  <p>Entre com a senha do operador da unidade principal para ver onde as pessoas estão desistindo.</p>
+  <input id="senha" type="password" placeholder="Senha do operador" autocomplete="current-password">
+  <div class="erro hidden" id="login-erro"></div>
+  <button class="btn" id="entrar">Entrar</button>
+</div>
+
+<div class="shell hidden" id="app">
+  <header>
+    <div>
+      <div class="sub">Fila virtual</div>
+      <h1>Onde as pessoas travam</h1>
+    </div>
+    <div class="spacer"></div>
+    <select id="periodo">
+      <option value="24">Últimas 24 horas</option>
+      <option value="72">Últimos 3 dias</option>
+      <option value="168" selected>Últimos 7 dias</option>
+      <option value="720">Últimos 30 dias</option>
+    </select>
+    <button class="btn" id="atualizar">Atualizar</button>
+  </header>
+
+  <section>
+    <h2 class="title">Funis</h2>
+    <p class="hint">Cada barra conta <strong>sessões distintas</strong> que chegaram à etapa — não cliques. A etiqueta à direita mostra quanta gente se perdeu desde a etapa anterior.</p>
+    <div id="funis"></div>
+  </section>
+
+  <section>
+    <h2 class="title">Erros que o usuário viu</h2>
+    <p class="hint">Falhas de JavaScript e respostas de erro da API, com a rota agrupada. É aqui que aparece a tela quebrada que ninguém reportou.</p>
+    <div class="table-wrap" id="erros"></div>
+  </section>
+
+  <section>
+    <h2 class="title">Eventos mais frequentes</h2>
+    <p class="hint">Visão bruta, útil para conferir se a instrumentação está chegando.</p>
+    <div class="table-wrap" id="eventos"></div>
+  </section>
+</div>
+
+<script src="config.js?v=8"></script>
+<script>
+(function () {
+  var API_BASE = window.FILA_API_BASE || "";
+  var TOKEN_KEY = "fila_analitico_token";
+  var token = sessionStorage.getItem(TOKEN_KEY) || "";
+
+  var login = document.getElementById("login");
+  var app = document.getElementById("app");
+  var erroLogin = document.getElementById("login-erro");
+
+  function esc(v) { var d = document.createElement("div"); d.textContent = v == null ? "" : String(v); return d.innerHTML; }
+
+  async function api(caminho) {
+    var res = await fetch(API_BASE + caminho, { headers: token ? { Authorization: "Bearer " + token } : {} });
+    if (res.status === 401) { sair(); throw new Error("sessao"); }
+    if (!res.ok) throw new Error("falha");
+    return res.json();
+  }
+
+  function sair() {
+    token = "";
+    sessionStorage.removeItem(TOKEN_KEY);
+    app.classList.add("hidden");
+    login.classList.remove("hidden");
+  }
+
+  document.getElementById("entrar").addEventListener("click", entrar);
+  document.getElementById("senha").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") entrar();
+  });
+
+  async function entrar() {
+    erroLogin.classList.add("hidden");
+    var senha = document.getElementById("senha").value;
+    try {
+      var res = await fetch(API_BASE + "/api/operator/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: senha })
+      });
+      var data = await res.json();
+      if (!res.ok) {
+        erroLogin.textContent = data.error || "Não foi possível entrar.";
+        erroLogin.classList.remove("hidden");
+        return;
+      }
+      token = data.token;
+      sessionStorage.setItem(TOKEN_KEY, token);
+      abrir();
+    } catch (e) {
+      erroLogin.textContent = "Sem conexão com o servidor.";
+      erroLogin.classList.remove("hidden");
+    }
+  }
+
+  function abrir() {
+    login.classList.add("hidden");
+    app.classList.remove("hidden");
+    carregar();
+  }
+
+  document.getElementById("atualizar").addEventListener("click", carregar);
+  document.getElementById("periodo").addEventListener("change", carregar);
+
+  function horas() { return document.getElementById("periodo").value; }
+
+  async function carregar() {
+    try {
+      var funil = await api("/api/analytics/funnel?hours=" + horas());
+      renderFunis(funil.funis);
+      var erros = await api("/api/analytics/errors?hours=" + horas());
+      renderErros(erros.erros);
+      var eventos = await api("/api/analytics/events?hours=" + horas());
+      renderEventos(eventos.eventos);
+    } catch (e) { /* sair() já tratou o 401 */ }
+  }
+
+  function classeDaQueda(pct) {
+    if (pct >= 60) return "bad";
+    if (pct >= 30) return "warn";
+    return "ok";
+  }
+
+  function renderFunis(funis) {
+    var alvo = document.getElementById("funis");
+    alvo.innerHTML = funis.map(function (funil) {
+      var topo = funil.etapas.length ? funil.etapas[0].sessoes : 0;
+      var linhas = funil.etapas.map(function (etapa) {
+        var largura = topo ? Math.max((etapa.sessoes / topo) * 100, 0.5) : 0.5;
+        var etiqueta = etapa.quedaPercentual === null
+          ? ""
+          : '<span class="drop ' + classeDaQueda(etapa.quedaPercentual) + '">−' + etapa.quedaPercentual + "%</span>";
+        return '<div class="step">' +
+          '<div class="step-name">' + esc(etapa.etapa) + "<small>" + esc(etapa.evento) + "</small></div>" +
+          '<div class="step-track"><div class="step-fill" style="width:' + largura.toFixed(1) + '%"></div></div>' +
+          '<div class="step-num">' + etapa.sessoes + etiqueta + "</div>" +
+          "</div>";
+      }).join("");
+
+      // Maior queda: é o passo que mais custa gente.
+      var pior = null;
+      funil.etapas.forEach(function (etapa, i) {
+        if (etapa.quedaPercentual === null || i === 0) return;
+        if (!pior || etapa.quedaPercentual > pior.etapa.quedaPercentual) {
+          pior = { etapa: etapa, anterior: funil.etapas[i - 1] };
+        }
+      });
+
+      var diagnostico;
+      if (!topo) {
+        diagnostico = '<div class="destaque vazio"><strong>Sem dados ainda.</strong> ' +
+          "Assim que alguém usar essas telas, as etapas aparecem aqui.</div>";
+      } else if (pior && pior.etapa.quedaPercentual > 0) {
+        diagnostico = '<div class="destaque">Maior perda entre <strong>' + esc(pior.anterior.etapa) +
+          "</strong> e <strong>" + esc(pior.etapa.etapa) + "</strong>: " +
+          (pior.anterior.sessoes - pior.etapa.sessoes) + " de " + pior.anterior.sessoes +
+          " desistiram aí (" + pior.etapa.quedaPercentual + "%).</div>";
+      } else {
+        diagnostico = '<div class="destaque vazio"><strong>Nenhuma queda relevante</strong> no período.</div>';
+      }
+
+      return '<div class="funnel"><h3>' + esc(funil.titulo) + "</h3>" + linhas + diagnostico + "</div>";
+    }).join("");
+  }
+
+  function renderErros(erros) {
+    var alvo = document.getElementById("erros");
+    if (!erros || !erros.length) {
+      alvo.innerHTML = '<div class="vazio-tabela">Nenhum erro registrado no período.</div>';
+      return;
+    }
+    alvo.innerHTML = "<table><thead><tr><th>Tipo</th><th>Detalhe</th><th style=\"text-align:right\">Vezes</th></tr></thead><tbody>" +
+      erros.map(function (linha) {
+        var p = linha.props || {};
+        var detalhe = p.rota
+          ? "<code>" + esc(p.rota) + "</code>" + (p.status ? " → " + esc(p.status) : "")
+          : esc(p.msg || "—") + (p.arquivo ? ' <code>' + esc(p.arquivo) + (p.linha ? ":" + esc(p.linha) : "") + "</code>" : "");
+        return "<tr><td><code>" + esc(linha.name) + "</code></td><td>" + detalhe +
+          '</td><td class="num">' + linha.total + "</td></tr>";
+      }).join("") + "</tbody></table>";
+  }
+
+  function renderEventos(eventos) {
+    var alvo = document.getElementById("eventos");
+    if (!eventos || !eventos.length) {
+      alvo.innerHTML = '<div class="vazio-tabela">Nenhum evento no período.</div>';
+      return;
+    }
+    alvo.innerHTML = "<table><thead><tr><th>Evento</th><th style=\"text-align:right\">Total</th><th style=\"text-align:right\">Sessões</th></tr></thead><tbody>" +
+      eventos.map(function (linha) {
+        return "<tr><td><code>" + esc(linha.name) + '</code></td><td class="num">' + linha.total +
+          '</td><td class="num">' + (linha.sessoes != null ? linha.sessoes : "—") + "</td></tr>";
+      }).join("") + "</tbody></table>";
+  }
+
+  // Sessão guardada abre direto.
+  if (token) {
+    fetch(API_BASE + "/api/operator/session", { headers: { Authorization: "Bearer " + token } })
+      .then(function (res) { if (res.ok) abrir(); else sair(); })
+      .catch(sair);
+  }
+})();
+</script>
+</body>
+</html>

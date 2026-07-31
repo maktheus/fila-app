@@ -30,7 +30,7 @@ Cortado do MVP (explicitamente): seleção de unidade, busca por senha/nome, his
 
 ## MVP — o que falta construir (em blocos)
 
-Estado atual: ✅ painel do operador (`frontend/index.html`), ✅ backend com ações de operador (`backend/server.js`), ✅ landing, ✅ protótipos de design (`project/*.dc.html`). **Falta o app do cliente — o coração da ideia original (`chats/chat1.md`).**
+Estado atual (2026-07-30): ✅ Bloco 1 (app do cliente `frontend/cliente.html`), ✅ Bloco 2 (passar a vez + proximidade), ✅ Bloco 3 parcial (token de operador, CORS por env, rate limit — falta inverter rotas e expurgo LGPD), ✅ persistência em **Postgres via Docker** (`backend/db.js`, decisão de 2026-07-30: Postgres no lugar de SQLite/Supabase), ✅ deploy VPS + GitHub Pages, ✅ app Android WebView. Roadmap completo até o go-live: `docs/kanban.html`.
 
 As 3 telas do MVP (protótipo `project/Fila Virtual.dc.html` é a fonte visual):
 
@@ -44,9 +44,12 @@ As 3 telas do MVP (protótipo `project/Fila Virtual.dc.html` é a fonte visual):
 |---|---|---|
 | 1 | App do cliente: entrar via QR + status ao vivo | `frontend/cliente.html` novo; `POST /api/tickets` (ligar a token de unidade); WS |
 | 2 | Passar a vez + proximidade | endpoint `POST /api/tickets/:id/pass`; Geolocation no front; coords da unidade no store |
-| 3 | **Auth do admin + hardening** (pré-requisito de qualquer deploy real) | token de operador nos endpoints de ação; CORS restrito; rate limit |
-| 4 | Persistência + multi-unidade | SQLite ou Supabase; QR token por unidade; limpeza de tickets (LGPD) |
-| 5 | Monetização B2B | assinatura Cakto/Pix por unidade; onboarding da clínica (gera QR na hora) |
+| 3 | ✅ **Auth do admin + hardening** (Sprint 1, 30/07) | login com sessão expirável, CORS por env, rate limit por IP real, expurgo LGPD, nomes só para o operador, cliente na raiz, 24 testes + CI |
+| 4 | ✅ **Persistência + multi-unidade** (Sprint 2, 30/07) | Postgres via Docker, schema multi-tenant, cadastro self-service (`cadastro.html` → `POST /api/venues`), QR PNG gerado por unidade, limites do plano free aplicados, expurgo LGPD |
+| 5 | ✅ **Monetização B2B** (Sprint 3, 31/07) | trial de 14 dias, checkout com adapter de provedor, webhook HMAC idempotente que ativa/suspende o premium, e-mails transacionais, eventos de funil, `planos.html`. **Pendente de você**: abrir conta no provedor e comprar a própria assinatura |
+| 6 | ✅ **Publicação e marketing** (Sprints 4 e 5, 31/07) | política de privacidade e termos, ficha da Play Store, assetlinks, workflow de release `.aab`, monitores Uptime Kuma, SEO da landing, captura de leads, cartaz do balcão |
+| 7 | ✅ **Observabilidade de comportamento** (31/07) | `frontend/analytics.js` + tabela `analytics_events`, funil por sessão, detecção de rage-click e abandono de formulário, painel `analitico.html` mostrando onde o usuário desiste |
+| 8 | ✅ **Vendedor automático** (31/07) | chatbot com RAG lexical, guardrails em três camadas, 4 ferramentas ligadas à API real, servidor MCP, **modelo local (Ollama/qwen2.5:7b) como padrão — custo zero**, e `laboratorio.html` para ver o que acontece por dentro. Detalhes em `docs/CHATBOT.md` |
 
 ### Prompt de construção do Bloco 1 (planejar com Opus, executar com Sonnet)
 
@@ -78,14 +81,21 @@ Checkout: **assinatura recorrente Pix via Cakto** (alternativas Stripe/Mercado P
 
 ## Checklist de segurança (bloqueia deploy real)
 
-- [ ] **CRÍTICO — endpoints de admin abertos**: hoje qualquer pessoa pode `POST /api/tickets/call-next` e comandar a fila. Bloco 3 antes de qualquer cliente real.
-- [ ] CORS irrestrito (`app.use(cors())`) — restringir ao domínio em produção.
-- [ ] Sem rate limit — um loop de `POST /api/tickets` enche a fila (DoS trivial).
-- [ ] LGPD: nomes na fila são dado pessoal — coletar só primeiro nome, expurgar tickets encerrados; vazamento = notificação obrigatória + multa de até 5% do faturamento.
+- [x] ~~**CRÍTICO — endpoints de admin abertos**~~: resolvido em 30/07 — sessão de operador com expiração (`POST /api/operator/login`); `ADMIN_TOKEN` segue válido só para automação.
+- [x] ~~CORS irrestrito~~: restrito por `CORS_ORIGIN`; em produção sem a env, nenhuma origem passa.
+- [x] ~~Sem rate limit~~: 20 entradas/min e 8 logins/15min por IP — com `trust proxy` para valer o IP real atrás do nginx.
+- [x] ~~LGPD~~: só primeiro nome, expurgo automático dos encerrados (`TICKET_RETENTION_HOURS`, padrão 12h) e nomes transmitidos apenas para conexões autenticadas de operador.
 - [ ] Nada hardcoded até aqui (✔ verificado em `server.js` — config via env), manter assim; `.env` já está no `.gitignore`.
 - [ ] Rodar `/security-review` (skill em `.claude/skills/`) ao fechar o Bloco 3 e antes de cada deploy.
-- [ ] Painel admin não pode ser rota enumerável óbvia em produção (hoje `index.html` é o admin! — inverter: cliente vira o index, admin vira rota autenticada).
+- [x] ~~Painel admin em rota óbvia~~: `index.html` agora é o app do cliente; o painel vive em `operador.html`, atrás de login, com `noindex` e `robots.txt`.
 
 ## Próxima ação única
 
-**Construir o Bloco 1** — colar o prompt acima no Claude Code dentro deste repo. É a peça que falta para a demo completa (cliente entra pelo QR e se vê na fila que o painel já gerencia).
+**Destravar o que depende de conta externa.** O código do Sprint 4 está pronto (`docs/PLAY_STORE.md`, `docs/MONITORAMENTO.md`, workflow de release); o que falta são passos seus, nesta ordem:
+
+1. **Domínio + HTTPS** — sem ele não há assetlinks nem Play Store.
+2. **Keystore de release** — `keytool -genkeypair`, guardar em local seguro, cadastrar `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` e `ANDROID_KEY_PASSWORD` nos secrets do repo.
+3. **Conta no provedor de pagamento** (Cakto ou Mercado Pago) e compra da própria assinatura.
+4. **Play Console** — ficha (já escrita), declaração de dados (já preenchida no doc) e teste fechado com 12+ testadores por 14 dias.
+
+Enquanto isso corre, o **Sprint 5 (marketing)** pode andar em paralelo.

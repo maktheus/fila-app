@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Testes do backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: backend
+        run: npm ci
+
+      - name: Rodar testes de API
+        working-directory: backend
+        run: npm test
+
+  docker:
+    name: Subir a stack em Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Subir Postgres + backend
+        env:
+          OPERATOR_PASSWORD: senha-de-ci
+        run: docker compose up -d --build backend
+
+      - name: Esperar o backend ficar saudavel
+        run: |
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' \
+              "$(docker compose ps -q backend)" 2>/dev/null || echo starting)
+            if [ "$status" = "healthy" ]; then echo "backend saudavel"; exit 0; fi
+            sleep 3
+          done
+          echo "backend nao ficou saudavel a tempo"
+          docker compose logs backend
+          exit 1
+
+      - name: Verificar persistencia em Postgres
+        run: |
+          docker compose exec -T backend wget -qO- \
+            --header='Content-Type: application/json' \
+            --post-data='{"name":"Teste CI"}' http://127.0.0.1:3000/api/tickets > /dev/null
+          docker compose restart backend
+          sleep 8
+          docker compose exec -T postgres psql -U fila -d fila -tAc \
+            "SELECT count(*) FROM tickets WHERE name = 'Teste';" | grep -q '^1$' \
+            || { echo "ticket nao sobreviveu ao restart"; exit 1; }
+          echo "persistencia confirmada"
+
+      - name: Derrubar a stack
+        if: always()
+        run: docker compose down -v

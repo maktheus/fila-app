@@ -4,6 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
 <title>Painel do Operador — Fila Virtual</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -76,6 +77,30 @@
   button:focus-visible{outline:2px solid color-mix(in oklch,var(--mutum-coral) 50%,transparent);outline-offset:2px;border-radius:6px}
 
   .shell{max-width:1320px;margin:0 auto;padding:22px 32px 44px}
+
+  .login-wrap{display:flex;align-items:center;justify-content:center;min-height:78vh;padding:20px}
+  .login-card{display:flex;flex-direction:column;gap:14px;width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:30px 28px}
+  .login-brand{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .login-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--fg-3)}
+  .login-input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border-strong);background:var(--bg);color:var(--fg-1);font:inherit;font-size:15px}
+  .login-input:focus{outline:2px solid var(--primary);outline-offset:1px;border-color:transparent}
+  .login-btn{padding:12px 16px;border-radius:10px;border:none;background:var(--primary);color:#141312;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+  .login-btn:hover:not(:disabled){filter:brightness(1.08)}
+  .login-btn:disabled{opacity:.6;cursor:default}
+  .login-error{font-size:13px;color:var(--mutum-coral);font-weight:600}
+  .login-hint{font-size:12px;color:var(--fg-3);text-align:center}
+  .logout-btn{padding:7px 13px;border-radius:999px;border:1px solid var(--border-strong);background:transparent;color:var(--fg-2);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+  .logout-btn:hover{color:var(--fg-1);border-color:var(--fg-3)}
+
+  .plan-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:16px 0 0;padding:12px 16px;border-radius:12px;border:1px solid var(--border);background:var(--surface)}
+  .plan-bar.trial{border-color:color-mix(in oklch,var(--mutum-amber) 45%,transparent);background:color-mix(in oklch,var(--mutum-amber) 10%,var(--surface))}
+  .plan-bar.limited{border-color:color-mix(in oklch,var(--primary) 45%,transparent);background:color-mix(in oklch,var(--primary) 10%,var(--surface))}
+  .plan-tag{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:4px 10px;border-radius:999px;background:var(--bg);color:var(--fg-2);border:1px solid var(--border-strong)}
+  .plan-bar.premium .plan-tag{background:var(--mutum-forest);color:#fff;border-color:transparent}
+  .plan-text{font-size:13.5px;color:var(--fg-2);flex:1;min-width:200px}
+  .plan-text strong{color:var(--fg-1)}
+  .plan-cta{padding:9px 16px;border-radius:999px;border:0;background:var(--primary);color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+  .plan-cta:disabled{opacity:.6;cursor:default}
 
   .header{display:flex;align-items:center;gap:18px;padding-bottom:22px;border-bottom:1px solid var(--border)}
   .header-brand{display:flex;align-items:center;gap:11px}
@@ -217,6 +242,7 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <script src="config.js?v=4"></script>
+<script src="analytics.js?v=1"></script>
 <script src="ads.js"></script>
 </head>
 <body>
@@ -229,9 +255,20 @@ if ('serviceWorker' in navigator) {
   // For GitHub Pages, point to your backend's public URL.
   const API_BASE = window.FILA_API_BASE || '';
   const WS_BASE = window.FILA_WS_BASE || '';
-  const ADMIN_TOKEN = window.FILA_ADMIN_TOKEN || localStorage.getItem('fila_admin_token') || '';
+  // Multi-unidade: ?venue=slug escolhe a fila; sem ele, a unidade padrão da API.
+  const venueSlug = new URLSearchParams(location.search).get('venue') || '';
+  const API_PREFIX = venueSlug ? '/api/venues/' + encodeURIComponent(venueSlug) : '/api';
+  const apiPath = (path) => path.replace(/^\/api/, API_PREFIX);
+  const venueQuery = (prefix) => venueSlug ? prefix + 'venue=' + encodeURIComponent(venueSlug) : '';
+  FilaAnalytics.init({ surface: 'operador', venue: venueSlug || null });
+  const SESSION_KEY = 'fila_operator_session' + (venueSlug ? ':' + venueSlug : '');
 
   // ---- STATE ----
+  let sessionToken = sessionStorage.getItem(SESSION_KEY) || '';
+  let authed = false;
+  let authChecked = false;
+  let loginError = '';
+  let loginBusy = false;
   let serverState = null;
   let connected = false;
   let filter = 'waiting';
@@ -259,15 +296,16 @@ if ('serviceWorker' in navigator) {
   // ---- API CALLS ----
   async function api(method, path, body) {
     try {
-      const res = await fetch(API_BASE + path, {
+      const res = await fetch(API_BASE + apiPath(path), {
         method,
         headers: Object.assign(
           body ? { 'Content-Type': 'application/json' } : {},
-          ADMIN_TOKEN ? { Authorization: 'Bearer ' + ADMIN_TOKEN } : {}
+          sessionToken ? { Authorization: 'Bearer ' + sessionToken } : {}
         ),
         body: body ? JSON.stringify(body) : undefined,
       });
       const data = await res.json();
+      if (res.status === 401) { endSession('Sua sessão expirou. Entre novamente.'); return null; }
       if (!res.ok) { flash(data.error || 'Erro no servidor.'); return null; }
       if (data.message) flash(data.message);
       return data;
@@ -277,7 +315,70 @@ if ('serviceWorker' in navigator) {
     }
   }
 
-  function callNext() { api('POST', '/api/tickets/call-next'); }
+  // ---- SESSÃO ----
+  function endSession(message) {
+    sessionToken = '';
+    authed = false;
+    sessionStorage.removeItem(SESSION_KEY);
+    loginError = message || '';
+    if (ws) { try { ws.close(); } catch (e) {} ws = null; }
+    render();
+  }
+
+  async function checkSession() {
+    if (!sessionToken) { authChecked = true; render(); return; }
+    try {
+      const res = await fetch(API_BASE + apiPath('/api/operator/session'), {
+        headers: { Authorization: 'Bearer ' + sessionToken },
+      });
+      authed = res.ok;
+      if (!res.ok) { sessionToken = ''; sessionStorage.removeItem(SESSION_KEY); }
+    } catch (e) {
+      authed = false;
+    }
+    authChecked = true;
+    if (authed) start(); else render();
+  }
+
+  async function submitLogin(password) {
+    loginBusy = true;
+    loginError = '';
+    render();
+    try {
+      const res = await fetch(API_BASE + apiPath('/api/operator/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        loginError = data.error || 'Não foi possível entrar.';
+        loginBusy = false;
+        render();
+        return;
+      }
+      FilaAnalytics.track('operador:login_ok');
+      sessionToken = data.token;
+      sessionStorage.setItem(SESSION_KEY, sessionToken);
+      authed = true;
+      loginBusy = false;
+      start();
+    } catch (e) {
+      loginError = 'Sem conexão com o servidor.';
+      loginBusy = false;
+      render();
+    }
+  }
+
+  function logout() {
+    fetch(API_BASE + apiPath('/api/operator/logout'), {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + sessionToken },
+    }).catch(function() {});
+    endSession('');
+  }
+
+  function callNext() { FilaAnalytics.track('operador:chamou'); api('POST', '/api/tickets/call-next'); }
   function callId(id) { api('POST', '/api/tickets/' + id + '/call'); }
   function finishId(id) { api('POST', '/api/tickets/' + id + '/finish'); }
   function recallId(id) { api('POST', '/api/tickets/' + id + '/recall'); }
@@ -289,7 +390,12 @@ if ('serviceWorker' in navigator) {
     const wsUrl = WS_BASE
       ? (/\/ws$/.test(WS_BASE) ? WS_BASE : WS_BASE.replace(/\/$/, '') + '/ws')
       : (proto + '//' + location.host + '/ws');
-    ws = new WebSocket(wsUrl);
+    // O token identifica a conexão como operador: só ela recebe os nomes.
+    const wsParams = new URLSearchParams();
+    if (venueSlug) wsParams.set('venue', venueSlug);
+    if (sessionToken) wsParams.set('token', sessionToken);
+    const query = wsParams.toString();
+    ws = new WebSocket(wsUrl + (query ? '?' + query : ''));
 
     ws.onopen = () => {
       connected = true;
@@ -320,6 +426,19 @@ if ('serviceWorker' in navigator) {
   // ---- RENDER ----
   function render() {
     const app = document.getElementById('app');
+
+    if (!authChecked) {
+      app.innerHTML = renderHeader('Fila Virtual', '...', false) +
+        '<div style="text-align:center;padding:80px 20px;color:var(--fg-3);font-size:16px">Verificando sessão...</div>';
+      return;
+    }
+
+    if (!authed) {
+      app.innerHTML = renderLogin();
+      bindLoginEvents();
+      return;
+    }
+
     if (!serverState) {
       app.innerHTML = renderHeader('Fila Virtual', '...', false) +
         '<div style="text-align:center;padding:80px 20px;color:var(--fg-3);font-size:16px">Conectando ao servidor...</div>';
@@ -344,6 +463,7 @@ if ('serviceWorker' in navigator) {
     else list = [...calling, ...waiting, ...s.tickets.filter(t => t.status === 'served' || t.status === 'absent').slice().reverse()];
 
     app.innerHTML = renderHeader(s.venue, s.operator, connected) +
+      renderPlanBar(s.monetization) +
       renderKpis(kpis) +
       '<div class="main-grid">' +
         renderQueue(list, s.kpis.waiting) +
@@ -356,6 +476,92 @@ if ('serviceWorker' in navigator) {
       renderToast();
 
     bindEvents();
+  }
+
+  // Barra de plano: mostra o estado da assinatura e o caminho para o upgrade.
+  function renderPlanBar(monetization) {
+    if (!monetization) return '';
+    const sub = monetization.subscription || {};
+    const limits = monetization.limits || {};
+    const usados = (monetization.usage && monetization.usage.ticketsToday) || 0;
+    let classe = '';
+    let tag = 'Plano gratuito';
+    let texto = '';
+    let cta = 'Assinar premium';
+
+    if (sub.status === 'active') {
+      classe = 'premium';
+      tag = 'Premium ativo';
+      texto = 'Fila sem limite diário, todos os balcões liberados e sem anúncios.';
+      cta = '';
+    } else if (sub.status === 'trialing' && sub.trialDaysLeft > 0) {
+      classe = 'trial';
+      tag = 'Teste grátis';
+      texto = '<strong>' + sub.trialDaysLeft + ' dia(s) restantes</strong> com tudo liberado. ' +
+        'Depois a fila continua no plano gratuito, com limite diário e um balcão.';
+    } else if (sub.status === 'past_due') {
+      classe = 'limited';
+      tag = 'Pagamento pendente';
+      texto = 'Não conseguimos confirmar o último pagamento. Atualize para não voltar ao plano gratuito.';
+      cta = 'Regularizar';
+    } else {
+      classe = 'limited';
+      texto = 'Hoje: <strong>' + usados + ' de ' + (limits.dailyTickets || '∞') + '</strong> entradas · ' +
+        (limits.counters || '∞') + ' balcão. ' + (sub.priceLabel ? 'Premium por ' + sub.priceLabel + '/mês.' : '');
+    }
+
+    return '<div class="plan-bar ' + classe + '">' +
+      '<span class="plan-tag">' + esc(tag) + '</span>' +
+      '<span class="plan-text">' + texto + '</span>' +
+      (cta ? '<button class="plan-cta" id="upgrade-btn" type="button">' + esc(cta) + '</button>' : '') +
+    '</div>';
+  }
+
+  async function startCheckout() {
+    const btn = document.getElementById('upgrade-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Abrindo...'; }
+    FilaAnalytics.track('checkout:iniciado');
+    const data = await api('POST', '/api/checkout');
+    if (data && data.url) {
+      window.location.href = data.url;
+      return;
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Assinar premium'; }
+  }
+
+  function renderLogin() {
+    return '<div class="login-wrap">' +
+      '<form class="login-card" id="login-form">' +
+        '<div class="login-brand">' + BIRD_SVG +
+          '<div style="line-height:1.15">' +
+            '<div class="header-brand-sub">Fila virtual</div>' +
+            '<div class="header-brand-title">Painel do operador</div>' +
+          '</div>' +
+        '</div>' +
+        '<label class="login-label" for="login-password">Senha do operador</label>' +
+        '<input class="login-input" id="login-password" type="password" autocomplete="current-password" ' +
+          'placeholder="Digite a senha do balcão" ' + (loginBusy ? 'disabled' : '') + ' required>' +
+        (loginError ? '<p class="login-error" role="alert">' + esc(loginError) + '</p>' : '') +
+        '<button class="login-btn" type="submit"' + (loginBusy ? ' disabled' : '') + '>' +
+          (loginBusy ? 'Entrando...' : 'Entrar') +
+        '</button>' +
+        '<p class="login-hint">A sessão expira automaticamente após 8 horas.</p>' +
+      '</form>' +
+    '</div>';
+  }
+
+  function bindLoginEvents() {
+    const form = document.getElementById('login-form');
+    if (!form) return;
+    const input = document.getElementById('login-password');
+    if (input && !loginBusy) input.focus();
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (loginBusy) return;
+      const value = input ? input.value : '';
+      if (!value) { loginError = 'Informe a senha.'; render(); return; }
+      submitLogin(value);
+    });
   }
 
   function renderHeader(venue, operator, isConnected) {
@@ -376,8 +582,9 @@ if ('serviceWorker' in navigator) {
         '<span class="live-text">' + (isConnected ? 'ao vivo' : 'offline') + '</span>' +
       '</div>' +
       '<div class="header-right">' +
-        '<a href="telao.html" class="link-client">Telão</a>' +
-        '<a href="cliente.html" class="link-client">App do cliente →</a>' +
+        '<a href="cartaz.html' + venueQuery('?') + '" class="link-client">Cartaz</a>' +
+        '<a href="telao.html' + venueQuery('?') + '" class="link-client">Telão</a>' +
+        '<a href="./' + venueQuery('?') + '" class="link-client">App do cliente →</a>' +
         '<div class="clock">' + esc(clockNow()) + '</div>' +
         '<div class="operator">' +
           '<div class="operator-avatar">' + esc(opInitial) + '</div>' +
@@ -386,6 +593,7 @@ if ('serviceWorker' in navigator) {
             '<div class="operator-role">Operador</div>' +
           '</div>' +
         '</div>' +
+        (authed ? '<button class="logout-btn" id="logout-btn" type="button">Sair</button>' : '') +
       '</div>' +
     '</header>';
   }
@@ -536,11 +744,19 @@ if ('serviceWorker' in navigator) {
         render();
       });
     });
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) logoutBtn.addEventListener('click', logout);
+    const upgradeBtn = document.getElementById('upgrade-btn');
+    if (upgradeBtn) upgradeBtn.addEventListener('click', startCheckout);
   }
 
   // ---- BOOT ----
-  connectWs();
-  render();
+  function start() {
+    if (!ws) connectWs();
+    render();
+  }
+
+  checkSession();
   setInterval(() => {
     const el = document.querySelector('.clock');
     if (el) el.textContent = clockNow();

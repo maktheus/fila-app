@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planos e preços — Fila Virtual</title>
+<meta name="description" content="Fila virtual por QR code para clínicas e serviços: comece grátis e assine por R$ 99 ao mês por unidade, sem fidelidade.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/mutum-design-system.css">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{background:var(--bg);color:var(--fg-1);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{max-width:900px;margin:0 auto;padding:32px 22px 64px}
+  .brand{display:flex;align-items:center;gap:9px;margin-bottom:30px}
+  .brand img{width:24px;height:30px;object-fit:contain}
+  .brand strong{font-family:var(--font-display);font-size:14px;font-weight:600}
+  .eyebrow{font-family:var(--font-display);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--primary)}
+  h1{font-family:var(--font-display);font-weight:700;font-size:clamp(28px,5vw,38px);line-height:1.1;margin:6px 0 10px}
+  .lead{font-size:16px;line-height:1.55;color:var(--fg-2);max-width:60ch;margin:0 0 34px}
+  .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+  .plan{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px}
+  .plan.featured{border-color:color-mix(in oklch,var(--primary) 55%,transparent);box-shadow:0 8px 30px color-mix(in oklch,var(--primary) 12%,transparent)}
+  .plan h2{font-family:var(--font-display);font-size:19px;margin:0 0 4px}
+  .plan .who{font-size:13.5px;color:var(--fg-3);margin:0 0 16px}
+  .price{font-family:var(--font-display);font-size:36px;font-weight:700;line-height:1}
+  .price small{font-size:14px;font-weight:600;color:var(--fg-3)}
+  ul{list-style:none;padding:0;margin:20px 0 24px;display:grid;gap:10px}
+  li{display:grid;grid-template-columns:20px 1fr;gap:9px;font-size:14.5px;line-height:1.45;color:var(--fg-2)}
+  li i{display:block;width:18px;height:18px;border-radius:50%;background:color-mix(in oklch,var(--mutum-leaf) 22%,transparent);position:relative;margin-top:2px}
+  li i::after{content:"";position:absolute;left:6px;top:3px;width:4px;height:8px;border:solid var(--mutum-forest);border-width:0 2px 2px 0;transform:rotate(45deg)}
+  li.off i{background:var(--bg);border:1px solid var(--border-strong)}
+  li.off i::after{display:none}
+  .cta{margin-top:auto;display:block;text-align:center;border:0;border-radius:12px;padding:15px;font-weight:700;font-size:15px;text-decoration:none;background:var(--primary);color:#fff}
+  .cta.ghost{background:transparent;border:1px solid var(--border-strong);color:var(--fg-1)}
+  .note{margin-top:26px;font-size:13.5px;color:var(--fg-3);line-height:1.55}
+  .faq{margin-top:46px;display:grid;gap:18px}
+  .faq h3{font-family:var(--font-display);font-size:16px;margin:0 0 5px}
+  .faq p{margin:0;font-size:14.5px;line-height:1.55;color:var(--fg-2)}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="brand"><img src="assets/mark-bird.svg" alt=""><strong>Fila virtual</strong></div>
+
+  <p class="eyebrow">Planos</p>
+  <h1>Comece grátis. Assine quando a fila virar rotina.</h1>
+  <p class="lead">Todo estabelecimento novo começa com 14 dias de tudo liberado. Depois, ou você assina, ou a fila continua funcionando no plano gratuito — ela nunca sai do ar.</p>
+
+  <section class="plans">
+    <article class="plan">
+      <h2>Gratuito</h2>
+      <p class="who">Para testar com movimento baixo</p>
+      <div class="price">R$ 0 <small>/mês</small></div>
+      <ul>
+        <li><i></i>Fila por QR code, sem instalar app</li>
+        <li><i></i>Posição ao vivo no celular do cliente</li>
+        <li><i></i>Passar a vez com checagem de proximidade</li>
+        <li><i></i>Até 50 entradas por dia</li>
+        <li><i></i>1 balcão de atendimento</li>
+        <li class="off"><i></i>Com anúncios</li>
+      </ul>
+      <a class="cta ghost" href="cadastro.html">Criar minha fila</a>
+    </article>
+
+    <article class="plan featured">
+      <h2>Premium</h2>
+      <p class="who">Para quem atende todo dia</p>
+      <div class="price" id="price">R$ 99 <small>/mês por unidade</small></div>
+      <ul>
+        <li><i></i>Tudo do plano gratuito</li>
+        <li><i></i>Entradas ilimitadas por dia</li>
+        <li><i></i>Todos os balcões liberados</li>
+        <li><i></i>Telão da sala de espera sem anúncios</li>
+        <li><i></i>Pix recorrente, sem fidelidade</li>
+        <li><i></i>14 dias grátis para experimentar</li>
+      </ul>
+      <a class="cta" href="cadastro.html">Começar o teste grátis</a>
+    </article>
+  </section>
+
+  <p class="note">O preço é por unidade de atendimento. Tem mais de um endereço? Cada um tem sua própria fila, seu QR e seu painel — e é cobrado separadamente.</p>
+
+  <section class="faq">
+    <div>
+      <h3>Preciso instalar alguma coisa?</h3>
+      <p>Não. O cliente escaneia o QR e a fila abre no navegador dele. Você usa o painel pelo computador do balcão ou pelo celular.</p>
+    </div>
+    <div>
+      <h3>O que acontece quando o teste acaba?</h3>
+      <p>A fila continua funcionando, só que no plano gratuito: até 50 entradas por dia e um balcão. Nada é apagado e você pode assinar quando quiser.</p>
+    </div>
+    <div>
+      <h3>Como cancelo?</h3>
+      <p>Pelo mesmo lugar onde você assinou, a qualquer momento. A unidade volta para o plano gratuito no fim do período já pago.</p>
+    </div>
+    <div>
+      <h3>Os dados dos meus clientes ficam guardados?</h3>
+      <p>Coletamos só o primeiro nome, e as senhas encerradas são apagadas automaticamente algumas horas depois do atendimento.</p>
+    </div>
+  </section>
+</main>
+
+<script src="config.js?v=7"></script>
+<script src="analytics.js?v=1"></script>
+<script src="chat.js?v=1" defer></script>
+<script>window.addEventListener("DOMContentLoaded",function(){FilaAnalytics.init({surface:"planos"});});</script>
+<script>
+(function() {
+  var API_BASE = window.FILA_API_BASE || "";
+  var slug = new URLSearchParams(location.search).get("venue") || "";
+  var prefix = slug ? "/api/venues/" + encodeURIComponent(slug) : "/api";
+  fetch(API_BASE + prefix + "/config").then(function(r) { return r.json(); }).then(function(config) {
+    var sub = config.monetization && config.monetization.subscription;
+    if (sub && sub.priceLabel) {
+      document.getElementById("price").innerHTML = sub.priceLabel + ' <small>/mês por unidade</small>';
+    }
+  }).catch(function() {});
+})();
+</script>
+</body>
+</html>

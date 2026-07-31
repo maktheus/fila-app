@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Criar minha fila — Fila Virtual</title>
+<meta name="theme-color" content="#f0efeb">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/mutum-design-system.css">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{background:var(--bg);color:var(--fg-1);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+  button,input{font:inherit}
+  button{cursor:pointer}
+  button:focus-visible,input:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+  .wrap{max-width:640px;margin:0 auto;padding:32px 22px 64px}
+  .brand{display:flex;align-items:center;gap:9px;margin-bottom:28px}
+  .brand img{width:24px;height:30px;object-fit:contain}
+  .brand strong{font-family:var(--font-display);font-size:14px;font-weight:600}
+  .eyebrow{font-family:var(--font-display);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--primary)}
+  h1{font-family:var(--font-display);font-weight:700;font-size:clamp(26px,5vw,34px);line-height:1.1;margin:6px 0 10px}
+  h2{font-family:var(--font-display);font-weight:700;font-size:20px;margin:0 0 6px}
+  p{font-size:15px;line-height:1.55;color:var(--fg-2);margin:0 0 18px}
+  form{display:grid;gap:16px;margin-top:26px}
+  label{display:grid;gap:6px;font-size:13px;font-weight:700;color:var(--fg-2)}
+  .field{width:100%;border:1px solid var(--border-strong);border-radius:12px;background:var(--surface);color:var(--fg-1);padding:14px 15px;outline:none}
+  .field:focus{border-color:var(--primary)}
+  .hint{font-size:12.5px;font-weight:500;color:var(--fg-3)}
+  .btn{appearance:none;border:0;border-radius:12px;padding:15px 16px;font-weight:700;font-size:15px;background:var(--primary);color:#fff}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--fg-1)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row .btn{flex:1;min-width:180px}
+  .alert{padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600}
+  .alert.error{background:color-mix(in oklch,var(--primary) 12%,transparent);border:1px solid color-mix(in oklch,var(--primary) 40%,transparent);color:var(--primary)}
+  .alert.ok{background:color-mix(in oklch,var(--mutum-leaf) 14%,transparent);border:1px solid color-mix(in oklch,var(--mutum-leaf) 40%,transparent);color:var(--mutum-forest)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;margin-top:22px}
+  .qr-box{display:grid;place-items:center;gap:12px;padding:18px;background:#fff;border-radius:14px;border:1px solid var(--border)}
+  .qr-box img{width:min(260px,100%);height:auto;image-rendering:pixelated}
+  .secret{font-family:var(--font-mono);font-size:19px;font-weight:600;letter-spacing:.04em;background:var(--bg);border:1px dashed var(--border-strong);border-radius:10px;padding:12px 14px;text-align:center;word-break:break-all}
+  dl{display:grid;gap:10px;margin:16px 0 0}
+  dt{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3)}
+  dd{margin:2px 0 0;font-size:14px;word-break:break-all}
+  dd a{color:var(--primary)}
+  .steps{counter-reset:step;display:grid;gap:12px;margin:18px 0 0;padding:0;list-style:none}
+  .steps li{counter-increment:step;display:grid;grid-template-columns:26px 1fr;gap:10px;font-size:14px;line-height:1.5;color:var(--fg-2)}
+  .steps li::before{content:counter(step);display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--primary);color:#fff;font-size:13px;font-weight:700}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="brand">
+    <img src="assets/mark-bird.svg" alt="">
+    <strong>Fila virtual</strong>
+  </div>
+
+  <section id="form-section">
+    <p class="eyebrow">Comece agora</p>
+    <h1>Crie a fila do seu estabelecimento</h1>
+    <p>Leva um minuto. No fim você recebe o QR code para imprimir no balcão e a senha do painel do operador — sem instalar nada. Os primeiros 14 dias vêm com tudo liberado; <a href="planos.html">veja os planos</a>.</p>
+
+    <form id="signup-form">
+      <label>
+        Nome do estabelecimento
+        <input class="field" id="name" name="name" required minlength="3" maxlength="80"
+               placeholder="Clínica Bom Retiro" autocomplete="organization">
+      </label>
+
+      <label>
+        Seu e-mail
+        <input class="field" id="contactEmail" type="email" maxlength="120"
+               placeholder="voce@suaclinica.com.br" autocomplete="email">
+        <span class="hint">Para avisos de cobrança e do fim do teste grátis.</span>
+      </label>
+
+      <label>
+        Como a equipe do balcão aparece no painel
+        <input class="field" id="operatorName" maxlength="40" placeholder="Equipe recepção">
+        <span class="hint">Opcional — o padrão é "Equipe balcão".</span>
+      </label>
+
+      <div>
+        <div class="row">
+          <button type="button" class="btn btn-ghost" id="locate">Usar minha localização atual</button>
+        </div>
+        <p class="hint" id="coords-hint" style="margin:8px 0 0">
+          A localização é o ponto de referência para o cliente poder passar a vez. Dá para configurar depois.
+        </p>
+      </div>
+
+      <div id="alert" class="alert error hidden" role="alert"></div>
+
+      <button class="btn" type="submit" id="submit">Criar minha fila</button>
+      <p class="hint" style="text-align:center">Ao criar a fila você concorda com os
+        <a href="termos.html">Termos de Uso</a> e a <a href="privacidade.html">Política de Privacidade</a>.</p>
+    </form>
+  </section>
+
+  <section id="result-section" class="hidden">
+    <p class="eyebrow">Tudo pronto</p>
+    <h1 id="result-title">Sua fila está no ar</h1>
+    <div class="alert ok">Guarde a senha abaixo: ela não será mostrada de novo.</div>
+
+    <div class="card">
+      <h2>Senha do operador</h2>
+      <p>Use no painel para chamar os clientes.</p>
+      <div class="secret" id="password"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-ghost" type="button" id="copy-password">Copiar senha</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>QR code do balcão</h2>
+      <p>Imprima e deixe visível no balcão. É por aqui que o cliente entra na fila.</p>
+      <div class="qr-box">
+        <img id="qr" alt="QR code para entrar na fila">
+      </div>
+      <div class="row" style="margin-top:14px">
+        <a class="btn" id="cartaz" href="#" data-ev="abrir_cartaz">Abrir cartaz para imprimir</a>
+        <a class="btn btn-ghost" id="download-qr" download="qr-fila.png" href="#">Baixar só o QR</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Seus links</h2>
+      <dl>
+        <dt>Painel do operador</dt>
+        <dd><a id="link-operador" href="#"></a></dd>
+        <dt>Telão da sala de espera</dt>
+        <dd><a id="link-telao" href="#"></a></dd>
+        <dt>Link direto da fila (o mesmo do QR)</dt>
+        <dd><a id="link-join" href="#"></a></dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h2>Próximos passos</h2>
+      <ol class="steps">
+        <li>Imprima o QR e cole no balcão, na altura dos olhos.</li>
+        <li>Abra o painel do operador e entre com a senha acima.</li>
+        <li>Se tiver uma TV na sala de espera, abra o telão nela.</li>
+        <li>Teste você mesmo: escaneie o QR e entre na fila.</li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<script src="config.js?v=6"></script>
+<script src="analytics.js?v=1"></script>
+<script>
+(function() {
+  var API_BASE = window.FILA_API_BASE || "";
+  var form = document.getElementById("signup-form");
+  var alertBox = document.getElementById("alert");
+  var submit = document.getElementById("submit");
+  var coords = { latitude: null, longitude: null };
+  FilaAnalytics.init({ surface: "cadastro" });
+  FilaAnalytics.watchForm(form, "cadastro");
+
+  function showAlert(message) {
+    alertBox.textContent = message;
+    alertBox.classList.remove("hidden");
+  }
+
+  function hideAlert() {
+    alertBox.classList.add("hidden");
+  }
+
+  document.getElementById("locate").addEventListener("click", function() {
+    var hint = document.getElementById("coords-hint");
+    if (!navigator.geolocation) {
+      hint.textContent = "Seu navegador não oferece localização. Dá para configurar depois.";
+      return;
+    }
+    hint.textContent = "Buscando sua localização...";
+    navigator.geolocation.getCurrentPosition(function(position) {
+      coords.latitude = position.coords.latitude;
+      coords.longitude = position.coords.longitude;
+      hint.textContent = "Localização registrada: " +
+        coords.latitude.toFixed(5) + ", " + coords.longitude.toFixed(5);
+    }, function() {
+      hint.textContent = "Não conseguimos a localização. Você pode configurar depois no painel.";
+    }, { enableHighAccuracy: true, timeout: 8000 });
+  });
+
+  form.addEventListener("submit", async function(event) {
+    event.preventDefault();
+    hideAlert();
+    submit.disabled = true;
+    submit.textContent = "Criando...";
+
+    try {
+      var res = await fetch(API_BASE + "/api/venues", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: document.getElementById("name").value,
+          contactEmail: document.getElementById("contactEmail").value,
+          operatorName: document.getElementById("operatorName").value,
+          latitude: coords.latitude,
+          longitude: coords.longitude
+        })
+      });
+      var data = await res.json();
+      if (!res.ok) {
+        FilaAnalytics.track("cadastro:recusado", { motivo: String(res.status) });
+        showAlert(data.error || "Não foi possível criar a fila.");
+        return;
+      }
+      FilaAnalytics.setVenue(data.venue.slug);
+      FilaAnalytics.track("cadastro:concluido");
+      mostrarResultado(data);
+    } catch (error) {
+      showAlert("Sem conexão com o servidor. Tente de novo em instantes.");
+    } finally {
+      submit.disabled = false;
+      submit.textContent = "Criar minha fila";
+    }
+  });
+
+  function mostrarResultado(data) {
+    var qrSrc = API_BASE + data.qrUrl;
+    document.getElementById("form-section").classList.add("hidden");
+    document.getElementById("result-section").classList.remove("hidden");
+    document.getElementById("result-title").textContent = data.venue.name + " está no ar";
+    document.getElementById("password").textContent = data.operatorPassword;
+    document.getElementById("qr").src = qrSrc;
+    document.getElementById("download-qr").href = qrSrc;
+    document.getElementById("cartaz").href = "cartaz.html?venue=" + encodeURIComponent(data.venue.slug);
+
+    setLink("link-operador", data.operatorUrl);
+    setLink("link-telao", data.telaoUrl);
+    setLink("link-join", data.joinUrl);
+
+    document.getElementById("copy-password").addEventListener("click", function() {
+      navigator.clipboard.writeText(data.operatorPassword).then(function() {
+        var btn = document.getElementById("copy-password");
+        btn.textContent = "Senha copiada";
+        setTimeout(function() { btn.textContent = "Copiar senha"; }, 2000);
+      }).catch(function() {});
+    });
+
+    document.getElementById("print-qr").addEventListener("click", function() {
+      window.print();
+    });
+
+    window.scrollTo(0, 0);
+  }
+
+  function setLink(id, href) {
+    var el = document.getElementById(id);
+    var absolute = /^https?:/.test(href) ? href : location.origin + href;
+    el.href = absolute;
+    el.textContent = absolute;
+  }
+})();
+</script>
+</body>
+</html>

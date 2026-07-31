@@ -1,12 +1,19 @@
-const CACHE_NAME = 'fila-app-v5';
+const CACHE_NAME = 'fila-app-v7';
 const APP_SHELL = [
   './',
+  'index.html',
   'cliente.html',
-  'operador.html',
   'telao.html',
   'landing.html',
+  'cadastro.html',
+  'planos.html',
+  'privacidade.html',
+  'termos.html',
+  'cartaz.html',
   'manifest.webmanifest',
   'ads.js',
+  'analytics.js',
+  'chat.js',
   'assets/mark-bird.svg',
   'assets/mutum-design-system.css',
   'assets/fila-cliente-qr.png'
@@ -33,11 +40,28 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fetch(event.request, { cache: 'no-store' }));
     return;
   }
+  const isHtml = event.request.mode === 'navigate' ||
+    url.pathname.endsWith('.html') ||
+    url.pathname.endsWith('/');
+
+  // HTML vai na rede primeiro: cache-first entregava telas antigas depois de
+  // cada deploy. Assets versionados continuam saindo do cache.
+  if (isHtml) {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => undefined);
+        return response;
+      }).catch(() => caches.match(event.request).then((cached) => cached || caches.match('index.html')))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
       const copy = response.clone();
       caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => undefined);
       return response;
-    }).catch(() => caches.match('cliente.html')))
+    }))
   );
 });

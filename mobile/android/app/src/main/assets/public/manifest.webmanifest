@@ -2,7 +2,7 @@
   "name": "Fila App",
   "short_name": "Fila App",
   "description": "Entre na fila, acompanhe sua posição e receba a chamada pelo celular.",
-  "start_url": "cliente.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
