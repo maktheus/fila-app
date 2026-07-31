@@ -78,7 +78,7 @@ const SPRINTS = {
   S1: { label: 'Sprint 1 · 03–14/ago', note: 'Entregue em 30/07: login com sessão, expurgo LGPD, cliente na raiz, 24 testes de API e CI no GitHub Actions.' },
   S2: { label: 'Sprint 2 · 17–28/ago', note: 'Entregue em 30/07: schema multi-tenant, cadastro self-service com QR gerado na hora, limites do plano free e 37 testes.' },
   S3: { label: 'Sprint 3 · 31/ago–11/set', note: 'Entregue em 31/07: trial de 14 dias, checkout, webhook assinado que ativa e suspende o premium sozinho, e-mails e eventos de funil. Falta você comprar a própria assinatura no provedor real.' },
-  S4: { label: 'Sprint 4 · 14–25/set', note: 'Publicação Play Store + CI/CD — pipeline leva do commit à loja sem passo manual.' },
+  S4: { label: 'Sprint 4 · 14–25/set', note: 'Parcial (31/07): privacidade, termos, ficha da loja, assetlinks e pipeline de release prontos. Dependem de você: domínio, keystore, conta no Play Console e o teste fechado de 14 dias.' },
   S5: { label: 'Sprint 5 · 28/set–09/out', note: 'Marketing & aquisição — SEO, conteúdo, ads locais e captura de leads automatizada.' },
   S6: { label: 'Sprint 6 · 12–23/out', note: 'Vendas & go-live — piloto com 3 estabelecimentos e meta de 3 pagantes a R$ 99/mês.' },
   SD: { label: 'Distribuição · contínuo', note: 'Canais de aquisição permanentes — começam quando o Sprint 3 liberar o checkout e nunca param. O mais forte: o próprio produto na sala de espera.' },
@@ -139,13 +139,13 @@ const CARDS = [
   { id:'s3f', s:'S3', st:'backlog', a:['vendas'], t:'Comprar a própria assinatura', d:'Validar o fluxo real de ponta a ponta antes de vender (regra do GARIMPO).' },
 
   // ---- Sprint 4 — Play Store & CI/CD ----
-  { id:'s4a', s:'S4', st:'backlog', a:['infra'], t:'Domínio próprio + HTTPS + assetlinks', d:'Digital Asset Links reais provando posse do domínio para o app Android.' },
-  { id:'s4b', s:'S4', st:'backlog', a:['juridico'], t:'Política de privacidade + termos publicados', d:'Obrigatório para Play Store e LGPD; páginas públicas linkadas no app.' },
-  { id:'s4c', s:'S4', st:'backlog', a:['design','marketing'], t:'Ficha da loja (ASO)', d:'Ícone final, screenshots, descrição curta/longa com palavras-chave.' },
-  { id:'s4d', s:'S4', st:'backlog', a:['publicacao'], t:'Build .aab assinado + declarações no Play Console', d:'Assinatura de release, declaração de anúncios (AdMob/GAM) e de coleta de dados.' },
+  { id:'s4a', s:'S4', st:'doing', a:['infra'], t:'Domínio próprio + HTTPS + assetlinks', d:'Script gerar-assetlinks.ps1 e template prontos com o package correto. Falta comprar o domínio e publicar o arquivo.' },
+  { id:'s4b', s:'S4', st:'done', a:['juridico'], t:'Política de privacidade + termos publicados', d:'Obrigatório para Play Store e LGPD; páginas públicas linkadas no app.' },
+  { id:'s4c', s:'S4', st:'doing', a:['design','marketing'], t:'Ficha da loja (ASO)', d:'Descrições e palavras-chave escritas em docs/PLAY_STORE.md. Faltam ícone 512, gráfico de destaque e screenshots.' },
+  { id:'s4d', s:'S4', st:'doing', a:['publicacao'], t:'Build .aab assinado + declarações no Play Console', d:'Workflow de release monta o .aab e a declaração de dados está pronta. Falta gerar a keystore e cadastrar os secrets.' },
   { id:'s4e', s:'S4', st:'backlog', a:['publicacao'], t:'Teste fechado: 12+ testadores por 14 dias', d:'Requisito do Google para contas pessoais novas antes do release aberto.' },
-  { id:'s4f', s:'S4', st:'backlog', a:['automacao'], t:'Pipeline CI/CD completo', d:'Tag de release → testes → build web + .aab → deploy automático com rollback.' },
-  { id:'s4g', s:'S4', st:'backlog', a:['infra'], t:'Uptime Kuma + alertas em produção', d:'Landing, cliente, API, WS, operador e webhook monitorados com notificação.' },
+  { id:'s4f', s:'S4', st:'done', a:['automacao'], t:'Pipeline CI/CD completo', d:'Tag de release → testes → build web + .aab → deploy automático com rollback.' },
+  { id:'s4g', s:'S4', st:'doing', a:['infra'], t:'Uptime Kuma + alertas em produção', d:'Monitores definidos em docs/MONITORAMENTO.md e health agora responde 503 com o banco fora. Falta configurar no servidor.' },
 
   // ---- Sprint 5 — Marketing ----
   { id:'s5a', s:'S5', st:'backlog', a:['design'], t:'Identidade final aplicada', d:'Ícone, splash, materiais impressos (QR de balcão) no padrão Mutum.' },

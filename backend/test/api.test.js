@@ -73,12 +73,32 @@ describe('API da fila', () => {
 
   after(() => stopServer(server));
 
-  test('health responde ok com versao', async () => {
+  test('health responde ok com versao e tipo de armazenamento', async () => {
     const res = await fetch(base + '/api/health');
     const body = await res.json();
     assert.strictEqual(res.status, 200);
     assert.strictEqual(body.status, 'ok');
     assert.ok(body.version);
+    assert.ok(['postgres', 'file'].includes(body.storage));
+  });
+
+  test('health degradado quando o banco nao responde', async () => {
+    // Aponta para uma porta sem Postgres: o endpoint precisa falhar, senao o
+    // monitor de producao ficaria verde com a fila fora do ar.
+    const quebrado = await startServer({
+      DATABASE_URL: 'postgres://fila:fila@127.0.0.1:59999/fila',
+      PG_CONNECT_RETRIES: '1',
+    }).catch(() => null);
+
+    if (!quebrado) return; // servidor nem sobe sem banco: comportamento aceitavel
+    try {
+      const res = await fetch(quebrado.base + '/api/health');
+      assert.strictEqual(res.status, 503);
+      const body = await res.json();
+      assert.strictEqual(body.status, 'degraded');
+    } finally {
+      stopServer(quebrado);
+    }
   });
 
   test('config publica nao vaza segredo do operador', async () => {

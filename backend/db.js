@@ -194,4 +194,10 @@ async function saveVenues(venues) {
   }
 }
 
-module.exports = { ensureSchema, loadVenues, saveVenues };
+async function ping() {
+  const started = Date.now();
+  await getPool().query('SELECT 1');
+  return Date.now() - started;
+}
+
+module.exports = { ensureSchema, loadVenues, saveVenues, ping };

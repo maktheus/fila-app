@@ -7,6 +7,8 @@ const APP_SHELL = [
   'landing.html',
   'cadastro.html',
   'planos.html',
+  'privacidade.html',
+  'termos.html',
   'manifest.webmanifest',
   'ads.js',
   'assets/mark-bird.svg',

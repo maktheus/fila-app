@@ -88,4 +88,11 @@ Checkout: **assinatura recorrente Pix via Cakto** (alternativas Stripe/Mercado P
 
 ## Próxima ação única
 
-**Sprint 4 — publicação** (`docs/kanban.html`): domínio próprio com HTTPS e assetlinks, política de privacidade e termos, ficha da loja, `.aab` assinado e teste fechado com 12 testadores. Em paralelo, **abrir a conta no provedor de pagamento** (Cakto ou Mercado Pago), apontar `PAYMENT_PROVIDER`/`CHECKOUT_BASE_URL`/`PAYMENT_WEBHOOK_SECRET` e comprar a própria assinatura para validar o fluxo real.
+**Destravar o que depende de conta externa.** O código do Sprint 4 está pronto (`docs/PLAY_STORE.md`, `docs/MONITORAMENTO.md`, workflow de release); o que falta são passos seus, nesta ordem:
+
+1. **Domínio + HTTPS** — sem ele não há assetlinks nem Play Store.
+2. **Keystore de release** — `keytool -genkeypair`, guardar em local seguro, cadastrar `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` e `ANDROID_KEY_PASSWORD` nos secrets do repo.
+3. **Conta no provedor de pagamento** (Cakto ou Mercado Pago) e compra da própria assinatura.
+4. **Play Console** — ficha (já escrita), declaração de dados (já preenchida no doc) e teste fechado com 12+ testadores por 14 dias.
+
+Enquanto isso corre, o **Sprint 5 (marketing)** pode andar em paralelo.

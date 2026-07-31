@@ -573,14 +573,26 @@ function broadcast(venue, event) {
 
 // --------------- Rotas globais ---------------
 
-app.get('/api/health', (_req, res) => {
-  res.json({
+// Health de verdade: se o Postgres nao responde, o endpoint falha. Um health
+// que responde ok com o banco fora nao serve para monitorar nada.
+app.get('/api/health', async (_req, res) => {
+  const base = {
     status: 'ok',
     uptime: process.uptime(),
     version: APP_VERSION,
     venues: venues.size,
     websocketClients: clients.size,
-  });
+    storage: USE_POSTGRES ? 'postgres' : 'file',
+  };
+
+  if (!USE_POSTGRES) return res.json(base);
+
+  try {
+    base.dbLatencyMs = await db.ping();
+    res.json(base);
+  } catch (error) {
+    res.status(503).json({ ...base, status: 'degraded', error: 'Banco de dados indisponivel.' });
+  }
 });
 
 // Cadastro self-service: cria a unidade e devolve a senha do operador uma

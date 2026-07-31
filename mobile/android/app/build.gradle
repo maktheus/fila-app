@@ -26,8 +26,9 @@ android {
         applicationId 'br.com.filaapp.cliente'
         minSdk 23
         targetSdk 35
-        versionCode 2
-        versionName '0.2.0'
+        // O workflow de release deriva ambos da tag (v1.2.3 -> 10203 / '1.2.3').
+        versionCode providers.gradleProperty('versionCodeOverride').map { it.toInteger() }.getOrElse(2)
+        versionName providers.gradleProperty('versionNameOverride').getOrElse('0.2.0')
 
         manifestPlaceholders = [
                 admobAppId: admobAppIdValue
@@ -37,6 +38,31 @@ android {
         buildConfigField 'String', 'CLIENT_ENTRY_URL', '"' + clientEntryUrlValue + '"'
         buildConfigField 'String', 'TRUSTED_HOST', '"' + trustedHostValue + '"'
         buildConfigField 'String', 'OFFLINE_ENTRY_URL', '"file:///android_asset/public/cliente.html?v=5&source=android&offline=1"'
+    }
+
+    // Assinatura de release: as credenciais vêm de propriedades do Gradle
+    // (no CI, dos secrets), nunca do repositório.
+    signingConfigs {
+        release {
+            def storeFilePath = providers.gradleProperty('FILA_KEYSTORE_FILE').orNull
+            if (storeFilePath) {
+                storeFile file(storeFilePath)
+                storePassword providers.gradleProperty('FILA_KEYSTORE_PASSWORD').orNull
+                keyAlias providers.gradleProperty('FILA_KEY_ALIAS').orNull
+                keyPassword providers.gradleProperty('FILA_KEY_PASSWORD').orNull
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // Sem keystore configurada o build sai não assinado, em vez de falhar
+            // com uma mensagem obscura do Gradle.
+            if (providers.gradleProperty('FILA_KEYSTORE_FILE').isPresent()) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+        }
     }
 
     buildFeatures {
