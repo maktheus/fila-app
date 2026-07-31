@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const guardrails = require('../chat/guardrails');
 const knowledge = require('../chat/knowledge');
 const tools = require('../chat/tools');
+const { portaLivre } = require('./porta');
 
 const FATOS = { precoMensal: 99, precoLabel: 'R$ 99,00', diasDeTeste: 14 };
 
@@ -90,6 +91,43 @@ describe('guardrails de saida', () => {
     const r = guardrails.validarSaida('Nós integramos com o seu prontuário eletrônico.', FATOS);
     assert.strictEqual(r.ok, false);
   });
+
+  // O primeiro nome de quem entra na fila E dado pessoal sob a LGPD. Dizer a um
+  // cliente que nao coletamos dado pessoal e declaracao falsa sobre tratamento —
+  // ele repassa ao paciente dele e a responsabilidade volta para nos.
+  // O qwen2.5:7b escreveu exatamente isso num teste real.
+  test('negar coleta de dado pessoal e barrado', () => {
+    const r = guardrails.validarSaida(
+      'Não armazenamos dados pessoais dos pacientes. Coletamos apenas o primeiro nome.',
+      FATOS,
+    );
+    assert.strictEqual(r.ok, false);
+    assert.ok(r.problemas.some(p => p.includes('dado pessoal')));
+    // A troca acompanha o assunto: responder preco a quem perguntou de LGPD
+    // seria seguro e inutil ao mesmo tempo.
+    assert.ok(r.texto.includes('primeiro nome'));
+    assert.ok(!r.texto.includes('R$ 99,00'));
+  });
+
+  test('promessa de anonimato total e barrada', () => {
+    assert.strictEqual(guardrails.validarSaida('O sistema é 100% anônimo.', FATOS).ok, false);
+  });
+
+  test('dispensar a LGPD e barrado nas duas ordens da frase', () => {
+    assert.strictEqual(guardrails.validarSaida('A LGPD não se aplica ao nosso caso.', FATOS).ok, false);
+    assert.strictEqual(
+      guardrails.validarSaida('Você não precisa se preocupar com a LGPD.', FATOS).ok,
+      false,
+    );
+  });
+
+  test('dizer a verdade sobre o que se coleta continua passando', () => {
+    const r = guardrails.validarSaida(
+      'Coletamos só o primeiro nome, apagado poucas horas depois do atendimento. Não pedimos CPF. A LGPD se aplica sim, e por isso coletamos o mínimo possível.',
+      FATOS,
+    );
+    assert.strictEqual(r.ok, true);
+  });
 });
 
 describe('recuperacao de conhecimento', () => {
@@ -158,7 +196,7 @@ describe('ferramentas contra a API', () => {
   let servidor;
 
   before(async () => {
-    const porta = 3600 + Math.floor(Math.random() * 200);
+    const porta = await portaLivre();
     const dataFile = path.join(os.tmpdir(), `fila-chat-${porta}.json`);
     servidor = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {
       env: {

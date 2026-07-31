@@ -130,4 +130,45 @@ function montarContexto(trechos) {
     .join('\n\n');
 }
 
-module.exports = { TRECHOS, recuperar, montarContexto, normalizar };
+// --------------- Privacidade: resposta exata, sem modelo ---------------
+//
+// Aqui o modelo sai do caminho de propósito.
+//
+// O que dizemos sobre tratamento de dado pessoal é declaração da empresa, e o
+// interlocutor é um dono de clínica que vai repassar isso ao paciente dele.
+// Rodando o qwen2.5:7b em cima deste mesmo trecho, ele inventou um prazo de
+// retenção ("24 horas") e uma finalidade que ninguém escreveu ("para
+// identificar rapidamente em caso de emergência"). Finalidade declarada é
+// exatamente o que a LGPD cobra.
+//
+// A resposta certa é curta, fixa e já está escrita. Não há fluência a ganhar
+// que compense o risco de reescrevê-la a cada pergunta — e de quebra sai em
+// milissegundos, sem token nenhum.
+const PERGUNTA_DE_PRIVACIDADE = [
+  /\bLGPD\b/i,
+  /\bdados?\s+(pessoa|sens[ií]ve|do[s]?\s+(paciente|cliente)|dele|deles)/i,
+  /\b(privacidade|anonimat|an[oô]nimo)\b/i,
+  /\b(guarda|armazena|coleta|salva|ret[eé]m|retem)m?\s+(o\s+|os\s+|que\s+|algum\s+|qual\s+)?(dad|nome|informa)/i,
+  /\b(o\s+que|quais|qual)\b[^?]{0,40}\b(coleta|guarda|armazena)/i,
+];
+
+function ehPerguntaDePrivacidade(pergunta) {
+  const texto = String(pergunta || '');
+  return PERGUNTA_DE_PRIVACIDADE.some(p => p.test(texto));
+}
+
+function respostaExataDePrivacidade() {
+  const trecho = TRECHOS.find(t => t.id === 'privacidade');
+  return trecho.texto +
+    '\n\nO primeiro nome é dado pessoal, então a LGPD se aplica sim — é por isso que ' +
+    'coletamos o mínimo e apagamos rápido. A política completa está em /privacidade.html.';
+}
+
+module.exports = {
+  TRECHOS,
+  recuperar,
+  montarContexto,
+  normalizar,
+  ehPerguntaDePrivacidade,
+  respostaExataDePrivacidade,
+};

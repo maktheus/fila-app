@@ -46,11 +46,19 @@ services:
       - TRIAL_DAYS=${TRIAL_DAYS:-14}
       - PAYMENT_PROVIDER=${PAYMENT_PROVIDER:-sandbox}
       - PAYMENT_WEBHOOK_SECRET=${PAYMENT_WEBHOOK_SECRET:-}
+      - CHAT_PROVIDER=${CHAT_PROVIDER:-local}
+      # O runtime local roda na maquina host, fora do compose. Dentro do
+      # container, "localhost" e o proprio container — por isso host.docker.internal.
+      - LOCAL_LLM_BASE=${LOCAL_LLM_BASE:-http://host.docker.internal:11434/v1}
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-qwen2.5:7b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - CHAT_MODEL=${CHAT_MODEL:-claude-opus-5}
       - CHAT_EFFORT=${CHAT_EFFORT:-low}
       - VENUE_NAME=Unidade Centro
       - OPERATOR_NAME=Equipe balcao
+    extra_hosts:
+      # No Docker Desktop ja existe; no Linux precisa desta linha.
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

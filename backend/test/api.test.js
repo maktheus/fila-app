@@ -5,6 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs');
 const analyticsModule = require('../analytics');
+const { portaLivre } = require('./porta');
 
 const SERVER = path.join(__dirname, '..', 'server.js');
 const PASSWORD = 'senha-de-teste';
@@ -12,7 +13,7 @@ const PASSWORD = 'senha-de-teste';
 // Sobe uma instancia isolada do servidor (persistencia em arquivo temporario,
 // sem Postgres) e espera o /api/health responder.
 async function startServer(extraEnv = {}) {
-  const port = 3100 + Math.floor(Math.random() * 400);
+  const port = await portaLivre();
   const dataFile = path.join(os.tmpdir(), `fila-test-${port}-${Date.now()}.json`);
   const child = spawn(process.execPath, [SERVER], {
     env: {

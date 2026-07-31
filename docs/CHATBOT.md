@@ -95,32 +95,101 @@ exatamente o que um agente conectado pode fazer.
 
 Transporte stdio; logs vão para stderr porque stdout é o canal do protocolo.
 
-## Modelo e custo
+## Dois provedores
 
-Roda em `claude-opus-5` com `effort: "low"`. Effort é o botão certo para
-latência num chat de site — não trocamos por um modelo menor. O bloco estável do
-prompt (papel + regras) fica em cache; o conhecimento recuperado entra depois do
-ponto de cache, porque varia a cada pergunta.
+O agente (`chat/agent.js`) não sabe qual modelo está do outro lado. `CHAT_PROVIDER`
+escolhe entre:
+
+| Provedor | Quando usar | Custo |
+|---|---|---|
+| `local` (padrão) | Operação normal. Modelo rodando na sua VPS | zero |
+| `claude` | Quando a qualidade da conversa justificar o gasto | por token |
+
+### Local
+
+`chat/providers/local.js` fala a API compatível com OpenAI em
+`/v1/chat/completions`. Um adaptador só cobre **Ollama, llama.cpp server, LM
+Studio, vLLM e text-generation-webui** — todos expõem esse mesmo endpoint. Não há
+SDK envolvido; é `fetch` puro, então nada de dependência nova.
+
+Subir com Ollama:
+
+```bash
+ollama pull qwen2.5:7b
+```
+
+O Ollama já serve `/v1` em `http://127.0.0.1:11434` junto com a API nativa. Para
+apontar o backend em Docker para o modelo rodando no host, o compose já usa
+`host.docker.internal` — dentro do container `localhost` é o próprio container.
+
+**Modelo pequeno segue instrução pior e chama ferramenta de forma menos
+confiável.** Duas adaptações para isso:
+
+1. Os números do plano entram direto no prompt, num bloco `<fatos>`, lidos do
+   sistema a cada pergunta. `consultar_planos` continua disponível, mas o modelo
+   não precisa acertar uma chamada de ferramenta para citar o preço certo.
+2. Argumento de ferramenta mal formado vira `{}` em vez de exceção — modelo
+   pequeno erra JSON, e derrubar a conversa por isso seria pior.
+
+Os guardrails de saída conferem tudo de novo, com o mesmo rigor nos dois
+provedores. **Eles são a rede, não o enfeite:** o teste
+`preco inventado pelo modelo local nao chega ao visitante` existe exatamente
+porque um modelo de 7B chuta preço.
+
+### Claude
+
+`claude-opus-5` com `effort: "low"`. Effort é o botão certo para latência num
+chat de site — não trocamos por um modelo menor. O bloco estável do prompt
+(papel + regras) fica em cache; o conhecimento recuperado entra depois do ponto
+de cache, porque varia a cada pergunta.
 
 `fallbacks: "default"` está ligado. Um classificador de segurança pode recusar
 uma pergunta legítima, e a recusa volta como **HTTP 200 com corpo vazio** — sem
 isso, o visitante veria uma resposta em branco. O código também checa
 `stop_reason` antes de ler o conteúdo.
 
-**Este é o único componente do produto com custo por uso.** Cada conversa gasta
-tokens. Vale acompanhar `chat:mensagem` e `chat:resposta` no painel de
+Com `local`, o chat deixa de ser o único componente com custo por uso. Ainda
+assim vale acompanhar `chat:mensagem` e `chat:resposta` no painel de
 comportamento e comparar com `venue_created` — se o chat não estiver puxando
-cadastro, é custo sem retorno.
+cadastro, é trabalho sem retorno.
+
+## Laboratório do vendedor
+
+`/laboratorio.html` — a tela para ver o que acontece por dentro. Pede senha de
+operador (`POST /api/chat/debug` é autenticado; nunca deixe essa rota aberta,
+ela expõe o prompt e o conteúdo recuperado).
+
+Mostra, a cada pergunta: provedor e modelo que responderam, quais trechos de
+conhecimento foram recuperados, quais ferramentas rodaram com entrada e saída,
+o veredito dos dois guardrails e — quando a resposta foi substituída — **o que o
+modelo tinha escrito antes da substituição**, lado a lado com o que o visitante
+recebeu.
+
+A **bateria de testes** roda seis casos de uma vez, cada um verificando um
+comportamento que não pode regredir: preço vindo do sistema, assunto médico
+recusado sem chamar o modelo, CPF mascarado antes do prompt, injeção sinalizada
+sem bloquear, recuperação trazendo o trecho certo e demonstração criando fila de
+verdade. O veredito olha o **diagnóstico**, não o texto da resposta — modelo
+pequeno varia a redação, mas o comportamento tem que se manter.
+
+`GET /api/chat/provedores` diz o que está no ar; a tela avisa quando o runtime
+local não responde ou quando o modelo configurado não está baixado.
 
 ## Variáveis
 
 | Variável | Padrão | Para quê |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | — | Sem ela o widget responde que está fora do ar e aponta para o cadastro |
-| `CHAT_MODEL` | `claude-opus-5` | Modelo |
+| `CHAT_PROVIDER` | `local` | `local` ou `claude` |
+| `LOCAL_LLM_BASE` | `http://127.0.0.1:11434/v1` | Endpoint compatível com OpenAI |
+| `LOCAL_LLM_MODEL` | `qwen2.5:7b` | Modelo a pedir ao runtime |
+| `LOCAL_LLM_TIMEOUT_MS` | `90000` | Teto de espera (CPU sem GPU é lento) |
+| `LOCAL_LLM_TEMPERATURE` | `0.3` | Baixa de propósito: é venda, não criação |
+| `LOCAL_LLM_API_KEY` | — | Só se o runtime exigir (LM Studio, vLLM) |
+| `ANTHROPIC_API_KEY` | — | Só para `CHAT_PROVIDER=claude` |
+| `CHAT_MODEL` | `claude-opus-5` | Modelo do provedor `claude` |
 | `CHAT_EFFORT` | `low` | Profundidade de raciocínio |
 | `CHAT_MAX_TOKENS` | `1200` | Teto por resposta |
-| `CHAT_MAX_TOOL_TURNS` | `4` | Voltas de ferramenta por pergunta |
+| `CHAT_MAX_TOOL_TURNS` | `3` | Voltas de ferramenta por pergunta |
 | `CHAT_MAX_DEMOS_HORA` | `10` | Teto de demonstrações criadas |
 | `RATE_LIMIT_CHAT` | `12` | Mensagens por minuto por IP |
 | `CHAT_API_BASE` | `http://127.0.0.1:3000` | API que as ferramentas consultam |

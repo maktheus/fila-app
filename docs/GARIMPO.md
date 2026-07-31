@@ -47,6 +47,9 @@ As 3 telas do MVP (protótipo `project/Fila Virtual.dc.html` é a fonte visual):
 | 3 | ✅ **Auth do admin + hardening** (Sprint 1, 30/07) | login com sessão expirável, CORS por env, rate limit por IP real, expurgo LGPD, nomes só para o operador, cliente na raiz, 24 testes + CI |
 | 4 | ✅ **Persistência + multi-unidade** (Sprint 2, 30/07) | Postgres via Docker, schema multi-tenant, cadastro self-service (`cadastro.html` → `POST /api/venues`), QR PNG gerado por unidade, limites do plano free aplicados, expurgo LGPD |
 | 5 | ✅ **Monetização B2B** (Sprint 3, 31/07) | trial de 14 dias, checkout com adapter de provedor, webhook HMAC idempotente que ativa/suspende o premium, e-mails transacionais, eventos de funil, `planos.html`. **Pendente de você**: abrir conta no provedor e comprar a própria assinatura |
+| 6 | ✅ **Publicação e marketing** (Sprints 4 e 5, 31/07) | política de privacidade e termos, ficha da Play Store, assetlinks, workflow de release `.aab`, monitores Uptime Kuma, SEO da landing, captura de leads, cartaz do balcão |
+| 7 | ✅ **Observabilidade de comportamento** (31/07) | `frontend/analytics.js` + tabela `analytics_events`, funil por sessão, detecção de rage-click e abandono de formulário, painel `analitico.html` mostrando onde o usuário desiste |
+| 8 | ✅ **Vendedor automático** (31/07) | chatbot com RAG lexical, guardrails em três camadas, 4 ferramentas ligadas à API real, servidor MCP, **modelo local (Ollama/qwen2.5:7b) como padrão — custo zero**, e `laboratorio.html` para ver o que acontece por dentro. Detalhes em `docs/CHATBOT.md` |
 
 ### Prompt de construção do Bloco 1 (planejar com Opus, executar com Sonnet)
 

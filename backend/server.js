@@ -680,21 +680,55 @@ app.post('/api/webhooks/payments', (req, res) => {
 const chatAgent = require('./chat/agent');
 const chatLimiter = createRateLimit(60 * 1000, Number(process.env.RATE_LIMIT_CHAT || 12));
 
+function fatosDoPlano() {
+  const venue = venues.get(DEFAULT_SLUG);
+  const assinatura = billing.subscriptionView(venue);
+  return {
+    precoMensal: billing.PRICE_CENTS / 100,
+    precoLabel: assinatura.priceLabel,
+    diasDeTeste: billing.TRIAL_DAYS,
+    limiteDiario: FREE_LIMITS.dailyTickets,
+    balcoes: FREE_LIMITS.counters,
+  };
+}
+
+// Estado dos provedores — o laboratório usa para dizer o que está no ar.
+app.get('/api/chat/provedores', async (_req, res) => {
+  const local = await chatAgent.verificarLocal();
+  res.json({
+    padrao: chatAgent.PROVEDOR,
+    local,
+    claude: { configurado: chatAgent.configurado('claude') },
+  });
+});
+
+// Mesma execução do chat, mas devolvendo o que aconteceu por dentro:
+// trechos recuperados, chamadas de ferramenta e veredito dos guardrails.
+app.post('/api/chat/debug', chatLimiter, requireAnalyticsAuth, async (req, res) => {
+  const body = req.body || {};
+  try {
+    const resultado = await chatAgent.responder({
+      mensagem: body.message,
+      historico: Array.isArray(body.history) ? body.history.slice(-20) : [],
+      fatos: fatosDoPlano(),
+      provedor: body.provider,
+    });
+    res.json({ resposta: resultado.resposta, diagnostico: resultado.diagnostico });
+  } catch (error) {
+    res.status(503).json({ error: error.message });
+  }
+});
+
 app.post('/api/chat', chatLimiter, async (req, res) => {
   const body = req.body || {};
   const historico = Array.isArray(body.history) ? body.history.slice(-20) : [];
 
   try {
-    const venue = venues.get(DEFAULT_SLUG);
-    const assinatura = billing.subscriptionView(venue);
     const resultado = await chatAgent.responder({
       mensagem: body.message,
       historico,
-      fatos: {
-        precoMensal: billing.PRICE_CENTS / 100,
-        precoLabel: assinatura.priceLabel,
-        diasDeTeste: billing.TRIAL_DAYS,
-      },
+      fatos: fatosDoPlano(),
+      provedor: body.provider,
     });
 
     notify.track('chat:resposta', {
