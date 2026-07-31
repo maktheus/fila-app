@@ -47,6 +47,20 @@ const TEMPLATES = {
       `A fila continua funcionando por enquanto. Atualize o pagamento para não voltar ao plano gratuito.`,
     ].join('\n'),
   }),
+  lead_received: (v) => ({
+    subject: 'Recebemos seu contato — Fila Virtual',
+    body: [
+      `Olá! Recebemos seu interesse na Fila Virtual.`,
+      ``,
+      `Você não precisa esperar: dá para criar sua fila agora, em um minuto, e sair`,
+      `com o QR do balcão pronto para imprimir. São 14 dias com tudo liberado.`,
+      ``,
+      `${v.signupUrl}`,
+      ``,
+      `Se preferir conversar antes, é só responder este e-mail.`,
+    ].join('\n'),
+  }),
+
   subscription_canceled: (v) => ({
     subject: `${v.name}: assinatura cancelada`,
     body: [

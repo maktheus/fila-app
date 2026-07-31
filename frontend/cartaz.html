@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Cartaz do balcão — Fila Virtual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/mutum-design-system.css">
+<style>
+  @page{size:A4 portrait;margin:0}
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#dedbd3;font-family:var(--font-body);color:var(--mutum-ink);-webkit-font-smoothing:antialiased}
+
+  .toolbar{max-width:210mm;margin:0 auto;padding:18px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .toolbar p{margin:0;flex:1;min-width:220px;font-size:13.5px;color:var(--mutum-slate)}
+  .toolbar button,.toolbar a{border:1px solid var(--mutum-bone);background:#fff;color:var(--mutum-ink);font:inherit;font-size:13px;font-weight:700;padding:9px 16px;border-radius:99px;cursor:pointer;text-decoration:none}
+  .toolbar .primary{background:var(--mutum-red);border-color:var(--mutum-red);color:#fff}
+
+  .sheet{width:210mm;min-height:297mm;margin:0 auto 30px;background:#fff;padding:22mm 18mm;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(25,25,25,.14)}
+  .head{display:flex;align-items:center;gap:10px}
+  .head img{width:16mm;height:auto}
+  .head small{display:block;font-family:var(--font-display);font-size:3.4mm;font-weight:700;text-transform:uppercase;letter-spacing:.16em;color:var(--mutum-stone)}
+  .head strong{display:block;font-family:var(--font-display);font-size:6mm;font-weight:700}
+
+  h1{font-family:var(--font-display);font-weight:700;font-size:16mm;line-height:1.02;letter-spacing:-.02em;margin:14mm 0 4mm}
+  h1 em{font-style:normal;color:var(--mutum-red)}
+  .sub{font-size:5.2mm;line-height:1.4;color:var(--mutum-slate);margin:0 0 8mm;max-width:150mm}
+
+  .qr-area{display:flex;align-items:center;gap:12mm;padding:10mm;border:1.2mm solid var(--mutum-ink);border-radius:8mm}
+  .qr-area img{width:72mm;height:72mm;display:block}
+  .steps{list-style:none;margin:0;padding:0;counter-reset:s;display:grid;gap:5mm}
+  .steps li{counter-increment:s;display:grid;grid-template-columns:9mm 1fr;gap:4mm;align-items:start;font-size:5mm;line-height:1.32}
+  .steps li::before{content:counter(s);display:grid;place-items:center;width:9mm;height:9mm;border-radius:50%;background:var(--mutum-red);color:#fff;font-family:var(--font-display);font-weight:700;font-size:4.6mm}
+
+  .foot{margin-top:auto;padding-top:8mm;border-top:.5mm solid var(--mutum-bone);display:flex;align-items:flex-end;gap:8mm}
+  .foot .venue{flex:1}
+  .foot .venue span{display:block;font-size:3.6mm;text-transform:uppercase;letter-spacing:.14em;color:var(--mutum-stone);font-weight:700}
+  .foot .venue strong{display:block;font-family:var(--font-display);font-size:6.5mm;margin-top:1.5mm}
+  .foot .note{font-size:3.8mm;color:var(--mutum-stone);text-align:right;line-height:1.4;max-width:70mm}
+
+  .erro{max-width:210mm;margin:40px auto;padding:24px;background:#fff;border-radius:16px;text-align:center;color:var(--mutum-slate)}
+
+  @media print{
+    body{background:#fff}
+    .toolbar{display:none}
+    .sheet{margin:0;box-shadow:none;width:auto;min-height:auto}
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <p>Imprima em A4 e cole no balcão, na altura dos olhos. Papel comum resolve; se puder, plastifique.</p>
+  <button class="primary" id="print">Imprimir</button>
+  <a id="voltar" href="cadastro.html">Voltar</a>
+</div>
+
+<main class="sheet" id="sheet" hidden>
+  <div class="head">
+    <img src="assets/mark-bird.svg" alt="">
+    <div>
+      <small>Fila virtual</small>
+      <strong>Entre na fila pelo celular</strong>
+    </div>
+  </div>
+
+  <h1>Não fique <em>de pé</em><br>esperando.</h1>
+  <p class="sub">Aponte a câmera do seu celular para o código abaixo. Você entra na fila, acompanha a sua vez e pode esperar onde quiser.</p>
+
+  <div class="qr-area">
+    <img id="qr" alt="QR code para entrar na fila">
+    <ol class="steps">
+      <li>Abra a câmera do celular</li>
+      <li>Aponte para o código ao lado</li>
+      <li>Digite o seu primeiro nome</li>
+      <li>Acompanhe a sua vez pela tela</li>
+    </ol>
+  </div>
+
+  <div class="foot">
+    <div class="venue">
+      <span>Você está em</span>
+      <strong id="venue-name">—</strong>
+    </div>
+    <p class="note">Não precisa instalar nada.<br>Pedimos só o seu primeiro nome.</p>
+  </div>
+</main>
+
+<div class="erro" id="erro" hidden></div>
+
+<script src="config.js?v=7"></script>
+<script>
+(function() {
+  var API_BASE = window.FILA_API_BASE || "";
+  var slug = new URLSearchParams(location.search).get("venue") || "";
+  var prefix = slug ? "/api/venues/" + encodeURIComponent(slug) : "/api";
+  var sheet = document.getElementById("sheet");
+  var erro = document.getElementById("erro");
+
+  document.getElementById("print").addEventListener("click", function() { window.print(); });
+  if (slug) {
+    document.getElementById("voltar").href = "operador.html?venue=" + encodeURIComponent(slug);
+  }
+
+  fetch(API_BASE + prefix + "/config")
+    .then(function(res) {
+      if (!res.ok) throw new Error("unidade");
+      return res.json();
+    })
+    .then(function(config) {
+      document.getElementById("venue-name").textContent = config.venue.name;
+      document.getElementById("qr").src = API_BASE + prefix + "/qr.png?size=640";
+      sheet.hidden = false;
+    })
+    .catch(function() {
+      erro.hidden = false;
+      erro.textContent = slug
+        ? "Não encontramos a unidade “" + slug + "”. Confira o link no painel do operador."
+        : "Abra este cartaz a partir do painel da sua unidade, para ele trazer o QR correto.";
+    });
+})();
+</script>
+</body>
+</html>

@@ -484,6 +484,66 @@ describe('limites do plano free', () => {
   });
 });
 
+describe('captura de leads', () => {
+  let server;
+  let base;
+
+  before(async () => {
+    server = await startServer({ RATE_LIMIT_LEADS: '50' });
+    base = server.base;
+  });
+
+  after(() => stopServer(server));
+
+  function enviarLead(payload) {
+    return fetch(base + '/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  test('lead valido e aceito e devolve o caminho de autoatendimento', async () => {
+    const res = await enviarLead({ name: 'Carla', email: 'carla@lab.com.br', segment: 'laboratorio' });
+    const body = await res.json();
+    assert.strictEqual(res.status, 201);
+    assert.ok(body.signupUrl.includes('cadastro.html'));
+  });
+
+  test('recusa e-mail invalido', async () => {
+    const res = await enviarLead({ name: 'Carla', email: 'nao-e-email' });
+    assert.strictEqual(res.status, 400);
+  });
+
+  test('recusa nome vazio', async () => {
+    const res = await enviarLead({ name: '', email: 'ok@exemplo.com' });
+    assert.strictEqual(res.status, 400);
+  });
+
+  test('lista de leads exige operador autenticado', async () => {
+    const res = await fetch(base + '/api/leads');
+    assert.strictEqual(res.status, 401);
+  });
+
+  test('rate limit corta enxurrada de envios', async () => {
+    const limitado = await startServer({ RATE_LIMIT_LEADS: '2' });
+    try {
+      const status = [];
+      for (let i = 0; i < 4; i++) {
+        const res = await fetch(limitado.base + '/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Teste' + i, email: `t${i}@exemplo.com` }),
+        });
+        status.push(res.status);
+      }
+      assert.ok(status.includes(429), 'nunca respondeu 429: ' + status.join(','));
+    } finally {
+      stopServer(limitado);
+    }
+  });
+});
+
 describe('assinatura e cobranca', () => {
   let server;
   let base;

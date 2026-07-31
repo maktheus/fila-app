@@ -121,8 +121,8 @@
         <img id="qr" alt="QR code para entrar na fila">
       </div>
       <div class="row" style="margin-top:14px">
-        <a class="btn btn-ghost" id="download-qr" download="qr-fila.png" href="#">Baixar QR em PNG</a>
-        <button class="btn btn-ghost" type="button" id="print-qr">Imprimir</button>
+        <a class="btn" id="cartaz" href="#">Abrir cartaz para imprimir</a>
+        <a class="btn btn-ghost" id="download-qr" download="qr-fila.png" href="#">Baixar só o QR</a>
       </div>
     </div>
 
@@ -225,6 +225,7 @@
     document.getElementById("password").textContent = data.operatorPassword;
     document.getElementById("qr").src = qrSrc;
     document.getElementById("download-qr").href = qrSrc;
+    document.getElementById("cartaz").href = "cartaz.html?venue=" + encodeURIComponent(data.venue.slug);
 
     setLink("link-operador", data.operatorUrl);
     setLink("link-telao", data.telaoUrl);

@@ -8,6 +8,66 @@
 <meta property="og:title" content="Fila Virtual — Atendimento real, sem fila na porta">
 <meta property="og:description" content="O paciente entra na fila pelo QR Code, sem baixar nada. Você gerencia tudo em tempo real. Teste grátis 14 dias.">
 <meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="Fila Virtual">
+<meta property="og:image" content="assets/dashboard.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Fila Virtual — Atendimento real, sem fila na porta">
+<meta name="twitter:description" content="O cliente entra na fila pelo QR Code, sem baixar nada. Você gerencia tudo em tempo real.">
+<meta name="twitter:image" content="assets/dashboard.png">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="author" content="Fila Virtual">
+<link rel="canonical" href="landing.html">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Fila Virtual",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web, Android",
+      "description": "Fila virtual por QR code para clínicas, laboratórios e serviços: o cliente entra na fila pelo navegador, acompanha a posição em tempo real e pode passar a vez.",
+      "inLanguage": "pt-BR",
+      "offers": [
+        { "@type": "Offer", "name": "Gratuito", "price": "0", "priceCurrency": "BRL" },
+        {
+          "@type": "Offer",
+          "name": "Premium",
+          "price": "99.00",
+          "priceCurrency": "BRL",
+          "description": "Por unidade de atendimento, por mês. 14 dias de teste grátis."
+        }
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "O cliente precisa instalar algum aplicativo?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Não. Ele escaneia o QR code do balcão e a fila abre no navegador do próprio celular." }
+        },
+        {
+          "@type": "Question",
+          "name": "Preciso de totem ou impressora de senha?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Não. Basta um QR code impresso no balcão e um computador ou celular para o painel do operador." }
+        },
+        {
+          "@type": "Question",
+          "name": "Quanto custa a fila virtual?",
+          "acceptedAnswer": { "@type": "Answer", "text": "São 14 dias de teste com tudo liberado. Depois há um plano gratuito com limite diário e o plano premium por R$ 99 por mês por unidade, sem fidelidade." }
+        },
+        {
+          "@type": "Question",
+          "name": "Que dados dos clientes são coletados?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Apenas o primeiro nome, apagado automaticamente poucas horas após o atendimento. Não pedimos CPF, telefone nem dados de saúde." }
+        }
+      ]
+    }
+  ]
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -178,6 +238,19 @@
   .final h2{font-family:var(--font-display);font-weight:700;font-size:clamp(26px,3.6vw,38px);letter-spacing:-0.02em;position:relative}
   .final p{color:rgba(240,239,235,0.65);margin-top:14px;font-size:16px;position:relative}
   .final .btn{margin-top:30px;position:relative}
+
+  .lead-form{position:relative;max-width:520px;margin:38px auto 0;padding-top:30px;border-top:1px solid rgba(240,239,235,0.16);display:grid;gap:12px}
+  .lead-form-title{margin:0 0 2px;font-family:var(--font-display);font-weight:600;font-size:16px;color:var(--cream)}
+  .lead-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:560px){.lead-row{grid-template-columns:1fr}}
+  .lead-field{width:100%;padding:13px 14px;border-radius:11px;border:1px solid rgba(240,239,235,0.22);background:rgba(240,239,235,0.06);color:var(--cream);font:inherit;font-size:15px}
+  .lead-field::placeholder{color:rgba(240,239,235,0.45)}
+  .lead-field:focus{outline:2px solid var(--coral);outline-offset:1px;border-color:transparent}
+  .lead-field option{color:var(--ink)}
+  .lead-form .btn{margin-top:4px;width:100%}
+  .lead-note{margin:0;font-size:13px;color:rgba(240,239,235,0.6)}
+  .lead-note.erro{color:#F5A5A1}
+  .lead-note.ok{color:#8FD3AC}
 
   /* footer */
   footer{padding:44px 0 56px;color:var(--stone);font-size:13px}
@@ -763,6 +836,27 @@ if ('serviceWorker' in navigator) {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
         Quero testar grátis — chamar no WhatsApp
       </a>
+
+      <form class="lead-form" id="lead-form">
+        <p class="lead-form-title">Prefere que a gente entre em contato?</p>
+        <div class="lead-row">
+          <input class="lead-field" id="lead-name" name="name" placeholder="Seu nome" required minlength="2" maxlength="80" autocomplete="name">
+          <input class="lead-field" id="lead-email" name="email" type="email" placeholder="Seu e-mail" required maxlength="120" autocomplete="email">
+        </div>
+        <div class="lead-row">
+          <input class="lead-field" id="lead-phone" name="phone" type="tel" placeholder="WhatsApp (opcional)" maxlength="24" autocomplete="tel">
+          <select class="lead-field" id="lead-segment" name="segment">
+            <option value="">Tipo de estabelecimento</option>
+            <option value="clinica">Clínica ou consultório</option>
+            <option value="laboratorio">Laboratório</option>
+            <option value="cartorio">Cartório</option>
+            <option value="barbearia">Barbearia ou salão</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" type="submit" id="lead-submit">Quero falar com alguém</button>
+        <p class="lead-note" id="lead-note">Sem compromisso. Respondemos em até um dia útil.</p>
+      </form>
     </div>
   </div>
 </section>
@@ -1082,6 +1176,56 @@ if ('serviceWorker' in navigator) {
       });
     });
   }
+})();
+</script>
+
+<script>
+// Captura de leads: o formulário responde na hora e já oferece o autoatendimento.
+(function() {
+  var form = document.getElementById('lead-form');
+  if (!form) return;
+  var note = document.getElementById('lead-note');
+  var submit = document.getElementById('lead-submit');
+  var API_BASE = window.FILA_API_BASE || '';
+  var padrao = note.textContent;
+
+  form.addEventListener('submit', async function(event) {
+    event.preventDefault();
+    note.className = 'lead-note';
+    note.textContent = padrao;
+    submit.disabled = true;
+    submit.textContent = 'Enviando...';
+
+    try {
+      var res = await fetch(API_BASE + '/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('lead-name').value,
+          email: document.getElementById('lead-email').value,
+          phone: document.getElementById('lead-phone').value,
+          segment: document.getElementById('lead-segment').value,
+          source: 'landing'
+        })
+      });
+      var data = await res.json();
+      if (!res.ok) {
+        note.className = 'lead-note erro';
+        note.textContent = data.error || 'Não foi possível enviar. Tente de novo.';
+        return;
+      }
+      form.reset();
+      note.className = 'lead-note ok';
+      note.innerHTML = 'Recebemos seu contato. Se quiser adiantar, ' +
+        '<a href="cadastro.html" style="color:inherit;text-decoration:underline">crie sua fila agora</a>.';
+    } catch (error) {
+      note.className = 'lead-note erro';
+      note.textContent = 'Sem conexão no momento. Tente pelo WhatsApp acima.';
+    } finally {
+      submit.disabled = false;
+      submit.textContent = 'Quero falar com alguém';
+    }
+  });
 })();
 </script>
 

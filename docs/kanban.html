@@ -79,7 +79,7 @@ const SPRINTS = {
   S2: { label: 'Sprint 2 · 17–28/ago', note: 'Entregue em 30/07: schema multi-tenant, cadastro self-service com QR gerado na hora, limites do plano free e 37 testes.' },
   S3: { label: 'Sprint 3 · 31/ago–11/set', note: 'Entregue em 31/07: trial de 14 dias, checkout, webhook assinado que ativa e suspende o premium sozinho, e-mails e eventos de funil. Falta você comprar a própria assinatura no provedor real.' },
   S4: { label: 'Sprint 4 · 14–25/set', note: 'Parcial (31/07): privacidade, termos, ficha da loja, assetlinks e pipeline de release prontos. Dependem de você: domínio, keystore, conta no Play Console e o teste fechado de 14 dias.' },
-  S5: { label: 'Sprint 5 · 28/set–09/out', note: 'Marketing & aquisição — SEO, conteúdo, ads locais e captura de leads automatizada.' },
+  S5: { label: 'Sprint 5 · 28/set–09/out', note: 'Parcial (31/07): SEO, captura de leads e cartaz do balcão prontos. Conteúdo e campanha escritos em docs/MARKETING.md, faltando gravar e publicar.' },
   S6: { label: 'Sprint 6 · 12–23/out', note: 'Vendas & go-live — piloto com 3 estabelecimentos e meta de 3 pagantes a R$ 99/mês.' },
   SD: { label: 'Distribuição · contínuo', note: 'Canais de aquisição permanentes — começam quando o Sprint 3 liberar o checkout e nunca param. O mais forte: o próprio produto na sala de espera.' },
 };
@@ -148,12 +148,12 @@ const CARDS = [
   { id:'s4g', s:'S4', st:'doing', a:['infra'], t:'Uptime Kuma + alertas em produção', d:'Monitores definidos em docs/MONITORAMENTO.md e health agora responde 503 com o banco fora. Falta configurar no servidor.' },
 
   // ---- Sprint 5 — Marketing ----
-  { id:'s5a', s:'S5', st:'backlog', a:['design'], t:'Identidade final aplicada', d:'Ícone, splash, materiais impressos (QR de balcão) no padrão Mutum.' },
-  { id:'s5b', s:'S5', st:'backlog', a:['marketing'], t:'SEO da landing', d:'"fila virtual clínica", "senha por QR code"… páginas indexáveis por segmento.' },
-  { id:'s5c', s:'S5', st:'backlog', a:['marketing'], t:'Vídeo demo de 60s', d:'Fluxo real: escaneou → entrou → saiu para tomar café → foi chamado.' },
-  { id:'s5d', s:'S5', st:'backlog', a:['marketing'], t:'Perfis + 3 conteúdos de lançamento', d:'Instagram e Google Business; reels/posts do problema → solução.' },
-  { id:'s5e', s:'S5', st:'backlog', a:['marketing'], t:'Campanha Google Ads local', d:'Manaus primeiro; criativos por segmento (clínica, laboratório, cartório).' },
-  { id:'s5f', s:'S5', st:'backlog', a:['automacao','marketing'], t:'Captura de leads automatizada', d:'Formulário na landing → e-mail automático com link de demo + follow-up.' },
+  { id:'s5a', s:'S5', st:'doing', a:['design'], t:'Identidade final aplicada', d:'Cartaz A4 do balcão pronto (cartaz.html, com o QR real da unidade). Faltam ícone 512 e splash do app.' },
+  { id:'s5b', s:'S5', st:'done', a:['marketing'], t:'SEO da landing', d:'Meta, Open Graph, JSON-LD (SoftwareApplication + FAQ), canonical, sitemap.xml e robots. Falta o domínio para publicar.' },
+  { id:'s5c', s:'S5', st:'doing', a:['marketing'], t:'Vídeo demo de 60s', d:'Roteiro cena a cena em docs/MARKETING.md, com versão curta de 15s para anúncio. Falta gravar.' },
+  { id:'s5d', s:'S5', st:'doing', a:['marketing'], t:'Perfis + 3 conteúdos de lançamento', d:'Os três conteúdos escritos em docs/MARKETING.md. Falta criar os perfis e publicar.' },
+  { id:'s5e', s:'S5', st:'doing', a:['marketing'], t:'Campanha Google Ads local', d:'Estrutura, palavras-chave, negativas e criativos em docs/MARKETING.md. Falta criar a conta e subir.' },
+  { id:'s5f', s:'S5', st:'done', a:['automacao','marketing'], t:'Captura de leads automatizada', d:'POST /api/leads com validação e rate limit, formulário na landing e e-mail automático oferecendo o autoatendimento.' },
 
   // ---- Sprint 6 — Vendas & Go-live ----
   { id:'s6a', s:'S6', st:'backlog', a:['vendas'], t:'Lista de 50 estabelecimentos-alvo', d:'Clínicas, laboratórios e serviços de bairro em Manaus, com contato.' },

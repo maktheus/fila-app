@@ -1,4 +1,9 @@
 User-agent: *
 Disallow: /operador.html
 Disallow: /telao.html
+Disallow: /checkout-sandbox.html
+Disallow: /cartaz.html
 Allow: /
+
+# Troque SEU-DOMINIO antes de publicar.
+Sitemap: https://SEU-DOMINIO/sitemap.xml

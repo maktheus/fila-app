@@ -9,6 +9,7 @@ const APP_SHELL = [
   'planos.html',
   'privacidade.html',
   'termos.html',
+  'cartaz.html',
   'manifest.webmanifest',
   'ads.js',
   'assets/mark-bird.svg',

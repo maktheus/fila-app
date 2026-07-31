@@ -674,6 +674,48 @@ app.post('/api/webhooks/payments', (req, res) => {
   res.json({ ok: true, plan: venue.plan, status: venue.subscription.status });
 });
 
+// --------------- Leads ---------------
+
+const leads = [];
+const leadLimiter = createRateLimit(60 * 60 * 1000, Number(process.env.RATE_LIMIT_LEADS || 10));
+
+app.post('/api/leads', leadLimiter, (req, res) => {
+  const body = req.body || {};
+  const name = String(body.name || '').trim().slice(0, 80);
+  const email = String(body.email || '').trim().slice(0, 120);
+  const phone = String(body.phone || '').replace(/[^\d+\s()-]/g, '').slice(0, 24);
+  const segment = String(body.segment || '').trim().slice(0, 40);
+
+  if (name.length < 2) return res.status(400).json({ error: 'Informe seu nome.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return res.status(400).json({ error: 'Informe um e-mail válido.' });
+  }
+
+  const lead = { name, email, phone, segment, at: Date.now(), source: String(body.source || 'landing').slice(0, 40) };
+  leads.push(lead);
+  if (leads.length > 1000) leads.shift();
+
+  notify.track('lead_captured', { segment: segment || 'nao-informado', source: lead.source });
+  // Resposta automatica para o interessado, com o caminho de autoatendimento.
+  notify.sendEmail('lead_received', { name, slug: 'lead', contactEmail: email }, {
+    signupUrl: `${PUBLIC_APP_URL}/cadastro.html`,
+  });
+  console.log(`[lead] ${name} <${email}> segmento=${segment || '-'} origem=${lead.source}`);
+
+  res.status(201).json({
+    ok: true,
+    signupUrl: `${PUBLIC_APP_URL}/cadastro.html`,
+    message: 'Recebemos seu contato. Enquanto isso, você já pode criar sua fila.',
+  });
+});
+
+app.get('/api/leads', (req, res) => {
+  if (!isOperatorOf(bearerToken(req), DEFAULT_SLUG)) {
+    return res.status(401).json({ error: 'Operador nao autenticado.' });
+  }
+  res.json({ total: leads.length, leads: leads.slice(-100).reverse() });
+});
+
 app.get('/api/funnel', (req, res) => {
   if (!isOperatorOf(bearerToken(req), DEFAULT_SLUG)) {
     return res.status(401).json({ error: 'Operador nao autenticado.' });
