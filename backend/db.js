@@ -31,8 +31,10 @@ async function ensureSchema() {
           created_at BIGINT NOT NULL,
           last_presence_at BIGINT,
           passed_at BIGINT,
+          closed_at BIGINT,
           sort_order INT NOT NULL
         );
+        ALTER TABLE tickets ADD COLUMN IF NOT EXISTS closed_at BIGINT;
         CREATE TABLE IF NOT EXISTS queue_meta (
           key TEXT PRIMARY KEY,
           value JSONB NOT NULL
@@ -77,6 +79,7 @@ async function loadStore() {
       createdAt: Number(r.created_at),
       lastPresenceAt: r.last_presence_at ? Number(r.last_presence_at) : null,
       passedAt: r.passed_at ? Number(r.passed_at) : null,
+      closedAt: r.closed_at ? Number(r.closed_at) : null,
     })),
     log: log.rows.map(r => ({ t: r.t, text: r.text, ts: Number(r.ts) })),
   };
@@ -90,10 +93,10 @@ async function saveStore(snapshot) {
     for (let i = 0; i < snapshot.tickets.length; i++) {
       const t = snapshot.tickets[i];
       await client.query(
-        `INSERT INTO tickets (id, code, name, status, counter, wait_min, source, created_at, last_presence_at, passed_at, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        `INSERT INTO tickets (id, code, name, status, counter, wait_min, source, created_at, last_presence_at, passed_at, closed_at, sort_order)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [t.id, t.code, t.name, t.status, t.counter, t.waitMin || 0, t.source || 'qr',
-         t.createdAt, t.lastPresenceAt || null, t.passedAt || null, i]
+         t.createdAt, t.lastPresenceAt || null, t.passedAt || null, t.closedAt || null, i]
       );
     }
     for (const entry of snapshot.log) {

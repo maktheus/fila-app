@@ -1,7 +1,6 @@
 // Copie para config.js no deploy manual, ou configure vars no GitHub Actions.
 window.FILA_API_BASE = 'https://api.seu-dominio.com';
 window.FILA_WS_BASE = 'wss://api.seu-dominio.com/ws';
-window.FILA_ADMIN_TOKEN = '';
 window.FILA_ADS_ENABLED = true;
 window.FILA_PLATFORM = 'web';
 

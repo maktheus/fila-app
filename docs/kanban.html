@@ -75,7 +75,7 @@ const STORAGE_KEY = 'fila-kanban-v1';
 
 const SPRINTS = {
   S0: { label: 'Feito (pré-sprint)', note: 'Entregue até 30/07: blocos 1–3 do GARIMPO + infra de deploy + Postgres.' },
-  S1: { label: 'Sprint 1 · 03–14/ago', note: 'Segurança & qualidade — pré-requisito de qualquer cliente real (Bloco 3 completo).' },
+  S1: { label: 'Sprint 1 · 03–14/ago', note: 'Entregue em 30/07: login com sessão, expurgo LGPD, cliente na raiz, 24 testes de API e CI no GitHub Actions.' },
   S2: { label: 'Sprint 2 · 17–28/ago', note: 'Multi-unidade & onboarding self-service (Bloco 4) — uma instância atende N clínicas.' },
   S3: { label: 'Sprint 3 · 31/ago–11/set', note: 'Monetização automatizada (Bloco 5) — assinatura Pix ativa/suspende premium sozinha.' },
   S4: { label: 'Sprint 4 · 14–25/set', note: 'Publicação Play Store + CI/CD — pipeline leva do commit à loja sem passo manual.' },
@@ -102,7 +102,7 @@ const COLUMNS = [
   { id: 'done',     label: 'Concluído',    dot: 'var(--forest)' },
 ];
 
-// status inicial: S0 = done · S1 = todo · S2–S6 = backlog
+// status inicial: S0+S1 = done (Sprint 1 entregue em 30/07) · S2–S6 = backlog
 const CARDS = [
   // ---- Feito ----
   { id:'d1', s:'S0', st:'done', a:['dev'], t:'App do cliente (QR → fila → posição ao vivo)', d:'frontend/cliente.html consumindo POST /api/tickets e WebSocket /ws.' },
@@ -114,13 +114,13 @@ const CARDS = [
   { id:'d7', s:'S0', st:'done', a:['infra'], t:'Persistência Postgres via Docker', d:'backend/db.js + serviço postgres nos dois compose (local e VPS). Decisão: Postgres, não Supabase.' },
 
   // ---- Sprint 1 — Segurança & Qualidade ----
-  { id:'s1a', s:'S1', st:'todo', a:['dev'], t:'Inverter rotas públicas', d:'Cliente vira index.html; painel admin sai da raiz e vai para rota própria não óbvia.' },
-  { id:'s1b', s:'S1', st:'todo', a:['dev'], t:'Login real do operador', d:'Sessão com expiração no lugar do token fixo em config.js/localStorage.' },
-  { id:'s1c', s:'S1', st:'todo', a:['dev','juridico'], t:'Expurgo LGPD automático', d:'Job diário apaga tickets encerrados após retenção configurável; só primeiro nome em todo lugar.' },
-  { id:'s1d', s:'S1', st:'todo', a:['dev'], t:'Remover dados seed', d:'Fila inicia vazia em produção; seeds atuais têm nome completo (viola a própria regra LGPD).' },
-  { id:'s1e', s:'S1', st:'todo', a:['dev'], t:'Rodar /security-review e corrigir', d:'Skill obrigatória do CLAUDE.md antes de deploy real.' },
-  { id:'s1f', s:'S1', st:'todo', a:['dev','automacao'], t:'Testes de API no CI', d:'health, tickets, pass, auth, rate-limit — hoje o repo tem zero testes.' },
-  { id:'s1g', s:'S1', st:'todo', a:['automacao'], t:'CI no GitHub Actions bloqueando merge', d:'Lint + testes rodando em todo PR para main.' },
+  { id:'s1a', s:'S1', st:'done', a:['dev'], t:'Inverter rotas públicas', d:'Cliente vira index.html; painel admin sai da raiz e vai para rota própria não óbvia.' },
+  { id:'s1b', s:'S1', st:'done', a:['dev'], t:'Login real do operador', d:'Sessão com expiração no lugar do token fixo em config.js/localStorage.' },
+  { id:'s1c', s:'S1', st:'done', a:['dev','juridico'], t:'Expurgo LGPD automático', d:'Job diário apaga tickets encerrados após retenção configurável; só primeiro nome em todo lugar.' },
+  { id:'s1d', s:'S1', st:'done', a:['dev'], t:'Remover dados seed', d:'Fila inicia vazia em produção; seeds atuais têm nome completo (viola a própria regra LGPD).' },
+  { id:'s1e', s:'S1', st:'done', a:['dev'], t:'Rodar /security-review e corrigir', d:'Skill obrigatória do CLAUDE.md antes de deploy real.' },
+  { id:'s1f', s:'S1', st:'done', a:['dev','automacao'], t:'Testes de API no CI', d:'health, tickets, pass, auth, rate-limit — hoje o repo tem zero testes.' },
+  { id:'s1g', s:'S1', st:'done', a:['automacao'], t:'CI no GitHub Actions bloqueando merge', d:'Lint + testes rodando em todo PR para main.' },
 
   // ---- Sprint 2 — Multi-unidade ----
   { id:'s2a', s:'S2', st:'backlog', a:['dev'], t:'Schema multi-tenant no Postgres', d:'Tabela venues; tickets/telão/painel escopados por unidade; migrações versionadas.' },

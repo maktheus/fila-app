@@ -4,6 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
 <title>Painel do Operador — Fila Virtual</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -76,6 +77,20 @@
   button:focus-visible{outline:2px solid color-mix(in oklch,var(--mutum-coral) 50%,transparent);outline-offset:2px;border-radius:6px}
 
   .shell{max-width:1320px;margin:0 auto;padding:22px 32px 44px}
+
+  .login-wrap{display:flex;align-items:center;justify-content:center;min-height:78vh;padding:20px}
+  .login-card{display:flex;flex-direction:column;gap:14px;width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:30px 28px}
+  .login-brand{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .login-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--fg-3)}
+  .login-input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border-strong);background:var(--bg);color:var(--fg-1);font:inherit;font-size:15px}
+  .login-input:focus{outline:2px solid var(--primary);outline-offset:1px;border-color:transparent}
+  .login-btn{padding:12px 16px;border-radius:10px;border:none;background:var(--primary);color:#141312;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+  .login-btn:hover:not(:disabled){filter:brightness(1.08)}
+  .login-btn:disabled{opacity:.6;cursor:default}
+  .login-error{font-size:13px;color:var(--mutum-coral);font-weight:600}
+  .login-hint{font-size:12px;color:var(--fg-3);text-align:center}
+  .logout-btn{padding:7px 13px;border-radius:999px;border:1px solid var(--border-strong);background:transparent;color:var(--fg-2);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+  .logout-btn:hover{color:var(--fg-1);border-color:var(--fg-3)}
 
   .header{display:flex;align-items:center;gap:18px;padding-bottom:22px;border-bottom:1px solid var(--border)}
   .header-brand{display:flex;align-items:center;gap:11px}
@@ -229,9 +244,14 @@ if ('serviceWorker' in navigator) {
   // For GitHub Pages, point to your backend's public URL.
   const API_BASE = window.FILA_API_BASE || '';
   const WS_BASE = window.FILA_WS_BASE || '';
-  const ADMIN_TOKEN = window.FILA_ADMIN_TOKEN || localStorage.getItem('fila_admin_token') || '';
+  const SESSION_KEY = 'fila_operator_session';
 
   // ---- STATE ----
+  let sessionToken = sessionStorage.getItem(SESSION_KEY) || '';
+  let authed = false;
+  let authChecked = false;
+  let loginError = '';
+  let loginBusy = false;
   let serverState = null;
   let connected = false;
   let filter = 'waiting';
@@ -263,11 +283,12 @@ if ('serviceWorker' in navigator) {
         method,
         headers: Object.assign(
           body ? { 'Content-Type': 'application/json' } : {},
-          ADMIN_TOKEN ? { Authorization: 'Bearer ' + ADMIN_TOKEN } : {}
+          sessionToken ? { Authorization: 'Bearer ' + sessionToken } : {}
         ),
         body: body ? JSON.stringify(body) : undefined,
       });
       const data = await res.json();
+      if (res.status === 401) { endSession('Sua sessão expirou. Entre novamente.'); return null; }
       if (!res.ok) { flash(data.error || 'Erro no servidor.'); return null; }
       if (data.message) flash(data.message);
       return data;
@@ -275,6 +296,68 @@ if ('serviceWorker' in navigator) {
       flash('Sem conexão com o servidor.');
       return null;
     }
+  }
+
+  // ---- SESSÃO ----
+  function endSession(message) {
+    sessionToken = '';
+    authed = false;
+    sessionStorage.removeItem(SESSION_KEY);
+    loginError = message || '';
+    if (ws) { try { ws.close(); } catch (e) {} ws = null; }
+    render();
+  }
+
+  async function checkSession() {
+    if (!sessionToken) { authChecked = true; render(); return; }
+    try {
+      const res = await fetch(API_BASE + '/api/operator/session', {
+        headers: { Authorization: 'Bearer ' + sessionToken },
+      });
+      authed = res.ok;
+      if (!res.ok) { sessionToken = ''; sessionStorage.removeItem(SESSION_KEY); }
+    } catch (e) {
+      authed = false;
+    }
+    authChecked = true;
+    if (authed) start(); else render();
+  }
+
+  async function submitLogin(password) {
+    loginBusy = true;
+    loginError = '';
+    render();
+    try {
+      const res = await fetch(API_BASE + '/api/operator/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        loginError = data.error || 'Não foi possível entrar.';
+        loginBusy = false;
+        render();
+        return;
+      }
+      sessionToken = data.token;
+      sessionStorage.setItem(SESSION_KEY, sessionToken);
+      authed = true;
+      loginBusy = false;
+      start();
+    } catch (e) {
+      loginError = 'Sem conexão com o servidor.';
+      loginBusy = false;
+      render();
+    }
+  }
+
+  function logout() {
+    fetch(API_BASE + '/api/operator/logout', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + sessionToken },
+    }).catch(function() {});
+    endSession('');
   }
 
   function callNext() { api('POST', '/api/tickets/call-next'); }
@@ -320,6 +403,19 @@ if ('serviceWorker' in navigator) {
   // ---- RENDER ----
   function render() {
     const app = document.getElementById('app');
+
+    if (!authChecked) {
+      app.innerHTML = renderHeader('Fila Virtual', '...', false) +
+        '<div style="text-align:center;padding:80px 20px;color:var(--fg-3);font-size:16px">Verificando sessão...</div>';
+      return;
+    }
+
+    if (!authed) {
+      app.innerHTML = renderLogin();
+      bindLoginEvents();
+      return;
+    }
+
     if (!serverState) {
       app.innerHTML = renderHeader('Fila Virtual', '...', false) +
         '<div style="text-align:center;padding:80px 20px;color:var(--fg-3);font-size:16px">Conectando ao servidor...</div>';
@@ -358,6 +454,41 @@ if ('serviceWorker' in navigator) {
     bindEvents();
   }
 
+  function renderLogin() {
+    return '<div class="login-wrap">' +
+      '<form class="login-card" id="login-form">' +
+        '<div class="login-brand">' + BIRD_SVG +
+          '<div style="line-height:1.15">' +
+            '<div class="header-brand-sub">Fila virtual</div>' +
+            '<div class="header-brand-title">Painel do operador</div>' +
+          '</div>' +
+        '</div>' +
+        '<label class="login-label" for="login-password">Senha do operador</label>' +
+        '<input class="login-input" id="login-password" type="password" autocomplete="current-password" ' +
+          'placeholder="Digite a senha do balcão" ' + (loginBusy ? 'disabled' : '') + ' required>' +
+        (loginError ? '<p class="login-error" role="alert">' + esc(loginError) + '</p>' : '') +
+        '<button class="login-btn" type="submit"' + (loginBusy ? ' disabled' : '') + '>' +
+          (loginBusy ? 'Entrando...' : 'Entrar') +
+        '</button>' +
+        '<p class="login-hint">A sessão expira automaticamente após 8 horas.</p>' +
+      '</form>' +
+    '</div>';
+  }
+
+  function bindLoginEvents() {
+    const form = document.getElementById('login-form');
+    if (!form) return;
+    const input = document.getElementById('login-password');
+    if (input && !loginBusy) input.focus();
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (loginBusy) return;
+      const value = input ? input.value : '';
+      if (!value) { loginError = 'Informe a senha.'; render(); return; }
+      submitLogin(value);
+    });
+  }
+
   function renderHeader(venue, operator, isConnected) {
     const opInitial = (operator || 'E').trim().charAt(0).toUpperCase();
     return '<header class="header">' +
@@ -377,7 +508,7 @@ if ('serviceWorker' in navigator) {
       '</div>' +
       '<div class="header-right">' +
         '<a href="telao.html" class="link-client">Telão</a>' +
-        '<a href="cliente.html" class="link-client">App do cliente →</a>' +
+        '<a href="./" class="link-client">App do cliente →</a>' +
         '<div class="clock">' + esc(clockNow()) + '</div>' +
         '<div class="operator">' +
           '<div class="operator-avatar">' + esc(opInitial) + '</div>' +
@@ -386,6 +517,7 @@ if ('serviceWorker' in navigator) {
             '<div class="operator-role">Operador</div>' +
           '</div>' +
         '</div>' +
+        (authed ? '<button class="logout-btn" id="logout-btn" type="button">Sair</button>' : '') +
       '</div>' +
     '</header>';
   }
@@ -536,11 +668,17 @@ if ('serviceWorker' in navigator) {
         render();
       });
     });
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) logoutBtn.addEventListener('click', logout);
   }
 
   // ---- BOOT ----
-  connectWs();
-  render();
+  function start() {
+    if (!ws) connectWs();
+    render();
+  }
+
+  checkSession();
   setInterval(() => {
     const el = document.querySelector('.clock');
     if (el) el.textContent = clockNow();

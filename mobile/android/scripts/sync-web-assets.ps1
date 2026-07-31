@@ -29,7 +29,6 @@ if ($Environment -eq 'emulator') {
 @"
 window.FILA_API_BASE = '$apiBase';
 window.FILA_WS_BASE = '$wsBase';
-window.FILA_ADMIN_TOKEN = '';
 window.FILA_ADS_ENABLED = true;
 window.FILA_PLATFORM = 'android';
 window.FILA_WEB_ADS_PROVIDER = 'gam';

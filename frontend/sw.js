@@ -1,8 +1,8 @@
-const CACHE_NAME = 'fila-app-v5';
+const CACHE_NAME = 'fila-app-v6';
 const APP_SHELL = [
   './',
+  'index.html',
   'cliente.html',
-  'operador.html',
   'telao.html',
   'landing.html',
   'manifest.webmanifest',
@@ -38,6 +38,6 @@ self.addEventListener('fetch', (event) => {
       const copy = response.clone();
       caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => undefined);
       return response;
-    }).catch(() => caches.match('cliente.html')))
+    }).catch(() => caches.match('index.html')))
   );
 });

@@ -44,7 +44,7 @@ As 3 telas do MVP (protótipo `project/Fila Virtual.dc.html` é a fonte visual):
 |---|---|---|
 | 1 | App do cliente: entrar via QR + status ao vivo | `frontend/cliente.html` novo; `POST /api/tickets` (ligar a token de unidade); WS |
 | 2 | Passar a vez + proximidade | endpoint `POST /api/tickets/:id/pass`; Geolocation no front; coords da unidade no store |
-| 3 | **Auth do admin + hardening** (pré-requisito de qualquer deploy real) | token de operador nos endpoints de ação; CORS restrito; rate limit |
+| 3 | ✅ **Auth do admin + hardening** (Sprint 1, 30/07) | login com sessão expirável, CORS por env, rate limit por IP real, expurgo LGPD, nomes só para o operador, cliente na raiz, 24 testes + CI |
 | 4 | Persistência + multi-unidade | ✅ Postgres via Docker (base pronta); falta: schema multi-unidade, QR token por unidade, limpeza de tickets (LGPD) |
 | 5 | Monetização B2B | assinatura Cakto/Pix por unidade; onboarding da clínica (gera QR na hora) |
 
@@ -78,14 +78,14 @@ Checkout: **assinatura recorrente Pix via Cakto** (alternativas Stripe/Mercado P
 
 ## Checklist de segurança (bloqueia deploy real)
 
-- [ ] **CRÍTICO — endpoints de admin abertos**: hoje qualquer pessoa pode `POST /api/tickets/call-next` e comandar a fila. Bloco 3 antes de qualquer cliente real.
-- [ ] CORS irrestrito (`app.use(cors())`) — restringir ao domínio em produção.
-- [ ] Sem rate limit — um loop de `POST /api/tickets` enche a fila (DoS trivial).
-- [ ] LGPD: nomes na fila são dado pessoal — coletar só primeiro nome, expurgar tickets encerrados; vazamento = notificação obrigatória + multa de até 5% do faturamento.
+- [x] ~~**CRÍTICO — endpoints de admin abertos**~~: resolvido em 30/07 — sessão de operador com expiração (`POST /api/operator/login`); `ADMIN_TOKEN` segue válido só para automação.
+- [x] ~~CORS irrestrito~~: restrito por `CORS_ORIGIN`; em produção sem a env, nenhuma origem passa.
+- [x] ~~Sem rate limit~~: 20 entradas/min e 8 logins/15min por IP — com `trust proxy` para valer o IP real atrás do nginx.
+- [x] ~~LGPD~~: só primeiro nome, expurgo automático dos encerrados (`TICKET_RETENTION_HOURS`, padrão 12h) e nomes transmitidos apenas para conexões autenticadas de operador.
 - [ ] Nada hardcoded até aqui (✔ verificado em `server.js` — config via env), manter assim; `.env` já está no `.gitignore`.
 - [ ] Rodar `/security-review` (skill em `.claude/skills/`) ao fechar o Bloco 3 e antes de cada deploy.
-- [ ] Painel admin não pode ser rota enumerável óbvia em produção (hoje `index.html` é o admin! — inverter: cliente vira o index, admin vira rota autenticada).
+- [x] ~~Painel admin em rota óbvia~~: `index.html` agora é o app do cliente; o painel vive em `operador.html`, atrás de login, com `noindex` e `robots.txt`.
 
 ## Próxima ação única
 
-**Construir o Bloco 1** — colar o prompt acima no Claude Code dentro deste repo. É a peça que falta para a demo completa (cliente entra pelo QR e se vê na fila que o painel já gerencia).
+**Sprint 2 — multi-unidade** (`docs/kanban.html`): schema multi-tenant no Postgres, cadastro self-service de estabelecimento e QR gerado por unidade. É o que falta para uma instância atender mais de uma clínica.
