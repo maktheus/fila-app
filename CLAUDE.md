@@ -4,13 +4,38 @@ App de **fila virtual via QR code** para clínicas/serviços: o cliente escaneia
 
 Método de produto: blueprint [bateia](https://github.com/stpedr/bateia) (skills em `.claude/skills/`). O plano vivo do produto está em `docs/GARIMPO.md` — **leia-o antes de implementar qualquer feature** e mantenha-o atualizado quando um bloco for concluído.
 
-## Estado atual (2026-07-08)
+## Estado atual (2026-07-31)
 
-- `frontend/index.html` — painel do operador (pronto, consome a API + WS)
-- `frontend/landing.html` — landing page (pronta)
-- `backend/server.js` — Express + WebSocket, store em memória, ações de operador prontas
-- `project/*.dc.html` — protótipos de design (Claude Design, design system Mutum): **Fila Virtual** (app do cliente) e **Painel Admin**
-- **Falta construir**: o app do cliente (QR → entrar → posição ao vivo → passar a vez com proximidade) e a autenticação do admin
+O MVP está construído e em `main`. Postgres via Docker, multi-unidade, auth de
+operador, cobrança por Pix e cartão, chatbot de vendas com modelo local,
+observabilidade de comportamento. 154 testes, CI verde.
+
+- `frontend/` — `index.html` (app do cliente), `operador.html` (painel),
+  `telao.html`, `cadastro.html`, `planos.html`, `assinar.html` (Pix + Google
+  Pay), `cartaz.html`, `analitico.html` (funil, é seu), `laboratorio.html`
+  (bancada do chatbot, autenticada)
+- `backend/` — `server.js` (Express + WS), `db.js` (Postgres), `billing.js`,
+  `payments/` (Mercado Pago + sandbox), `chat/` (RAG, guardrails, ferramentas,
+  provedor local), `analytics.js`, `notify.js`, `mcp-server.js`
+- `project/*.dc.html` — protótipos de design (design system Mutum)
+
+### ⚠️ Antes de planejar qualquer coisa, leia `docs/PENDENCIAS.md`
+
+Ele cataloga os pontos que ainda quebram o objetivo de "funcionar sem o dono
+participar", ordenados por quanto custa deixar como estão. Resumo do que mais
+importa:
+
+- **Os e-mails não saem** (`MAIL_ENABLED=false`) — e todo o funil pressupõe que
+  chegam. Destrava a renovação e a recuperação de senha.
+- **Ninguém paga o segundo mês** — a renovação não existe.
+- **Não dá para cancelar sozinho** — obrigação do CDC, não escolha de produto.
+- **Senha perdida = cliente perdido** — não há recuperação.
+- **Google Pay** depende de dois identificadores que só o suporte do Mercado
+  Pago pode dar.
+
+Outros documentos: `docs/PAGAMENTOS.md` (Pix, cartão, webhook do MP),
+`docs/CHATBOT.md` (RAG, guardrails, modelo local), `docs/OBSERVABILIDADE.md`,
+`docs/kanban.html` (roadmap).
 
 ## Convenções
 

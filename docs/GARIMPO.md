@@ -89,6 +89,13 @@ Checkout: **assinatura recorrente Pix via Cakto** (alternativas Stripe/Mercado P
 - [ ] Rodar `/security-review` (skill em `.claude/skills/`) ao fechar o Bloco 3 e antes de cada deploy.
 - [x] ~~Painel admin em rota óbvia~~: `index.html` agora é o app do cliente; o painel vive em `operador.html`, atrás de login, com `noindex` e `robots.txt`.
 
+## O que ainda quebra o "zero participação"
+
+Catalogado em **[PENDENCIAS.md](PENDENCIAS.md)**, com o custo de deixar como
+está e o caminho de cada um. Os que travam receita, em ordem: os e-mails não
+saem, ninguém paga o segundo mês, não dá para cancelar sozinho, senha perdida
+não tem recuperação.
+
 ## Próxima ação única
 
 **Destravar o que depende de conta externa.** O código do Sprint 4 está pronto (`docs/PLAY_STORE.md`, `docs/MONITORAMENTO.md`, workflow de release); o que falta são passos seus, nesta ordem:
@@ -98,4 +105,6 @@ Checkout: **assinatura recorrente Pix via Cakto** (alternativas Stripe/Mercado P
 3. **Conta no provedor de pagamento** (Cakto ou Mercado Pago) e compra da própria assinatura.
 4. **Play Console** — ficha (já escrita), declaração de dados (já preenchida no doc) e teste fechado com 12+ testadores por 14 dias.
 
-Enquanto isso corre, o **Sprint 5 (marketing)** pode andar em paralelo.
+O marketing (Sprint 5) já está construído — landing com SEO, captura de leads,
+cartaz e plano de anúncios. Falta **ligar**: os canais dependem do domínio e da
+conta de anúncios.
