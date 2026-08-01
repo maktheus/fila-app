@@ -121,6 +121,23 @@ const TEMPLATES = {
     ].filter(l => l !== '').join('\n'),
   }),
 
+  acesso_solicitado: (v) => ({
+    subject: v.quantas > 1
+      ? `Seus painéis do Fila Virtual (${v.quantas} unidades)`
+      : `${v.name}: entre no seu painel`,
+    body: [
+      v.quantas > 1
+        ? `Você pediu acesso. Estes links entram direto no painel de cada unidade:`
+        : `Você pediu acesso. Este link entra direto no seu painel:`,
+      ``,
+      `${v.links || ''}`,
+      ``,
+      `Vale por ${v.minutos || 30} minutos e só pode ser usado uma vez.`,
+      ``,
+      `Se não foi você quem pediu, ignore este e-mail — nada muda.`,
+    ].join('\n'),
+  }),
+
   // Segundo passo da exclusao. O link do rodape das cobrancas cancela; este
   // apaga. Se fossem o mesmo, um e-mail encaminhado apagaria o negocio de
   // alguem — cancelar tem volta, exclusao nao.

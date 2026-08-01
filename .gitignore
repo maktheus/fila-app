@@ -8,3 +8,6 @@ mobile/android/.gradle/
 mobile/android/**/build/
 mobile/android/local.properties
 deploy/vps/.env
+
+# Dumps do Postgres: nunca versionar dado de cliente
+backups/

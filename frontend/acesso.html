@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Entrar no painel — Fila Virtual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/mutum-design-system.css">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{background:var(--bg);color:var(--fg-1);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:420px;margin:12vh auto;padding:0 20px 60px}
+  h1{font-family:var(--font-display);font-size:23px;font-weight:600;margin:0 0 8px}
+  .sub{font-size:14.5px;color:var(--fg-2);line-height:1.6;margin:0 0 22px}
+  .cartao{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px}
+  label{display:block;font-size:13px;font-weight:600;margin:0 0 6px}
+  input{width:100%;padding:12px 14px;border:1px solid var(--border-strong);border-radius:10px;font:inherit;font-size:15px;color:var(--fg-1);background:var(--bg-2)}
+  input:focus{outline:2px solid var(--mutum-river);outline-offset:1px;border-color:transparent}
+  .btn{display:block;width:100%;padding:14px;border:0;border-radius:11px;background:var(--mutum-ink);color:var(--mutum-cream);font:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:14px}
+  .btn:disabled{opacity:.5;cursor:default}
+  .aviso{padding:12px 14px;border-radius:11px;font-size:14px;line-height:1.55;margin-top:14px}
+  .aviso.erro{background:#FBE3E1;color:#8C1C18}
+  .aviso.ok{background:#E4F0E9;color:#1F5D3A}
+  .nota{font-size:12.5px;color:var(--fg-3);line-height:1.55;margin-top:16px;text-align:center}
+  .nota a{color:var(--fg-2)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="titulo">Entrar no painel</h1>
+  <p class="sub" id="sub">Perdeu a senha do balcão? Digite o e-mail do cadastro e mandamos um link que entra direto.</p>
+
+  <div class="cartao" id="cartao">
+    <form id="form">
+      <label for="email">E-mail do cadastro</label>
+      <input id="email" type="email" placeholder="voce@suaclinica.com.br" autocomplete="email" inputmode="email" required>
+      <button class="btn" id="enviar" type="submit">Mandar link de acesso</button>
+    </form>
+    <div class="aviso hidden" id="aviso"></div>
+  </div>
+
+  <p class="nota">Ainda lembra a senha? <a href="operador.html">Entrar pelo painel</a></p>
+</div>
+
+<script src="config.js?v=12"></script>
+<script>
+(function () {
+  "use strict";
+  var API = window.FILA_API_BASE || "";
+  var token = new URLSearchParams(location.search).get("t") || "";
+
+  // Tira o token da barra de endereco assim que ele e lido. Ele ja esta em
+  // memoria; deixa-lo na URL so o coloca no historico do navegador e em
+  // qualquer Referer que a pagina venha a gerar.
+  if (token) history.replaceState(null, "", location.pathname);
+
+  function qs(id) { return document.getElementById(id); }
+
+  function avisar(texto, tipo) {
+    var el = qs("aviso");
+    el.textContent = texto;
+    el.className = "aviso " + tipo;
+    el.classList.remove("hidden");
+  }
+
+  // Chegou pelo link do e-mail: troca por sessão e entra.
+  async function entrarComLink() {
+    qs("titulo").textContent = "Entrando…";
+    qs("sub").textContent = "Só um instante.";
+    qs("cartao").classList.add("hidden");
+    try {
+      var res = await fetch(API + "/api/acesso/entrar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ t: token })
+      });
+      var d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Não consegui entrar.");
+
+      // A chave tem que ser exatamente a que operador.html lê, senão o link
+      // mágico levaria a pessoa direto para a tela de login que ela não
+      // consegue passar — que é o problema que estamos resolvendo.
+      sessionStorage.setItem("fila_operator_session:" + d.venue, d.token);
+      location.replace(d.painel);
+    } catch (e) {
+      qs("titulo").textContent = "Este link não funciona mais";
+      qs("sub").textContent = e.message === "link ja usado"
+        ? "Ele já foi usado uma vez. Peça outro abaixo — leva alguns segundos."
+        : "Links de acesso valem por poucos minutos. Peça um novo abaixo.";
+      qs("cartao").classList.remove("hidden");
+      if (window.FilaAnalytics) FilaAnalytics.track("acesso:link_invalido");
+    }
+  }
+
+  async function pedirLink(evento) {
+    evento.preventDefault();
+    var botao = qs("enviar");
+    botao.disabled = true;
+    try {
+      var res = await fetch(API + "/api/acesso/solicitar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: qs("email").value.trim() })
+      });
+      var d = await res.json();
+      // A resposta é a mesma com e-mail cadastrado ou não — de propósito,
+      // para esta tela não virar um jeito de descobrir quem é cliente.
+      avisar(d.mensagem || "Se este e-mail estiver cadastrado, o link chega em instantes.", "ok");
+      qs("form").reset();
+      if (window.FilaAnalytics) FilaAnalytics.track("acesso:link_pedido");
+    } catch (e) {
+      avisar("Não consegui falar com o servidor. Tente de novo em instantes.", "erro");
+    } finally {
+      botao.disabled = false;
+    }
+  }
+
+  if (token) entrarComLink();
+  qs("form").addEventListener("submit", pedirLink);
+})();
+</script>
+<script src="analytics.js?v=12" defer></script>
+</body>
+</html>

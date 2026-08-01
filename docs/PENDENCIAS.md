@@ -129,26 +129,59 @@ servidor recusa assinar links e cancelar volta a depender da senha. Gere com
 
 ---
 
-## 4. Senha perdida = cliente perdido
+## 4. ✅ Recuperação de acesso — construída em 01/08
 
-**Estado:** a senha do operador é gerada aleatoriamente no cadastro, mostrada
-**uma única vez** e guardada só como hash scrypt. Não existe recuperação.
+**Estado: quem perde a senha entra sozinho.** Digita o e-mail do cadastro em
+`/acesso.html`, recebe um link e cai **dentro do painel, já logado**.
 
-**O que acontece na prática:** a recepcionista fecha a aba antes de anotar. O
-estabelecimento perde o painel. A fila continua funcionando para quem entra,
-mas ninguém consegue chamar ninguém. A única saída é falar com você — e você
-também não tem como recuperar, só resetar direto no banco.
+**Link mágico em vez de "redefinir senha"** porque quem esqueceu uma senha vai
+esquecer a próxima. O que a pessoa quer é entrar, não inventar segredo novo.
 
-**O que fazer:** `POST /api/venues/:slug/recuperar-senha` que gera um token de
-uso único com validade curta, manda por e-mail para o `contactEmail`, e uma
-tela que troca o token por uma senha nova. Depende do item 1.
+Três coisas que o desenho protege:
 
-**Cuidado ao construir:** a resposta tem que ser idêntica para e-mail que existe
-e e-mail que não existe, senão a rota vira um enumerador de clientes seus.
+- **A resposta é sempre a mesma**, com e-mail cadastrado ou não. Responder
+  diferente transformaria a tela num enumerador dos seus clientes — qualquer um
+  descobriria quais estabelecimentos usam o sistema.
+- **O link é de uso único**, e queima só depois de a sessão existir. Queimar
+  antes faria uma falha de rede custar o único link da pessoa.
+- **Vale 30 minutos** e não serve para cancelar nem excluir: o propósito está
+  dentro da assinatura.
+
+Quem tem várias unidades recebe um e-mail só, com um link por unidade.
 
 ---
 
-## 5. Google Pay depende de dois identificadores não confirmados
+## 5. ✅ Backup do Postgres — construído em 01/08
+
+`deploy/vps/backup.sh`. Dump diário, expurgo por idade, e — a parte que quase
+todo mundo pula — **verificação por restauração**.
+
+O script restaura o dump num banco descartável e confere que as unidades
+voltaram. Conferir que restaurou "sem erro" não basta: um dump vazio também
+restaura sem erro. **Backup que nunca foi restaurado não é backup, é
+esperança**, e a hora de descobrir que o arquivo está corrompido não pode ser a
+hora do desastre.
+
+Rodando aqui: 35 unidades voltaram do dump.
+
+```bash
+./deploy/vps/backup.sh                    # dump + verificação + expurgo
+./deploy/vps/backup.sh --restaurar ARQUIVO   # restaura no banco real
+```
+
+Agendar às 3h:
+
+```
+0 3 * * * cd /caminho/do/fila-app && ./deploy/vps/backup.sh >> /var/log/fila-backup.log 2>&1
+```
+
+**O que ainda é seu:** um backup só na mesma máquina não protege contra a
+máquina morrer. Copie para fora — outro provedor, ou um bucket. O script tem a
+linha do `rclone` comentada no fim.
+
+---
+
+## 6. Google Pay depende de dois identificadores não confirmados
 
 **Estado:** o cartão está construído e testado. Falta um dado que só o Mercado
 Pago pode dar.
@@ -186,7 +219,7 @@ e passar pela revisão da tela de checkout antes de virar `GPAY_ENVIRONMENT` par
 
 ---
 
-## 6. O vendedor local fecha ~4 de 5
+## 7. O vendedor local fecha ~4 de 5
 
 **Estado:** medido, não estimado. Rodando a jornada completa contra o
 `qwen2.5:7b`, quando a demonstração é criada a venda fecha em cerca de 4 de cada
@@ -224,7 +257,7 @@ passada só; pares como Qwen 0.6B → 8B dão ~1.9×) ou um modelo menor. Nada d
 
 ---
 
-## 7. Nada disso está no ar
+## 8. Nada disso está no ar
 
 O sistema roda inteiro em Docker, com testes e CI verdes, mas em `localhost`.
 
@@ -238,14 +271,14 @@ Para virar produto público falta, na ordem:
 3. **Keystore de release** e Play Console, para o app Android.
 4. **`CORS_ORIGIN`** restrito ao domínio e `NODE_ENV=production` — hoje, fora de
    produção, o CORS aceita qualquer origem.
-5. **Backup do Postgres.** Não existe script. Um volume Docker sem backup é
-   perda de dados esperando acontecer.
+5. ~~Backup do Postgres~~ — feito (item 5). Falta copiar os dumps para fora
+   da máquina: um backup só na mesma VPS não protege contra a VPS morrer.
 6. **Rodar `/security-review`** antes do primeiro deploy real, como manda o
    `CLAUDE.md`.
 
 ---
 
-## 8. Distribuição não começou
+## 9. Distribuição não começou
 
 A landing tem SEO, Open Graph, JSON-LD e sitemap prontos. O chatbot atende. O
 cartaz de balcão imprime. Mas nenhum canal está **ligado**:
@@ -265,7 +298,7 @@ descobre que ele existe.
 
 1. ~~E-mails (item 1)~~ — feito em 31/07. Falta contratar o SMTP e o DNS.
 2. ~~Renovação (item 2)~~ — feita em 01/08, com plano anual junto.
-3. **Domínio + HTTPS** (item 7) — destrava tudo que é externo.
+3. **Domínio + HTTPS** (item 8) — destrava tudo que é externo.
 4. ~~Cancelamento (item 3)~~ — feito em 01/08, com exclusão LGPD e estorno.
-5. **Recuperação de senha** (item 4).
+5. ~~Recuperação de senha (item 4)~~ e ~~backup (item 5)~~ — feitos em 01/08.
 6. O resto, conforme aparecer volume.

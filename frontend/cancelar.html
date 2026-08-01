@@ -117,6 +117,10 @@
   var params = new URLSearchParams(location.search);
   var unidade = params.get("venue") || "";
   var token = params.get("t") || "";
+
+  // O token sai da barra assim que e lido; a unidade fica, porque nao e
+  // segredo e serve para recarregar a pagina.
+  if (token) history.replaceState(null, "", location.pathname + "?venue=" + encodeURIComponent(unidade));
   var dados = null;
 
   function qs(id) { return document.getElementById(id); }

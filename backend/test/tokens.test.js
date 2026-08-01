@@ -94,6 +94,44 @@ describe('token assinado', () => {
     // O que importa e que mexer nisso invalida a assinatura, ja coberto acima.
   });
 
+  // Link de login e diferente dos outros: ele CRIA sessao. Reaproveitar um
+  // significa uma sessao a mais para quem pegou o e-mail de alguem.
+  test('token de uso unico queima depois de usado', () => {
+    const t = carregar({ LINK_SECRET: SEGREDO });
+    const token = t.gerarToken({ slug: 'clinica-teste', proposito: 'acesso', usoUnico: true });
+
+    assert.strictEqual(t.verificarToken(token, 'acesso').ok, true);
+    t.consumir(token);
+    const r = t.verificarToken(token, 'acesso');
+    assert.strictEqual(r.ok, false);
+    assert.match(r.motivo, /ja usado/);
+  });
+
+  test('queimar um token nao afeta os outros', () => {
+    const t = carregar({ LINK_SECRET: SEGREDO });
+    const a = t.gerarToken({ slug: 'clinica-teste', proposito: 'acesso', usoUnico: true });
+    const b = t.gerarToken({ slug: 'clinica-teste', proposito: 'acesso', usoUnico: true });
+    t.consumir(a);
+    assert.strictEqual(t.verificarToken(a, 'acesso').ok, false);
+    assert.strictEqual(t.verificarToken(b, 'acesso').ok, true);
+  });
+
+  test('token sem uso unico continua valendo depois de consumir', () => {
+    const t = carregar({ LINK_SECRET: SEGREDO });
+    const token = t.gerarToken({ slug: 'clinica-teste', proposito: 'cancelar' });
+    t.consumir(token);
+    // Cancelar e idempotente: nao faz mal repetir, e queimar o link so
+    // atrapalharia quem clicou duas vezes.
+    assert.strictEqual(t.verificarToken(token, 'cancelar').ok, true);
+  });
+
+  test('token de acesso nao serve para cancelar nem excluir', () => {
+    const t = carregar({ LINK_SECRET: SEGREDO });
+    const token = t.gerarToken({ slug: 'clinica-teste', proposito: 'acesso', usoUnico: true });
+    assert.strictEqual(t.verificarToken(token, 'cancelar').ok, false);
+    assert.strictEqual(t.verificarToken(token, 'excluir').ok, false);
+  });
+
   test('o link de cancelamento carrega unidade e token', () => {
     const t = carregar({ LINK_SECRET: SEGREDO });
     const link = t.linkDeCancelamento('https://fila.exemplo.com', 'clinica-teste');
