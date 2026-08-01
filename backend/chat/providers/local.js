@@ -12,6 +12,17 @@ const MODELO = process.env.LOCAL_LLM_MODEL || 'qwen2.5:7b';
 const TIMEOUT_MS = Number(process.env.LOCAL_LLM_TIMEOUT_MS || 90000);
 const TEMPERATURA = Number(process.env.LOCAL_LLM_TEMPERATURE || 0.3);
 
+// Quanto tempo o runtime segura o modelo na memoria depois da ultima chamada.
+//
+// Isto vale mais que trocar de modelo. Medido numa RTX 4060 com qwen2.5:7b:
+// modelo frio 5,5s, quente 1,0s — 5x, so por nao recarregar 4,7GB do disco
+// para a VRAM. O padrao do Ollama e 5 minutos, e num site de vendas de baixo
+// trafego isso significa que quase todo visitante paga o carregamento.
+//
+// "-1" mantem para sempre. O campo e ignorado por runtimes que nao o
+// conhecem (llama.cpp, vLLM, LM Studio), entao mandar nao quebra ninguem.
+const KEEP_ALIVE = process.env.LOCAL_LLM_KEEP_ALIVE || '30m';
+
 function paraFormatoOpenAI(definicoes) {
   return definicoes.map(d => ({
     type: 'function',
@@ -36,6 +47,7 @@ async function chamar({ system, mensagens, ferramentas }) {
     temperature: TEMPERATURA,
     messages: [{ role: 'system', content: system }, ...mensagens],
     stream: false,
+    keep_alive: KEEP_ALIVE,
   };
   if (ferramentas && ferramentas.length) corpo.tools = paraFormatoOpenAI(ferramentas);
 
@@ -233,6 +245,31 @@ function mensagensDeResultado(mensagemBruta, resultados) {
   ];
 }
 
+// Carrega o modelo sem gerar nada, so para ele ja estar residente quando o
+// primeiro visitante escrever. Falha em silencio de proposito: se o runtime
+// nao estiver no ar, isso nao pode impedir o servidor de subir.
+async function aquecer() {
+  try {
+    const resposta = await fetch(`${BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(process.env.LOCAL_LLM_API_KEY ? { Authorization: `Bearer ${process.env.LOCAL_LLM_API_KEY}` } : {}),
+      },
+      body: JSON.stringify({
+        model: MODELO,
+        messages: [{ role: 'user', content: 'ok' }],
+        max_tokens: 1,
+        keep_alive: KEEP_ALIVE,
+      }),
+      signal: AbortSignal.timeout(Number(process.env.LOCAL_LLM_WARMUP_TIMEOUT_MS || 120000)),
+    });
+    return { ok: resposta.ok };
+  } catch (erro) {
+    return { ok: false, motivo: erro.message };
+  }
+}
+
 async function verificar() {
   try {
     const resposta = await fetch(`${BASE}/models`, { signal: AbortSignal.timeout(4000) });
@@ -257,6 +294,8 @@ module.exports = {
   MODELO,
   chamar,
   verificar,
+  aquecer,
+  KEEP_ALIVE,
   achatarConteudo,
   mensagensDeResultado,
   analisarArgumentos,

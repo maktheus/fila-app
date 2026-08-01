@@ -19,6 +19,13 @@
   h1{font-family:var(--font-display);font-size:24px;font-weight:600;margin:0 0 6px}
   .sub{font-size:14.5px;color:var(--fg-2);line-height:1.55;margin:0 0 22px}
   .cartao{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:16px}
+  .ciclos{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+  .ciclo{display:flex;flex-direction:column;gap:2px;padding:12px 10px;border:1px solid var(--border-strong);border-radius:11px;background:var(--bg-2);cursor:pointer;text-align:left;font:inherit;color:var(--fg-1)}
+  .ciclo.on{border-color:var(--mutum-ink);border-width:2px;padding:11px 9px;background:var(--surface)}
+  .ciclo-nome{font-size:13px;font-weight:700}
+  .ciclo-nome em{font-style:normal;font-size:11px;font-weight:700;color:var(--mutum-forest);background:#E4F0E9;padding:1px 6px;border-radius:99px;margin-left:4px}
+  .ciclo-valor{font-family:var(--font-display);font-size:19px;font-weight:600}
+  .ciclo-nota{font-size:11.5px;color:var(--fg-3)}
   .preco{display:flex;align-items:baseline;gap:8px;padding-bottom:16px;border-bottom:1px solid var(--border);margin-bottom:16px}
   .preco strong{font-family:var(--font-display);font-size:30px;font-weight:600}
   .preco span{font-size:14px;color:var(--fg-3)}
@@ -56,7 +63,20 @@
   <p class="sub" id="sub">Entradas ilimitadas, todos os balcões e sem anúncios.</p>
 
   <div class="cartao">
-    <div class="preco"><strong id="preco">—</strong><span>por mês, por unidade</span></div>
+    <div class="ciclos" id="ciclos" role="radiogroup" aria-label="Ciclo de cobrança">
+      <button type="button" class="ciclo on" data-ciclo="mensal" role="radio" aria-checked="true">
+        <span class="ciclo-nome">Mensal</span>
+        <span class="ciclo-valor" id="valor-mensal">—</span>
+        <span class="ciclo-nota">por mês</span>
+      </button>
+      <button type="button" class="ciclo" data-ciclo="anual" role="radio" aria-checked="false">
+        <span class="ciclo-nome">Anual <em id="economia"></em></span>
+        <span class="ciclo-valor" id="valor-anual">—</span>
+        <span class="ciclo-nota">à vista, 12 meses</span>
+      </button>
+    </div>
+
+    <div class="preco"><strong id="preco">—</strong><span id="preco-nota">por mês, por unidade</span></div>
     <ul class="lista">
       <li>Entradas ilimitadas por dia</li>
       <li>Todos os balcões liberados</li>
@@ -98,6 +118,26 @@
 
   var elEmail = document.getElementById("email");
   var elAviso = document.getElementById("aviso");
+  // O nome do ciclo vai para o servidor; o PREÇO nunca. O servidor mapeia um
+  // contra o outro numa tabela fechada.
+  var ciclo = "mensal";
+
+  function trocarCiclo(novo) {
+    ciclo = novo === "anual" ? "anual" : "mensal";
+    var dados = config.googlePay;
+    document.querySelectorAll(".ciclo").forEach(function (b) {
+      var ativo = b.dataset.ciclo === ciclo;
+      b.classList.toggle("on", ativo);
+      b.setAttribute("aria-checked", String(ativo));
+    });
+    var c = config.ciclos[ciclo];
+    document.getElementById("preco").textContent = c.label;
+    document.getElementById("preco-nota").textContent =
+      ciclo === "anual" ? "por ano, por unidade" : "por mês, por unidade";
+    if (dados) dados.precoCentavos = c.centavos;
+    // O botão do Google Pay carrega o valor no momento do clique, então trocar
+    // o ciclo depois de ele existir continua funcionando.
+  }
 
   function avisar(texto, tipo) {
     elAviso.textContent = texto;
@@ -124,7 +164,7 @@
       var res = await fetch(API + "/api/venues/" + encodeURIComponent(unidade) + "/cobranca", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email })
+        body: JSON.stringify({ email: email, ciclo: ciclo })
       });
       var d = await res.json();
       if (!res.ok) throw new Error(d.error || "Não consegui gerar o Pix.");
@@ -156,7 +196,7 @@
         headers: { "Content-Type": "application/json" },
         // Repare no que não vai daqui: valor nenhum. Quem decide quanto
         // cobrar é o servidor.
-        body: JSON.stringify({ email: email, token: token, bandeira: bandeira })
+        body: JSON.stringify({ email: email, token: token, bandeira: bandeira, ciclo: ciclo })
       });
       var d = await res.json();
       if (!res.ok) throw new Error(d.error || "O pagamento não foi aprovado.");
@@ -259,7 +299,10 @@
     }
     try {
       config = await (await fetch(API + "/api/pagamento/config")).json();
-      document.getElementById("preco").textContent = config.precoLabel;
+      document.getElementById("valor-mensal").textContent = config.ciclos.mensal.label;
+      document.getElementById("valor-anual").textContent = config.ciclos.anual.label;
+      document.getElementById("economia").textContent = "economize " + config.ciclos.anual.economiaLabel;
+      trocarCiclo("mensal");
       document.getElementById("sub").textContent =
         "Unidade " + unidade + ". Entradas ilimitadas, todos os balcões e sem anúncios.";
       montarGooglePay();
@@ -268,6 +311,9 @@
     }
   })();
 
+  document.querySelectorAll(".ciclo").forEach(function (b) {
+    b.addEventListener("click", function () { trocarCiclo(b.dataset.ciclo); });
+  });
   document.getElementById("btn-pix").addEventListener("click", pagarComPix);
   document.getElementById("btn-copiar").addEventListener("click", function () {
     var codigo = document.getElementById("pix-codigo").textContent;

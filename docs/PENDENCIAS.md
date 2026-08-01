@@ -8,77 +8,124 @@ Ordenado por quanto custa deixar como está, não por dificuldade.
 
 ---
 
-## 1. Os e-mails não saem
+## 1. ✅ Os e-mails — construído em 31/07
 
-**Estado:** os textos existem em `backend/notify.js` — fila criada, teste
-acabando, teste vencido, premium ativado, pagamento falhou, assinatura
-cancelada. Todos funcionam. Mas `MAIL_ENABLED` é `false` por padrão, e sem SMTP
-configurado o `sendEmail` só escreve no log e volta.
+**Estado: o envio funciona.** Testado ponta a ponta contra um SMTP real: o
+cadastro de uma unidade disparou o e-mail sozinho e ele chegou.
 
-**Por que isso é o pior item da lista:** o cliente cria a fila, recebe a senha
-na tela, fecha o navegador e **nunca mais ouve falar de você**. Não é sabotagem
-de conversão, é ausência de conversão. Todo o resto do funil pressupõe que esses
-e-mails chegam.
+O que existia antes era uma armadilha: o `require('nodemailer')` estava no
+código mas a dependência **não estava instalada**. Ligar `MAIL_ENABLED=true`
+faria o `require` estourar, o `catch` engolir, e você veria o sistema
+respondendo normalmente sem nada sair.
 
-**O que fazer:** contratar um SMTP transacional (Resend, Brevo e Amazon SES têm
-faixa gratuita que cobre bem mais que os primeiros meses), preencher
-`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` e virar
-`MAIL_ENABLED=true`. O código não precisa mudar.
+O que foi construído: dependência instalada, um transporte com pool em vez de um
+por mensagem, três tentativas com espera crescente para falha transitória (e
+nenhuma para 5xx, que é recusa definitiva), verificação na subida que **grita no
+log** se estiver ligado e quebrado, `GET /api/email/status` e
+`POST /api/email/teste` para conferir sem esperar um cadastro real, e um coletor
+de e-mail local no compose (`--profile mail`) para ver as mensagens sem
+contratar provedor.
 
-**Antes de virar a chave:** configurar SPF, DKIM e DMARC no domínio. Sem isso o
-e-mail vai para spam e o efeito é o mesmo de não enviar — só que você acha que
-está enviando.
+Procedimento completo em **[EMAIL.md](EMAIL.md)**.
 
----
+**O que ainda é seu:**
 
-## 2. Ninguém paga o segundo mês
-
-**Estado:** a primeira cobrança é gerada — no chat (Pix) ou em `assinar.html`
-(Pix ou cartão). A **renovação não existe**. Não há job de ciclo, não há
-cobrança recorrente, não há e-mail de "sua mensalidade venceu".
-
-**Por que dói:** como não guardamos cartão nem usamos débito automático, o
-cliente só paga de novo se for lembrado. Sem o lembrete, a receita morre no mês
-1 e o `effectivePlan()` derruba a unidade para o gratuito sozinha — o cliente
-descobre pelo produto piorando, o que é a pior forma de descobrir.
-
-**Caminhos, do mais simples ao mais completo:**
-
-1. **Job de ciclo + e-mail** (algumas horas de trabalho). Um `setInterval` que
-   varre as unidades com `currentPeriodEnd` próximo, gera a cobrança do ciclo e
-   dispara o e-mail. Reaproveita tudo que já existe. Depende do item 1.
-2. **Preapproval do Mercado Pago** (assinatura de verdade, com cartão). O MP
-   cobra sozinho todo mês. **Não implementei porque não consegui confirmar a
-   forma exata do endpoint na documentação** — a página da referência devolveu
-   404 nas duas tentativas. Escrever integração de pagamento a partir de
-   memória é como esse tipo de bug entra em produção. Precisa ser confirmado
-   contra a conta real antes de codar.
-3. **Pix Automático.** O rail do Banco Central está no ar desde junho de 2025 e
-   em rollout ao longo de 2026. É a resposta certa a médio prazo para um
-   produto brasileiro de assinatura barata, porque não tem MDR. Vale checar com
-   o MP se a sua conta já tem.
-
-O adaptador em `backend/payments/mercadopago.js` está estruturado para receber
-qualquer um dos três sem mexer no resto.
+1. **Escolher e contratar um SMTP.** Resend, Brevo, SES e Mailgun têm faixa
+   gratuita que cobre muito mais que os primeiros meses. Não use Gmail nem o
+   SMTP da hospedagem: limite baixo e nenhum relatório de entrega.
+2. **Configurar SPF, DKIM e DMARC** no domínio **antes** de ligar em produção.
+   Domínio novo disparando sem autenticação cai em spam, e o efeito prático é
+   idêntico ao de não enviar. Pior: um domínio queimado leva semanas para
+   recuperar reputação.
+3. **Mandar o teste para um Gmail** e confirmar que caiu na caixa de entrada.
 
 ---
 
-## 3. Não dá para cancelar sozinho
+## 2. ✅ A renovação — construída em 01/08
 
-**Estado:** não existe. Para cancelar, o cliente precisa falar com você.
+**Estado: o ciclo roda sozinho.** Testado com o relógio adiantado: aviso prévio
+3 dias antes (já com o Pix do próximo ciclo dentro do e-mail), aviso no
+vencimento, aviso de atraso e rebaixamento depois da tolerância — cada um uma
+vez só.
 
-**Por que isso é mais sério que os outros:** é **obrigação legal**. O Código de
-Defesa do Consumidor exige que cancelar seja tão fácil quanto contratar — e
-contratar aqui leva um clique num chat. Um cancelamento que exige e-mail e
-espera é exatamente o que o Decreto 11.034/2022 endereça.
+Duas decisões que valem entender:
 
-Além do risco jurídico, é o item que mais te puxa de volta para dentro do
-processo: cada cancelamento vira uma conversa sua.
+**A decisão é uma função pura** (`billing.acaoDoCiclo`). O calendário de um ano
+inteiro roda em milissegundos nos testes, sem esperar um mês passar e sem
+simular temporizador. O job de hora em hora só executa o que ela decide.
 
-**O que fazer:** botão no painel do operador → `POST /api/venues/:slug/cancelar`
-→ `subscription.status = 'canceled'`, mantendo o premium até o fim do ciclo já
-pago (`currentPeriodEnd`), com e-mail de confirmação. O `applyEvent` já entende
-`subscription.canceled`; falta a rota e o botão.
+**O plano não depende do job ter rodado.** `effectivePlan` deriva tudo do
+relógio, tolerância incluída. Se o container ficar parado dois dias, ninguém
+fica premium de graça nem cai por engano; ao voltar, o job só manda os e-mails
+atrasados.
+
+O **plano anual** entrou junto: R$ 990 à vista contra R$ 1.188 pagando mês a
+mês. Sem cartão guardado, cada renovação mensal é uma chance de perder o
+cliente por esquecimento — pagar uma vez elimina onze dessas chances, e o
+desconto é o que compra isso.
+
+**Um bug que só apareceu testando:** o job marcava o aviso como enviado sem
+saber se o e-mail tinha sido entregue. Um SMTP fora do ar por uma hora faria o
+cliente ser rebaixado sem **nunca** ter sido avisado — e nós acharíamos que
+avisamos. Agora o aviso só conta se saiu, e a próxima rodada tenta de novo. O
+rebaixamento é a exceção: o estado já mudou, então marca sempre.
+
+**O que ainda falta aqui:**
+
+- **Devolução proporcional no anual.** Pelo CDC, quem cancela um anual no meio
+  tem direito ao proporcional. Hoje não há estorno automático — é operação no
+  painel do provedor. Precisa entrar junto com o cancelamento self-service.
+- **Preapproval do Mercado Pago** (assinatura com cartão, cobrada sozinha).
+  Continua não implementado porque a página da referência devolveu 404 nas duas
+  tentativas, e escrever integração de pagamento a partir de memória é como
+  esse tipo de bug entra em produção.
+- **Pix Automático**, quando a conta tiver.
+
+---
+
+## 3. ✅ Cancelamento e exclusão — construídos em 01/08
+
+**Estado: o cliente cancela sozinho, sem falar com você.** Duas portas: o painel
+do operador, e um **link assinado no rodapé de todo e-mail de cobrança** —
+porque quem perdeu a senha é justamente quem não entra no painel, e sem esse
+caminho cancelar viraria uma conversa sua.
+
+**Cancelar mantém o premium até o fim do ciclo já pago.** Cortar na hora seria
+ficar com o dinheiro sem entregar o serviço.
+
+**A tela explica que cancelar não desliga a fila.** Ela continua no ar, no
+gratuito, e nada é apagado. Isso é retenção honesta: informação, não atrito —
+atrito para cancelar é justamente o que o CDC proíbe. Há um campo de motivo,
+opcional, para você saber por que perde cliente.
+
+**Estorno do anual é calculado e enfileirado, não executado.** Proporcional aos
+dias não usados, registrado em `GET /api/estornos` para você confirmar no painel
+do provedor. Devolução automática é dinheiro saindo sozinho: um bug ali custa
+caro e é difícil de reverter.
+
+**Exclusão (LGPD art. 18) exige dois passos.** O link do rodapé cancela; não
+apaga. Pedir a exclusão dispara um **segundo e-mail**, com link de propósito
+próprio e validade curta. Se fossem o mesmo link, um e-mail de cobrança
+encaminhado — ou vazado — apagaria o negócio de alguém. Cancelar tem volta;
+exclusão não. Ainda pede o nome do estabelecimento digitado.
+
+### O que os testes pegaram
+
+Meus primeiros testes de segurança foram **inconclusivos, não positivos**:
+`LINK_SECRET` não estava no `docker-compose.yml`, então o container gerou um
+segredo efêmero e os tokens que eu criava por fora eram assinados com outra
+chave. Todo "assinatura inválida" era isso, não a defesa funcionando.
+
+Com o segredo compartilhado, as defesas se confirmaram de verdade: token de
+outra unidade recusado, token de cancelar não apaga, nome errado não confirma.
+
+Também corrigi uma mensagem enganosa: token de outra unidade respondia "link não
+serve para esta ação" — a falha da segunda tentativa, não a real. Mensagem
+errada manda a pessoa procurar o problema no lugar errado.
+
+**O que ainda é seu:** `LINK_SECRET` é obrigatório em produção. Sem ele o
+servidor recusa assinar links e cancelar volta a depender da senha. Gere com
+`openssl rand -hex 32`.
 
 ---
 
@@ -156,9 +203,24 @@ fingir que gerou o Pix.
 
 O `laboratorio.html` mede isso caso a caso — dá para comparar antes de decidir.
 
-**Latência também pesa:** de 3 a 20 segundos por resposta em CPU. Num widget de
-site isso é muito. `qwen2.5:3b` é ~3× mais rápido e os guardrails continuam
-sendo a rede.
+**Latência: resolvida, e não era o modelo.** Medido numa RTX 4060 com
+`qwen2.5:7b`: modelo frio 5,5s, quente 1,0s a ~37 tokens/s. Os "3 a 20 segundos"
+que apareciam eram quase todos custo de recarregar 4,7GB do disco para a VRAM —
+o Ollama descarrega depois de 5 minutos, e num site de baixo tráfego quase todo
+visitante pegava o modelo frio.
+
+Corrigido com `keep_alive` em toda chamada (`LOCAL_LLM_KEEP_ALIVE`, padrão 30m)
+e um aquecimento na subida do servidor. Ficou em **1,1 a 2,5s**.
+
+Vale registrar o que **não** serve aqui: **AirLLM é o contrário do que se
+quer**. Ele fatia o modelo camada por camada para caber num GPU pequeno, e paga
+isso em velocidade — os relatos vão de 0,7 token/s a casos extremos de 100
+segundos por token. É solução de memória, não de latência.
+
+Se um dia a latência voltar a incomodar, o caminho de verdade é **speculative
+decoding** (um modelo-rascunho pequeno propõe tokens e o grande valida em uma
+passada só; pares como Qwen 0.6B → 8B dão ~1.9×) ou um modelo menor. Nada disso
+é necessário hoje.
 
 ---
 
@@ -201,9 +263,9 @@ descobre que ele existe.
 
 ## Ordem que eu seguiria
 
-1. **E-mails** (item 1) — destrava 2 e 4, e é o mais barato.
-2. **Domínio + HTTPS** (item 7) — destrava tudo que é externo.
-3. **Cancelamento** (item 3) — obrigação legal, não escolha.
-4. **Renovação** (item 2) — sem isso não existe receita recorrente.
+1. ~~E-mails (item 1)~~ — feito em 31/07. Falta contratar o SMTP e o DNS.
+2. ~~Renovação (item 2)~~ — feita em 01/08, com plano anual junto.
+3. **Domínio + HTTPS** (item 7) — destrava tudo que é externo.
+4. ~~Cancelamento (item 3)~~ — feito em 01/08, com exclusão LGPD e estorno.
 5. **Recuperação de senha** (item 4).
 6. O resto, conforme aparecer volume.

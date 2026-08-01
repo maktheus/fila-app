@@ -176,6 +176,68 @@ a jornada ser testável sem conta no Google.
 
 Detalhes e plano B em [PENDENCIAS.md](PENDENCIAS.md#5).
 
+## Ciclo de cobrança
+
+`backend/billing.js` decide, `backend/server.js` executa.
+
+A decisão é **uma função pura**, `acaoDoCiclo(venue, agora)`. Isso não é
+purismo: o calendário de um ano inteiro roda em milissegundos nos testes, sem
+esperar um mês passar e sem simular temporizador. Bug de calendário só aparece
+na virada do mês ou no fim da tolerância — descobrir isso em produção significa
+descobrir com dinheiro de cliente no meio.
+
+O que ela decide, na ordem em que acontece:
+
+| Quando | Ação | E-mail |
+|---|---|---|
+| 3 dias antes | emite o Pix do próximo ciclo | `renewal_upcoming` |
+| no vencimento | reaproveita o mesmo Pix | `renewal_due` |
+| vencido, dentro da tolerância | avisa quantos dias faltam | `renewal_overdue` |
+| passada a tolerância (3 dias) | volta ao gratuito | `downgraded` |
+
+**O Pix vai dentro do e-mail.** Sem cartão guardado, cada renovação depende da
+pessoa agir, e todo passo entre o aviso e o pagamento derruba a conversão.
+Mandar "acesse o painel para pagar" é pedir para ela lembrar duas vezes.
+
+**O plano não depende do job ter rodado.** `effectivePlan` deriva tudo do
+relógio, tolerância incluída. Container parado dois dias não deixa ninguém
+premium de graça nem derruba ninguém por engano; ao voltar, o job só manda os
+e-mails atrasados.
+
+**Aviso só conta se o e-mail saiu.** Sem isso, um SMTP fora do ar por uma hora
+faria o cliente ser rebaixado sem nunca ter sido avisado — e nós acharíamos que
+avisamos. O rebaixamento é a exceção: o estado já mudou, então marca sempre.
+
+**Quem paga adiantado não perde dias.** O ciclo novo começa onde o antigo
+terminava, não em "agora". Pagar três dias antes custaria três dias.
+
+Para ver um mês inteiro em segundos, fora de produção:
+
+```bash
+curl -X POST http://localhost/api/ciclo/rodar -H "Content-Type: application/json" -H "Authorization: Bearer SEU_TOKEN" -d '{"em": 1790000000000}'
+```
+
+## Mensal e anual
+
+| | Mensal | Anual |
+|---|---|---|
+| Preço | R$ 99,00 | R$ 990,00 |
+| Equivale a | — | 10 meses |
+| Economia | — | R$ 198,00 |
+
+O anual existe por um motivo específico: **sem cartão guardado, cada renovação
+mensal é uma chance de perder o cliente por esquecimento.** Pagar uma vez
+elimina onze dessas chances. O desconto é o que compra isso, não generosidade.
+
+O cliente escolhe o **ciclo**; o servidor decide o **preço**. Aceitar `"anual"`
+de fora é seguro porque o nome é validado contra uma tabela fechada e o valor
+sai dela — inclusive `__proto__` e `constructor` caem no mensal. Aceitar um
+valor de fora nunca é seguro, e continua não acontecendo em lugar nenhum.
+
+**Pendência do anual:** pelo CDC, quem cancela no meio tem direito ao
+proporcional. Não há estorno automático — precisa entrar junto com o
+cancelamento self-service.
+
 ## Recorrência: o que existe e o que não
 
 Hoje é **avulso por ciclo**, tanto no Pix quanto no cartão. Não guardamos o
