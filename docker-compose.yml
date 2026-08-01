@@ -100,6 +100,13 @@ services:
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - MAIL_RETRIES=${MAIL_RETRIES:-3}
+      # Para onde vao os avisos de dinheiro entrando e saindo. Vazio = so log.
+      - OWNER_EMAIL=${OWNER_EMAIL:-}
+      - APP_VERSION=${APP_VERSION:-0.1.0}
+      - TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS:-1}
+      - FREE_DAILY_TICKETS=${FREE_DAILY_TICKETS:-50}
+      - FREE_COUNTERS=${FREE_COUNTERS:-1}
+      - TRIAL_WARN_DAYS=${TRIAL_WARN_DAYS:-3}
       - CHAT_PROVIDER=${CHAT_PROVIDER:-local}
       - LOCAL_LLM_KEEP_ALIVE=${LOCAL_LLM_KEEP_ALIVE:-30m}
       # O runtime local roda na maquina host, fora do compose. Dentro do

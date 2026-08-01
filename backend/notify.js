@@ -325,6 +325,50 @@ Para cancelar a qualquer momento: ${extra.linkCancelar}`
   return record;
 }
 
+// --------------- Avisos para o dono ---------------
+//
+// Um negocio que voce nao toca precisa te contar quando o dinheiro se mexe.
+// Sem isto, a unica forma de saber que alguem assinou — ou cancelou — e
+// abrindo o painel por conta propria, e ninguem abre painel todo dia.
+//
+// So dinheiro entra aqui, de proposito. Aviso de tudo vira ruido, e ruido
+// vira filtro, e filtro faz voce perder o aviso que importava.
+const OWNER_EMAIL = process.env.OWNER_EMAIL || '';
+
+const AVISOS_DE_DINHEIRO = {
+  assinou: (d) => `${d.nome} assinou o plano ${d.ciclo} (${d.valor}).`,
+  renovou: (d) => `${d.nome} renovou (${d.valor}).`,
+  cancelou: (d) => `${d.nome} cancelou.${d.estorno ? ` Estorno a confirmar: ${d.estorno}.` : ''}`,
+  caiu: (d) => `${d.nome} voltou ao gratuito por falta de pagamento.`,
+};
+
+async function avisarDono(tipo, dados = {}) {
+  const montar = AVISOS_DE_DINHEIRO[tipo];
+  if (!montar) return null;
+
+  const linha = montar(dados);
+  // Sempre no log, mesmo sem e-mail do dono configurado: assim o historico
+  // existe de qualquer jeito e da para reconstruir depois.
+  console.log(`[dinheiro] ${linha}`);
+
+  if (!OWNER_EMAIL || !MAIL_ENABLED) return { avisado: false, linha };
+
+  const r = await entregar({
+    from: MAIL_FROM,
+    to: OWNER_EMAIL,
+    subject: `Fila Virtual: ${linha.slice(0, 70)}`,
+    text: [
+      linha,
+      ``,
+      dados.receitaMensal ? `Receita recorrente agora: ${dados.receitaMensal}` : '',
+      dados.assinantes != null ? `Assinantes ativos: ${dados.assinantes}` : '',
+      ``,
+      dados.painel ? `Painel: ${dados.painel}` : '',
+    ].filter(l => l !== '').join('\n'),
+  });
+  return { avisado: r.ok, linha };
+}
+
 // Envio de teste, para conferir a configuracao sem esperar um evento real.
 async function enviarTeste(destino) {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(destino || ''))) {
@@ -377,6 +421,8 @@ module.exports = {
   verificarEmail,
   statusEmail,
   enviarTeste,
+  avisarDono,
+  OWNER_EMAIL,
   TEMPLATES,
   track,
   funnelSummary,

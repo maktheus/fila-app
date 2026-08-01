@@ -245,3 +245,74 @@ describe('virada de mes', () => {
     }
   });
 });
+
+describe('metricas do painel', () => {
+  const billing = carregar();
+  const DIA = 86400000;
+
+  function cenario(agora) {
+    return [
+      { slug: 'a', name: 'A', subscription: { status: 'active', interval: 'mensal', currentPeriodStart: agora - 20 * DIA, currentPeriodEnd: agora + 10 * DIA } },
+      { slug: 'b', name: 'B', subscription: { status: 'active', interval: 'anual', currentPeriodStart: agora - 30 * DIA, currentPeriodEnd: agora + 335 * DIA } },
+      { slug: 'c', name: 'C', subscription: { status: 'trialing', trialEndsAt: agora + 2 * DIA } },
+      { slug: 'd', name: 'D', subscription: { status: 'trialing', trialEndsAt: agora + 10 * DIA } },
+      { slug: 'e', name: 'E', subscription: { status: 'past_due', currentPeriodEnd: agora - 10 * DIA } },
+      { slug: 'f', name: 'F', subscription: { status: 'canceled', currentPeriodEnd: agora - DIA, estornoPendente: { centavos: 74589, label: 'R$ 745,89', pago: false, solicitadoEm: agora } } },
+    ];
+  }
+
+  // O anual entra dividido por doze. Somar R$ 990 num mes so inflaria a
+  // receita recorrente e daria a impressao de que entra dez vezes mais.
+  test('o anual entra na receita mensal dividido por doze', () => {
+    const agora = Date.now();
+    const m = billing.metricas(cenario(agora), agora);
+    // 1 mensal (9900) + 1 anual (99000/12 = 8250) = 18150
+    assert.strictEqual(m.receitaMensalCentavos, 9900 + Math.round(99000 / 12));
+    assert.strictEqual(m.porCiclo.mensal, 1);
+    assert.strictEqual(m.porCiclo.anual, 1);
+  });
+
+  test('conta cada estado de assinatura no lugar certo', () => {
+    const agora = Date.now();
+    const m = billing.metricas(cenario(agora), agora);
+    assert.strictEqual(m.assinantes, 2);
+    assert.strictEqual(m.emTeste, 2);
+    assert.strictEqual(m.inadimplentes, 1);
+    assert.strictEqual(m.canceladas, 1);
+    assert.strictEqual(m.total, 6);
+  });
+
+  // A lista mais acionavel do painel: e a hora em que a pessoa decide pagar
+  // ou sumir.
+  test('so lista os testes que vencem em ate 3 dias', () => {
+    const agora = Date.now();
+    const m = billing.metricas(cenario(agora), agora);
+    assert.strictEqual(m.testesVencendoEm3Dias.length, 1);
+    assert.strictEqual(m.testesVencendoEm3Dias[0].slug, 'c');
+  });
+
+  test('estorno pendente vira lista e total', () => {
+    const agora = Date.now();
+    const m = billing.metricas(cenario(agora), agora);
+    assert.strictEqual(m.estornosPendentes.length, 1);
+    assert.strictEqual(m.estornoPendenteCentavos, 74589);
+    assert.strictEqual(m.estornoPendenteLabel, 'R$ 745,89');
+  });
+
+  test('estorno ja pago sai da lista', () => {
+    const agora = Date.now();
+    const lista = cenario(agora);
+    lista[5].subscription.estornoPendente.pago = true;
+    const m = billing.metricas(lista, agora);
+    assert.strictEqual(m.estornosPendentes.length, 0);
+    assert.strictEqual(m.estornoPendenteCentavos, 0);
+  });
+
+  test('sem unidade nenhuma, zero em tudo — e nao NaN', () => {
+    const m = billing.metricas([], Date.now());
+    assert.strictEqual(m.receitaMensalCentavos, 0);
+    assert.strictEqual(m.receitaMensalLabel, 'R$ 0,00');
+    assert.strictEqual(m.assinantes, 0);
+    assert.deepStrictEqual(m.testesVencendoEm3Dias, []);
+  });
+});

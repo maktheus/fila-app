@@ -1,11 +1,104 @@
-# Observabilidade de comportamento
+# Observabilidade
 
-Duas camadas diferentes, que respondem perguntas diferentes:
+O objetivo do produto é funcionar sem você participar. Mas um negócio que você
+não observa é um negócio que você não consegue consertar — e a falha mais cara
+não é a que quebra alto, é a que roda em silêncio por semanas.
+
+Três camadas, cada uma respondendo uma pergunta diferente:
 
 | Camada | Pergunta | Onde |
 |---|---|---|
+| Negócio | Está fazendo dinheiro, e está inteiro? | `/painel.html` |
+| Comportamento | Onde as pessoas travam? | `/analitico.html` (este documento) |
 | Infraestrutura | O serviço está no ar? | `docs/MONITORAMENTO.md` (Uptime Kuma) |
-| Comportamento | Onde as pessoas travam? | este documento (`/analitico.html`) |
+
+---
+
+## Painel do dono — `/painel.html`
+
+`GET /api/painel`, autenticado. Uma leitura só, porque se você precisa abrir
+cinco abas para saber se o negócio está de pé, você não abre nenhuma.
+
+**Receita recorrente por mês** é o número grande. O plano anual entra dividido
+por doze: somar R$ 990 num mês só inflaria a receita e daria a impressão de que
+entra dez vezes mais do que entra.
+
+Abaixo dele, o que é acionável:
+
+- **Testes vencendo em 3 dias** — a lista mais útil que existe aqui. É a hora
+  em que a pessoa decide pagar ou sumir.
+- **Assinaturas vencendo em 7 dias** — quem o ciclo vai cobrar.
+- **Estornos a confirmar** — sua lista de tarefas: dinheiro que você prometeu
+  devolver e ainda não devolveu. O botão marca como pago depois de você
+  confirmar no painel do provedor.
+
+### Saúde: cada luz é algo que para o negócio sem barulho
+
+| Luz | Vermelho significa |
+|---|---|
+| Banco de dados | nada funciona — você vai saber rápido |
+| E-mail | cadastro, cobrança e recuperação de senha não chegam a ninguém |
+| Vendedor | o chat não atende, e a landing vira folheto |
+| Pagamento | em produção, `sandbox` = ninguém está pagando de verdade |
+| Links assinados | sem `LINK_SECRET`, cancelar volta a depender da senha |
+| Cobrança automática | job parado há mais de 3h = receita parada |
+
+Duas merecem explicação, porque são do tipo que mostra verde estando errada:
+
+**Pagamento em sandbox** só é verde fora de produção. Em produção, sandbox
+significa que a receita no painel é imaginária — o falso positivo mais caro que
+existe aqui, e por isso fica vermelho.
+
+**Cobrança automática** olha quando o job rodou pela última vez, não se ele
+existe. Um `setInterval` que morreu continua "configurado".
+
+## Avisos: só dinheiro
+
+`OWNER_EMAIL` recebe um e-mail quando o dinheiro se mexe: alguém assinou,
+renovou, cancelou (com o estorno a confirmar, se houver) ou caiu para o
+gratuito por falta de pagamento.
+
+**Só dinheiro entra aqui, de propósito.** Aviso de tudo vira ruído, ruído vira
+filtro, e filtro faz você perder o aviso que importava.
+
+Todo aviso também vai para o log com o prefixo `[dinheiro]`, mesmo sem
+`OWNER_EMAIL` configurado — assim o histórico existe de qualquer jeito.
+
+**Cuidado:** `OWNER_EMAIL` vazio desliga os avisos em silêncio. O servidor diz
+na subida qual caso está valendo. Variável que desliga recurso sem avisar é a
+pior espécie — o sistema responde normal e você só descobre o que perdeu quando
+vai procurar.
+
+## O que o servidor grita na subida
+
+Antes de qualquer requisição, o log já responde:
+
+```
+E-mail pronto: smtp.provedor.com como Fila Virtual <nao-responda@dominio.com.br>
+Avisos de dinheiro vao para voce@dominio.com.br.
+Modelo local aquecido e residente.
+Ciclo de cobranca a cada 60min · tolerancia 3d · aviso 3d antes
+```
+
+E quando algo está ligado e quebrado, em maiúsculas:
+
+```
+E-mail LIGADO MAS QUEBRADO: getaddrinfo ENOTFOUND smtp.errado.com
+OWNER_EMAIL vazio: avisos de dinheiro so no log, ninguem sera notificado.
+```
+
+## O que ainda não existe
+
+- **Alerta de coisa quebrada.** O painel mostra, mas não te procura. Um monitor
+  externo em `/api/health` cobre o caso mais grave; e-mail parado ou modelo
+  caído só aparecem se você olhar.
+- **Histórico de receita.** O painel mostra o agora, não a curva.
+- **Resumo semanal.** Você preferiu só os avisos de dinheiro; se mudar de
+  ideia, `billing.metricas()` já devolve tudo que ele precisaria.
+
+---
+
+# Observabilidade de comportamento
 
 ## O que é coletado
 

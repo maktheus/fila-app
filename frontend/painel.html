@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Painel do dono — Fila Virtual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#191919;--surface:#1F1E1C;--surface-2:#232220;--border:#34322E;--border-2:#4A4742;
+    --fg-1:#DBD4C9;--fg-2:#B5AFA4;--fg-3:#877F73;
+    --ok:#3F8A5B;--warn:#C48119;--bad:#E86660;--info:#3D8CC2;
+    --display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif;
+    --body:"Manrope",ui-sans-serif,system-ui,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  body{background:var(--bg);color:var(--fg-1);font-family:var(--body);-webkit-font-smoothing:antialiased}
+  button,input{font:inherit}
+  button{cursor:pointer}
+  button:focus-visible,input:focus-visible{outline:2px solid var(--info);outline-offset:2px}
+
+  .shell{max-width:1100px;margin:0 auto;padding:22px 22px 60px}
+  header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--border)}
+  header h1{font-family:var(--display);font-size:19px;font-weight:600}
+  header .sub{font-family:var(--display);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.13em;color:var(--fg-3)}
+  .spacer{margin-left:auto}
+  .btn{background:var(--surface);border:1px solid var(--border-2);color:var(--fg-1);border-radius:9px;padding:8px 13px;font-size:13px;font-weight:600}
+
+  .login{max-width:380px;margin:14vh auto;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:28px;display:grid;gap:13px}
+  .login h2{font-family:var(--display);font-size:18px}
+  .login p{font-size:13.5px;color:var(--fg-3);line-height:1.5}
+  .login input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border-2);background:var(--bg);color:var(--fg-1)}
+  .login .btn{width:100%;text-align:center;background:var(--info);border-color:var(--info);color:#0d0d0d;padding:12px}
+  .erro{font-size:13px;color:var(--bad);font-weight:600}
+
+  /* A receita é a única coisa que precisa ser lida de longe. */
+  .heroi{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;padding:26px 0 22px}
+  .heroi .valor{font-family:var(--display);font-size:52px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+  .heroi .rotulo{font-size:13px;color:var(--fg-3);margin-bottom:6px}
+
+  .numeros{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:22px}
+  .num{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:15px}
+  .num .n{font-family:var(--display);font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+  .num .t{font-size:12px;color:var(--fg-3);margin-top:3px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+  @media(max-width:860px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:16px}
+  .card > h2{font-family:var(--display);font-size:14px;font-weight:600;padding:13px 16px;border-bottom:1px solid var(--border);background:var(--surface-2);display:flex;align-items:center;gap:9px}
+  .card-corpo{padding:14px 16px}
+
+  .item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+  .item:last-child{border-bottom:0}
+  .item .nome{font-weight:600}
+  .item .detalhe{color:var(--fg-3);font-size:12.5px}
+  .item .direita{margin-left:auto;text-align:right;font-variant-numeric:tabular-nums}
+  .vazio{color:var(--fg-3);font-size:13px;padding:6px 0}
+
+  .luz{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+  .luz:last-child{border-bottom:0}
+  .luz i{width:9px;height:9px;border-radius:50%;background:var(--fg-3);flex:0 0 9px}
+  .luz.on i{background:var(--ok)}
+  .luz.off i{background:var(--bad)}
+  .luz.aviso i{background:var(--warn)}
+  .luz .obs{margin-left:auto;color:var(--fg-3);font-size:12px;text-align:right}
+
+  .tag{font-size:10.5px;font-weight:700;padding:2.5px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.05em}
+  .tag.ok{background:color-mix(in oklch,var(--ok) 22%,transparent);color:var(--ok)}
+  .tag.bad{background:color-mix(in oklch,var(--bad) 22%,transparent);color:var(--bad)}
+  .tag.warn{background:color-mix(in oklch,var(--warn) 24%,transparent);color:var(--warn)}
+  .btn-pago{background:transparent;border:1px solid var(--border-2);color:var(--fg-2);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;margin-left:10px}
+  .btn-pago:hover{color:var(--fg-1);border-color:var(--fg-3)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+
+<div class="login" id="login">
+  <h2>Painel do dono</h2>
+  <p>Receita, assinantes, testes vencendo e saúde do sistema. Entre com a senha do operador da unidade principal.</p>
+  <input id="senha" type="password" placeholder="Senha do operador" autocomplete="current-password">
+  <div class="erro hidden" id="login-erro"></div>
+  <button class="btn" id="entrar">Entrar</button>
+</div>
+
+<div class="shell hidden" id="app">
+  <header>
+    <div>
+      <div class="sub">Fila virtual</div>
+      <h1>Painel do dono</h1>
+    </div>
+    <div class="spacer"></div>
+    <span id="atualizado" style="font-size:12px;color:var(--fg-3)"></span>
+    <button class="btn" id="recarregar">Atualizar</button>
+  </header>
+
+  <div class="heroi">
+    <div>
+      <div class="rotulo">Receita recorrente por mês</div>
+      <div class="valor" id="mrr">—</div>
+    </div>
+    <div id="saude-geral"></div>
+  </div>
+
+  <div class="numeros" id="numeros"></div>
+
+  <div class="grid">
+    <div>
+      <section class="card">
+        <h2>Testes vencendo <span class="tag warn" id="tag-testes"></span></h2>
+        <div class="card-corpo" id="testes"></div>
+      </section>
+
+      <section class="card">
+        <h2>Assinaturas vencendo em 7 dias</h2>
+        <div class="card-corpo" id="vencendo"></div>
+      </section>
+    </div>
+
+    <div>
+      <section class="card">
+        <h2>Estornos a confirmar <span class="tag bad" id="tag-estornos"></span></h2>
+        <div class="card-corpo" id="estornos"></div>
+      </section>
+
+      <section class="card">
+        <h2>Saúde do sistema</h2>
+        <div class="card-corpo" id="saude"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="config.js?v=13"></script>
+<script>
+(function () {
+  "use strict";
+  var API = window.FILA_API_BASE || "";
+  var CHAVE = "fila_painel_token";
+  var token = sessionStorage.getItem(CHAVE) || "";
+
+  function qs(id) { return document.getElementById(id); }
+  function esc(v) { var d = document.createElement("div"); d.textContent = v == null ? "" : String(v); return d.innerHTML; }
+  function dataBr(ms) { return ms ? new Date(ms).toLocaleDateString("pt-BR") : "—"; }
+
+  function num(n, t) {
+    return '<div class="num"><div class="n">' + esc(n) + '</div><div class="t">' + esc(t) + "</div></div>";
+  }
+
+  function luz(estado, nome, obs) {
+    return '<div class="luz ' + estado + '"><i></i><span>' + esc(nome) + "</span>" +
+      (obs ? '<span class="obs">' + esc(obs) + "</span>" : "") + "</div>";
+  }
+
+  function render(d) {
+    var n = d.negocio, s = d.saude;
+
+    qs("mrr").textContent = n.receitaMensalLabel;
+    qs("atualizado").textContent = "às " + new Date(d.em).toLocaleTimeString("pt-BR");
+
+    qs("saude-geral").innerHTML = s.tudoOk
+      ? '<span class="tag ok">tudo no ar</span>'
+      : '<span class="tag bad">algo quebrado</span>';
+
+    qs("numeros").innerHTML =
+      num(n.assinantes, "assinantes") +
+      num(n.emTeste, "em teste") +
+      num(n.inadimplentes, "inadimplentes") +
+      num(n.canceladas, "canceladas") +
+      num(n.porCiclo.anual, "no plano anual") +
+      num(n.total, "unidades no total");
+
+    // Testes vencendo — a lista mais acionável: é a hora em que a pessoa
+    // decide pagar ou sumir.
+    qs("tag-testes").textContent = n.testesVencendoEm3Dias.length || "";
+    qs("tag-testes").classList.toggle("hidden", !n.testesVencendoEm3Dias.length);
+    qs("testes").innerHTML = n.testesVencendoEm3Dias.length
+      ? n.testesVencendoEm3Dias.map(function (t) {
+          return '<div class="item"><span class="nome">' + esc(t.nome) + "</span>" +
+            '<span class="direita">' + (t.faltam <= 0 ? "vence hoje" : t.faltam + " dia(s)") + "</span></div>";
+        }).join("")
+      : '<p class="vazio">Nenhum teste vencendo nos próximos 3 dias.</p>';
+
+    qs("vencendo").innerHTML = n.vencendoEm7Dias.length
+      ? n.vencendoEm7Dias.map(function (v) {
+          return '<div class="item"><span class="nome">' + esc(v.nome) + "</span>" +
+            '<span class="detalhe">' + esc(v.ciclo) + "</span>" +
+            '<span class="direita">' + dataBr(v.em) + "</span></div>";
+        }).join("")
+      : '<p class="vazio">Nenhuma assinatura vencendo nos próximos 7 dias.</p>';
+
+    // Estornos são a sua lista de tarefas: dinheiro que você prometeu devolver
+    // e ainda não devolveu.
+    qs("tag-estornos").textContent = n.estornosPendentes.length ? n.estornoPendenteLabel : "";
+    qs("tag-estornos").classList.toggle("hidden", !n.estornosPendentes.length);
+    qs("estornos").innerHTML = n.estornosPendentes.length
+      ? n.estornosPendentes.map(function (e) {
+          return '<div class="item"><span class="nome">' + esc(e.nome) + "</span>" +
+            '<span class="direita">' + esc(e.label) +
+            '<button class="btn-pago" data-slug="' + esc(e.slug) + '">marcar pago</button></span></div>';
+        }).join("")
+      : '<p class="vazio">Nada a devolver.</p>';
+
+    qs("saude").innerHTML =
+      luz(s.banco.ok ? "on" : "off", "Banco de dados",
+        s.banco.latenciaMs != null ? s.banco.latenciaMs + " ms" : (s.banco.erro || s.banco.tipo)) +
+      luz(s.email.ok ? "on" : (s.email.habilitado ? "off" : "aviso"), "E-mail",
+        s.email.ok ? "enviando" : (s.email.motivo || "desligado")) +
+      luz(s.modelo.ok ? "on" : "off", "Vendedor (" + esc(s.modelo.provedor) + ")",
+        s.modelo.nome || "fora do ar") +
+      luz(s.pagamento.sandbox ? "aviso" : "on", "Pagamento",
+        s.pagamento.sandbox ? "sandbox: ninguém paga de verdade" : s.pagamento.provedor) +
+      luz(s.links.ok ? "on" : "off", "Links assinados",
+        s.links.ok ? "cancelamento e acesso funcionam" : "LINK_SECRET não configurado") +
+      luz(s.cicloDeCobranca.ok ? "on" : "off", "Cobrança automática",
+        s.cicloDeCobranca.ultimaRodada
+          ? "última: " + new Date(s.cicloDeCobranca.ultimaRodada).toLocaleTimeString("pt-BR")
+          : "nunca rodou");
+
+    document.querySelectorAll(".btn-pago").forEach(function (b) {
+      b.addEventListener("click", function () { marcarPago(b.dataset.slug); });
+    });
+  }
+
+  async function marcarPago(slug) {
+    if (!confirm("Confirmar que o estorno de " + slug + " já foi devolvido no provedor?")) return;
+    await fetch(API + "/api/estornos/" + encodeURIComponent(slug) + "/pago", {
+      method: "POST", headers: { Authorization: "Bearer " + token }
+    });
+    carregar();
+  }
+
+  async function carregar() {
+    try {
+      var res = await fetch(API + "/api/painel", { headers: { Authorization: "Bearer " + token } });
+      if (res.status === 401) return sair();
+      render(await res.json());
+    } catch (e) {
+      qs("atualizado").textContent = "sem conexão";
+    }
+  }
+
+  function sair() {
+    token = "";
+    sessionStorage.removeItem(CHAVE);
+    qs("app").classList.add("hidden");
+    qs("login").classList.remove("hidden");
+  }
+
+  function abrir() {
+    qs("login").classList.add("hidden");
+    qs("app").classList.remove("hidden");
+    carregar();
+    // Atualiza sozinho: um painel que mostra número velho é pior que nenhum.
+    setInterval(carregar, 60000);
+  }
+
+  async function entrar() {
+    var erro = qs("login-erro");
+    erro.classList.add("hidden");
+    try {
+      var res = await fetch(API + "/api/operator/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: qs("senha").value })
+      });
+      var d = await res.json();
+      if (!res.ok) {
+        erro.textContent = d.error || "Não foi possível entrar.";
+        erro.classList.remove("hidden");
+        return;
+      }
+      token = d.token;
+      sessionStorage.setItem(CHAVE, token);
+      abrir();
+    } catch (e) {
+      erro.textContent = "Sem conexão com o servidor.";
+      erro.classList.remove("hidden");
+    }
+  }
+
+  qs("entrar").addEventListener("click", entrar);
+  qs("senha").addEventListener("keydown", function (e) { if (e.key === "Enter") entrar(); });
+  qs("recarregar").addEventListener("click", carregar);
+
+  if (token) abrir();
+})();
+</script>
+</body>
+</html>

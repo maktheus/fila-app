@@ -688,6 +688,84 @@ app.post('/api/venues/:slug/cobranca', cobrancaLimiter, async (req, res) => {
   }
 });
 
+// Avisa voce quando o dinheiro se mexe. Roda solto: um aviso que falha nao
+// pode derrubar a ativacao de uma assinatura ja paga.
+function avisarDinheiro(tipo, venue, extra = {}) {
+  const m = billing.metricas([...venues.values()]);
+  notify.avisarDono(tipo, {
+    nome: venue.name,
+    receitaMensal: m.receitaMensalLabel,
+    assinantes: m.assinantes,
+    painel: `${PUBLIC_APP_URL}/painel.html`,
+    ...extra,
+  }).catch(e => console.warn('[dinheiro] aviso falhou:', e.message));
+}
+
+// --------------- Painel do dono ---------------
+//
+// A pergunta "a maquina esta fazendo dinheiro, e esta inteira?" nao tinha
+// onde ser respondida: receita, assinaturas, estornos, saude do e-mail e do
+// modelo viviam em endpoints separados que so davam para consultar por curl.
+//
+// Um endpoint so, porque a resposta e uma leitura so. Se voce precisa abrir
+// cinco abas para saber se o negocio esta de pe, voce nao vai abrir nenhuma.
+app.get('/api/painel', requireAnalyticsAuth, async (_req, res) => {
+  const agora = Date.now();
+  const negocio = billing.metricas([...venues.values()], agora);
+
+  // Saude tecnica. Cada item aqui e algo que, quebrado, faz o negocio parar
+  // em silencio — que e o jeito mais caro de quebrar.
+  const email = notify.statusEmail();
+  const modelo = chatAgent.PROVEDOR === 'local'
+    ? await chatAgent.verificarLocal()
+    : { disponivel: chatAgent.configurado('claude'), modelo: process.env.CHAT_MODEL || 'claude' };
+
+  let banco = { ok: !USE_POSTGRES, tipo: USE_POSTGRES ? 'postgres' : 'arquivo' };
+  if (USE_POSTGRES) {
+    try {
+      banco = { ok: true, tipo: 'postgres', latenciaMs: await db.ping() };
+    } catch (erro) {
+      banco = { ok: false, tipo: 'postgres', erro: erro.message };
+    }
+  }
+
+  const saude = {
+    banco,
+    email: {
+      ok: email.habilitado && email.verificado,
+      habilitado: email.habilitado,
+      motivo: email.motivo || '',
+      ultimoErro: email.ultimoErro || null,
+    },
+    modelo: {
+      ok: !!modelo.disponivel,
+      provedor: chatAgent.PROVEDOR,
+      nome: modelo.modelo || '',
+    },
+    pagamento: {
+      provedor: billing.PROVIDER,
+      sandbox: billing.PROVIDER === 'sandbox',
+      // Sandbox local e o esperado; sandbox em PRODUCAO significa que ninguem
+      // esta pagando de verdade e o painel estaria mostrando verde enquanto a
+      // receita e imaginaria. E o falso positivo mais caro que existe aqui.
+      ok: !(IS_PRODUCTION && billing.PROVIDER === 'sandbox'),
+    },
+    links: { ok: tokens.configurado() },
+    cicloDeCobranca: {
+      ultimaRodada: ultimaRodadaDoCiclo,
+      // Sem rodada nas ultimas 3h o job parou, e cobranca parada e receita
+      // parada — sem barulho nenhum.
+      ok: !!ultimaRodadaDoCiclo && agora - ultimaRodadaDoCiclo < 3 * 3600000,
+    },
+  };
+
+  saude.tudoOk = Object.values(saude)
+    .filter(v => v && typeof v.ok === 'boolean')
+    .every(v => v.ok);
+
+  res.json({ em: agora, negocio, saude });
+});
+
 // --------------- Recuperacao de acesso ---------------
 //
 // A senha do operador aparece uma vez so no cadastro. Quem fecha a aba antes
@@ -843,6 +921,7 @@ app.post('/api/venues/:slug/cancelar', cancelamentoLimiter, async (req, res) => 
   if (motivo) venue.subscription.motivoDoCancelamento = motivo;
 
   pushLog(venue, 'Assinatura cancelada');
+  avisarDinheiro('cancelou', venue, { estorno: r.estorno ? r.estorno.label : '' });
   notify.track('assinatura_cancelada', { venue: venue.slug, alvo: motivo || 'sem motivo' });
   if (r.estorno) {
     // Registrado, nao executado: devolucao automatica e dinheiro saindo
@@ -1055,6 +1134,7 @@ async function aplicarCiclo(venue, agora = Date.now()) {
     venue.plan = billing.effectivePlan(venue);
     venue.subscription.cobrancaDoCiclo = null;
     entrega = await notify.sendEmail('downgraded', venue, extras);
+    avisarDinheiro('caiu', venue);
     broadcast(venue, { action: 'subscription', status: venue.subscription.status });
   }
 
@@ -1080,8 +1160,11 @@ async function aplicarCiclo(venue, agora = Date.now()) {
   return { ...acao, entregue: entrega ? entrega.entregue : null };
 }
 
+let ultimaRodadaDoCiclo = null;
+
 async function rodarCicloDeCobranca(agora = Date.now()) {
   const aplicadas = [];
+  ultimaRodadaDoCiclo = Date.now();
   for (const venue of venues.values()) {
     try {
       const acao = await aplicarCiclo(venue, agora);
@@ -1189,6 +1272,9 @@ app.post('/api/venues/:slug/cobranca/cartao', cobrancaLimiter, async (req, res) 
     venue.pendingCharge = null;
     if (email) venue.contactEmail = email;
     pushLog(venue, 'Assinatura: pagamento no cartao confirmado');
+    avisarDinheiro(result.email === 'subscription_renewed' ? 'renovou' : 'assinou', venue, {
+      ciclo: cobranca.ciclo, valor: cobranca.valorLabel,
+    });
     notify.track('cartao_aprovado', { venue: venue.slug });
     notify.sendEmail(result.email, venue, { priceLabel: billing.subscriptionView(venue).priceLabel });
     broadcast(venue, { action: 'subscription', status: venue.subscription.status });
@@ -1228,6 +1314,9 @@ app.post('/api/cobrancas/:id/confirmar-sandbox', (req, res) => {
   venue.pendingCharge = null;
   billing.sandbox.esquecer(cobranca.externalId);
   pushLog(venue, 'Assinatura: pagamento confirmado (sandbox)');
+  avisarDinheiro(result.email === 'subscription_renewed' ? 'renovou' : 'assinou', venue, {
+    ciclo: venue.subscription.interval, valor: billing.subscriptionView(venue).priceLabel,
+  });
   notify.track(result.email, { venue: venue.slug });
   broadcast(venue, { action: 'subscription', status: venue.subscription.status });
   persistStore();
@@ -1275,6 +1364,11 @@ app.post('/api/webhooks/mercadopago', async (req, res) => {
     venue.plan = result.plan;
     if (evento === 'payment.confirmed') venue.pendingCharge = null;
     pushLog(venue, `Assinatura: ${evento}`);
+    if (evento === 'payment.confirmed') {
+      avisarDinheiro(result.email === 'subscription_renewed' ? 'renovou' : 'assinou', venue, {
+        ciclo: venue.subscription.interval, valor: billing.subscriptionView(venue).priceLabel,
+      });
+    }
     notify.track(result.email, { venue: venue.slug });
     notify.sendEmail(result.email, venue, { priceLabel: billing.subscriptionView(venue).priceLabel });
     broadcast(venue, { action: 'subscription', status: venue.subscription.status });
@@ -1898,6 +1992,13 @@ loadPersistedStore()
         } else {
           console.error(`E-mail LIGADO MAS QUEBRADO: ${e.motivo}`);
         }
+
+        // Variavel que desliga recurso em silencio e a pior especie: o
+        // sistema responde normal e voce so descobre o que perdeu quando
+        // procura. Melhor dizer na subida.
+        console.log(notify.OWNER_EMAIL
+          ? `Avisos de dinheiro vao para ${notify.OWNER_EMAIL}.`
+          : 'OWNER_EMAIL vazio: avisos de dinheiro so no log, ninguem sera notificado.');
       });
 
       // Carrega o modelo na memoria antes do primeiro visitante escrever.

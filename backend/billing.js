@@ -221,6 +221,89 @@ function cancelar(venue, agora = Date.now()) {
   };
 }
 
+// --------------- Metricas de negocio ---------------
+//
+// A pergunta que este bloco responde e "a maquina esta fazendo dinheiro?".
+// Ela nao tinha onde ser respondida: assinaturas, estornos e testes vencendo
+// viviam em endpoints separados que so davam para consultar por curl.
+//
+// Funcao pura sobre a lista de unidades, entao da para testar com um cenario
+// montado a mao em vez de precisar de um mes de dados reais.
+function metricas(listaDeUnidades, agora = Date.now()) {
+  const m = {
+    receitaMensalCentavos: 0,
+    assinantes: 0,
+    emTeste: 0,
+    inadimplentes: 0,
+    canceladas: 0,
+    gratuitas: 0,
+    total: 0,
+    porCiclo: { mensal: 0, anual: 0 },
+    testesVencendoEm3Dias: [],
+    vencendoEm7Dias: [],
+    estornosPendentes: [],
+    estornoPendenteCentavos: 0,
+  };
+
+  for (const venue of listaDeUnidades) {
+    m.total++;
+    const sub = ensureSubscription(venue);
+    const plano = effectivePlan(venue);
+
+    if (sub.status === 'active') {
+      m.assinantes++;
+      const ciclo = cicloValido(sub.interval);
+      m.porCiclo[ciclo]++;
+      // O anual entra dividido por doze. Somar R$ 990 num mes so inflaria a
+      // receita recorrente e daria a impressao errada de quanto entra por mes.
+      m.receitaMensalCentavos += ciclo === 'anual'
+        ? Math.round(CICLOS.anual.centavos / 12)
+        : CICLOS.mensal.centavos;
+
+      if (sub.currentPeriodEnd && sub.currentPeriodEnd - agora < 7 * 86400000) {
+        m.vencendoEm7Dias.push({
+          slug: venue.slug,
+          nome: venue.name,
+          em: sub.currentPeriodEnd,
+          ciclo,
+        });
+      }
+    } else if (sub.status === 'trialing') {
+      m.emTeste++;
+      const faltam = sub.trialEndsAt ? Math.ceil((sub.trialEndsAt - agora) / 86400000) : 0;
+      // Teste vencendo e a lista mais acionavel que existe aqui: e a hora em
+      // que a pessoa decide pagar ou sumir.
+      if (faltam >= 0 && faltam <= 3) {
+        m.testesVencendoEm3Dias.push({ slug: venue.slug, nome: venue.name, faltam });
+      }
+    } else if (sub.status === 'past_due') {
+      m.inadimplentes++;
+    } else if (sub.status === 'canceled') {
+      m.canceladas++;
+    }
+
+    if (plano === 'free') m.gratuitas++;
+
+    const estorno = sub.estornoPendente;
+    if (estorno && !estorno.pago) {
+      m.estornosPendentes.push({
+        slug: venue.slug,
+        nome: venue.name,
+        label: estorno.label,
+        centavos: estorno.centavos,
+        solicitadoEm: estorno.solicitadoEm,
+      });
+      m.estornoPendenteCentavos += estorno.centavos;
+    }
+  }
+
+  m.receitaMensalLabel = rotuloDeReais(m.receitaMensalCentavos);
+  m.estornoPendenteLabel = rotuloDeReais(m.estornoPendenteCentavos);
+  m.testesVencendoEm3Dias.sort((a, b) => a.faltam - b.faltam);
+  m.vencendoEm7Dias.sort((a, b) => a.em - b.em);
+  return m;
+}
+
 function marcarAviso(venue, chave, agora = Date.now()) {
   const sub = ensureSubscription(venue);
   if (!sub.avisos) sub.avisos = {};
@@ -487,6 +570,7 @@ module.exports = {
   marcarAviso,
   calcularEstorno,
   cancelar,
+  metricas,
   PROVIDER,
   startTrial,
   ensureSubscription,
