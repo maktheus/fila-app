@@ -688,6 +688,83 @@ app.post('/api/venues/:slug/cobranca', cobrancaLimiter, async (req, res) => {
   }
 });
 
+// --------------- Recuperacao de acesso ---------------
+//
+// A senha do operador aparece uma vez so no cadastro. Quem fecha a aba antes
+// de anotar perde o painel — a fila continua recebendo gente, mas ninguem
+// consegue chamar ninguem. Sem isto, a unica saida e falar com voce.
+//
+// Link magico em vez de "redefinir senha" porque quem esqueceu uma senha vai
+// esquecer a proxima. O que a pessoa quer e entrar, nao inventar segredo novo.
+
+const acessoLimiter = createRateLimit(60 * 60 * 1000, Number(process.env.RATE_LIMIT_ACESSO || 8));
+
+app.post('/api/acesso/solicitar', acessoLimiter, async (req, res) => {
+  const email = String((req.body || {}).email || '').trim().toLowerCase().slice(0, 120);
+
+  // A resposta e SEMPRE a mesma, com e-mail cadastrado ou nao. Responder
+  // diferente transformaria esta rota num enumerador dos seus clientes:
+  // qualquer um descobriria quais estabelecimentos usam o sistema.
+  const resposta = {
+    ok: true,
+    mensagem: 'Se este e-mail estiver cadastrado, o link de acesso chega em instantes.',
+  };
+
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.json(resposta);
+  if (!tokens.configurado()) {
+    console.warn('[acesso] LINK_SECRET nao configurado: link magico indisponivel.');
+    return res.json(resposta);
+  }
+
+  const minhas = [...venues.values()].filter(
+    v => String(v.contactEmail || '').trim().toLowerCase() === email,
+  );
+  // Nada a fazer, mas a resposta ja saiu igual acima.
+  if (!minhas.length) return res.json(resposta);
+
+  const validadeMs = Number(process.env.LINK_ACESSO_TTL_MINUTOS || 30) * 60000;
+  const links = minhas.map(v => ({
+    nome: v.name,
+    url: `${PUBLIC_APP_URL}/acesso.html?t=${tokens.gerarToken({
+      slug: v.slug, proposito: 'acesso', validadeMs, usoUnico: true,
+    })}`,
+  }));
+
+  // Uma pessoa pode ter varias unidades; um e-mail so, com todas.
+  await notify.sendEmail('acesso_solicitado', minhas[0], {
+    links: links.map(l => `${l.nome}: ${l.url}`).join('\n'),
+    quantas: links.length,
+    minutos: Math.round(validadeMs / 60000),
+  });
+  notify.track('acesso_solicitado', { venue: minhas[0].slug });
+  res.json(resposta);
+});
+
+// Troca o link por uma sessao de operador. E aqui que a pessoa "entra".
+app.post('/api/acesso/entrar', acessoLimiter, (req, res) => {
+  const t = String((req.body || {}).t || '');
+  const r = tokens.verificarToken(t, 'acesso');
+  if (!r.ok) return res.status(401).json({ error: r.motivo });
+
+  const venue = venues.get(r.slug);
+  if (!venue) return res.status(404).json({ error: 'Unidade nao encontrada.' });
+
+  const sessao = createSession(venue.slug);
+  // Consumido DEPOIS de a sessao existir: queimar antes faria uma falha aqui
+  // custar o unico link da pessoa.
+  tokens.consumir(t);
+
+  pushLog(venue, 'Acesso por link de e-mail');
+  notify.track('acesso_por_link', { venue: venue.slug });
+  res.json({
+    token: sessao.token,
+    expiresAt: sessao.expiresAt,
+    venue: venue.slug,
+    nome: venue.name,
+    painel: `/operador.html?venue=${venue.slug}`,
+  });
+});
+
 // --------------- Cancelamento e exclusao ---------------
 
 // Autoriza pela sessao do operador OU por link assinado. Cancelar tem que ser

@@ -31,7 +31,8 @@ importa:
   plano anual. Falta o estorno proporcional do anual no cancelamento.
 - ~~Não dá para cancelar sozinho~~ — construído em 01/08, com exclusão LGPD e
   estorno do anual enfileirado para você aprovar.
-- **Senha perdida = cliente perdido** — não há recuperação. É o próximo bloco.
+- ~~Senha perdida = cliente perdido~~ — link mágico de acesso construído em
+  01/08. Backup do Postgres com verificação por restauração, também.
 - **Google Pay** depende de dois identificadores que só o suporte do Mercado
   Pago pode dar.
 
