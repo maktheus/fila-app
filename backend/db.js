@@ -267,6 +267,16 @@ async function purgeEvents(cutoffMs) {
   return res.rowCount;
 }
 
+// Apaga os eventos de comportamento de uma unidade.
+//
+// `analytics_events` nao tem FK para `venues`, entao apagar a unidade nao
+// leva os eventos junto — eles ficariam para tras carregando o slug de quem
+// pediu apagamento. Exclusao pela LGPD que deixa rastro nao e exclusao.
+async function purgeEventsByVenue(slug) {
+  const res = await getPool().query('DELETE FROM analytics_events WHERE venue_slug = $1', [slug]);
+  return res.rowCount;
+}
+
 async function ping() {
   const started = Date.now();
   await getPool().query('SELECT 1');
@@ -276,4 +286,5 @@ async function ping() {
 module.exports = {
   ensureSchema, loadVenues, saveVenues, ping,
   insertEvents, countEventsByName, sessionsByNameAndSurface, recentErrors, purgeEvents,
+  purgeEventsByVenue,
 };

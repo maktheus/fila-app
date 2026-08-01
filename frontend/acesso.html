@@ -54,6 +54,11 @@
   var API = window.FILA_API_BASE || "";
   var token = new URLSearchParams(location.search).get("t") || "";
 
+  // Tira o token da barra de endereco assim que ele e lido. Ele ja esta em
+  // memoria; deixa-lo na URL so o coloca no historico do navegador e em
+  // qualquer Referer que a pagina venha a gerar.
+  if (token) history.replaceState(null, "", location.pathname);
+
   function qs(id) { return document.getElementById(id); }
 
   function avisar(texto, tipo) {

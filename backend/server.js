@@ -731,11 +731,17 @@ app.post('/api/acesso/solicitar', acessoLimiter, async (req, res) => {
   }));
 
   // Uma pessoa pode ter varias unidades; um e-mail so, com todas.
-  await notify.sendEmail('acesso_solicitado', minhas[0], {
+  //
+  // Responder SEM esperar o envio nao e otimizacao: e o que fecha o vazamento
+  // por tempo. Esperar o SMTP faria o caminho do e-mail cadastrado demorar
+  // centenas de milissegundos a mais que o do nao cadastrado — e a resposta
+  // generica acima perderia o sentido, porque o relogio contaria a verdade.
+  notify.sendEmail('acesso_solicitado', minhas[0], {
     links: links.map(l => `${l.nome}: ${l.url}`).join('\n'),
     quantas: links.length,
     minutos: Math.round(validadeMs / 60000),
-  });
+  }).catch(erro => console.warn('[acesso] envio falhou:', erro.message));
+
   notify.track('acesso_solicitado', { venue: minhas[0].slug });
   res.json(resposta);
 });
@@ -921,11 +927,23 @@ app.post('/api/venues/:slug/excluir', cancelamentoLimiter, async (req, res) => {
     });
   }
   if (estorno.devido) {
-    console.log(`[estorno] ${venue.slug} excluida com ${estorno.label} a devolver para ${contato}`);
+    console.log(`[estorno] ${venue.slug} excluida com ${estorno.label} a devolver`);
     notify.track('estorno_pendente', { venue: venue.slug });
   }
 
   venues.delete(venue.slug);
+
+  // Os eventos de comportamento nao tem FK para venues, entao nao saem pelo
+  // cascade — ficariam para tras carregando o slug de quem pediu apagamento.
+  // Exclusao pela LGPD que deixa rastro nao e exclusao.
+  if (USE_POSTGRES) {
+    db.purgeEventsByVenue(venue.slug)
+      .then(n => {
+        if (n) console.log(`[LGPD] ${n} evento(s) de comportamento apagados com ${venue.slug}`);
+      })
+      .catch(e => console.warn('[LGPD] nao consegui apagar os eventos:', e.message));
+  }
+
   notify.track('unidade_excluida', { venue: venue.slug });
   console.log(`[LGPD] unidade ${venue.slug} (${nome}) excluida a pedido do titular`);
   persistStore();
