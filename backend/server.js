@@ -658,7 +658,7 @@ app.post('/api/venues/:slug/cobranca', cobrancaLimiter, async (req, res) => {
 
   const email = String((req.body || {}).email || '').trim().slice(0, 120);
   try {
-    const cobranca = await billing.criarCobrancaPix({ venue, email });
+    const cobranca = await billing.criarCobrancaPix({ venue, email, ciclo: (req.body || {}).ciclo });
 
     // Guardamos so o que precisamos para reconciliar o webhook depois.
     venue.pendingCharge = {
@@ -687,7 +687,130 @@ app.post('/api/venues/:slug/cobranca', cobrancaLimiter, async (req, res) => {
   }
 });
 
+// --------------- Ciclo de cobranca ---------------
+//
+// Roda de hora em hora e aplica o que `billing.acaoDoCiclo` decidir. Toda a
+// logica de calendario mora la, e e pura — este job so executa efeitos.
+//
+// De proposito ele NAO decide plano: `effectivePlan` deriva isso do relogio.
+// Se o container ficar parado dois dias, ninguem fica premium de graca e
+// ninguem cai por engano; ao voltar, o job so manda os e-mails atrasados.
+
+async function cobrancaDoProximoCiclo(venue) {
+  // Sem e-mail de contato nao ha para quem mandar, e gerar cobranca que
+  // ninguem vai ver so suja o provedor de pagamento.
+  if (!venue.contactEmail) return null;
+  try {
+    const cobranca = await billing.criarCobrancaPix({
+      venue,
+      email: venue.contactEmail,
+      ciclo: venue.subscription.interval || 'mensal',
+      competencia: new Date(venue.subscription.currentPeriodEnd).toISOString().slice(0, 7),
+    });
+    venue.subscription.cobrancaDoCiclo = {
+      externalId: cobranca.externalId,
+      criadaEm: Date.now(),
+      copiaECola: cobranca.copiaECola,
+    };
+    return cobranca;
+  } catch (error) {
+    console.warn(`[ciclo] nao consegui gerar a cobranca de ${venue.slug}: ${error.message}`);
+    return null;
+  }
+}
+
+function linkDeAssinatura(venue) {
+  return `${PUBLIC_APP_URL}/assinar.html?venue=${encodeURIComponent(venue.slug)}`;
+}
+
+async function aplicarCiclo(venue, agora = Date.now()) {
+  const acao = billing.acaoDoCiclo(venue, agora);
+  if (!acao) return null;
+
+  const view = billing.subscriptionView(venue);
+  const guardada = venue.subscription.cobrancaDoCiclo;
+  const extras = {
+    priceLabel: view.priceLabel,
+    linkCartao: linkDeAssinatura(venue),
+    diasDeTolerancia: billing.GRACE_DAYS,
+  };
+
+  let entrega = null;
+
+  if (acao.tipo === 'previo') {
+    const cobranca = await cobrancaDoProximoCiclo(venue);
+    if (cobranca) extras.copiaECola = cobranca.copiaECola;
+    extras.diasRestantes = acao.diasRestantes;
+    entrega = await notify.sendEmail('renewal_upcoming', venue, extras);
+  } else if (acao.tipo === 'vencimento') {
+    // Reaproveita o Pix ja emitido no aviso previo: gerar outro faria a pessoa
+    // ficar com dois codigos e sem saber qual vale.
+    if (guardada) extras.copiaECola = guardada.copiaECola;
+    entrega = await notify.sendEmail('renewal_due', venue, extras);
+  } else if (acao.tipo === 'atraso') {
+    if (guardada) extras.copiaECola = guardada.copiaECola;
+    extras.diasParaCair = acao.diasParaCair;
+    entrega = await notify.sendEmail('renewal_overdue', venue, extras);
+  } else if (acao.tipo === 'rebaixar') {
+    venue.subscription.status = 'past_due';
+    venue.plan = billing.effectivePlan(venue);
+    venue.subscription.cobrancaDoCiclo = null;
+    entrega = await notify.sendEmail('downgraded', venue, extras);
+    broadcast(venue, { action: 'subscription', status: venue.subscription.status });
+  }
+
+  // Aviso so conta como dado se o e-mail saiu.
+  //
+  // Sem isto, um SMTP fora do ar por uma hora faria o cliente ser rebaixado
+  // sem NUNCA ter sido avisado — e nos acharíamos que avisamos. Nao marcando,
+  // a proxima rodada tenta de novo, e a janela de cada aviso (dias) da folga
+  // de sobra para o provedor voltar.
+  //
+  // "rebaixar" e a excecao: o plano ja mudou de estado, e nao marcar faria o
+  // efeito se repetir a cada hora.
+  const contabilizar = acao.tipo === 'rebaixar' || !entrega || entrega.entregue !== false;
+  if (contabilizar) {
+    billing.marcarAviso(venue, acao.chave, agora);
+  } else {
+    console.warn(`[ciclo] ${venue.slug}: aviso "${acao.tipo}" nao entregue, sera tentado de novo`);
+    notify.track('ciclo:aviso_nao_entregue', { venue: venue.slug, alvo: acao.tipo });
+  }
+
+  notify.track(`ciclo:${acao.tipo}`, { venue: venue.slug });
+  pushLog(venue, `Cobranca: ${acao.tipo}`);
+  return { ...acao, entregue: entrega ? entrega.entregue : null };
+}
+
+async function rodarCicloDeCobranca(agora = Date.now()) {
+  const aplicadas = [];
+  for (const venue of venues.values()) {
+    try {
+      const acao = await aplicarCiclo(venue, agora);
+      if (acao) aplicadas.push({ venue: venue.slug, tipo: acao.tipo });
+    } catch (error) {
+      // Uma unidade com problema nao pode parar a cobranca das outras.
+      console.warn(`[ciclo] falhou em ${venue.slug}: ${error.message}`);
+    }
+  }
+  if (aplicadas.length) {
+    persistStore();
+    console.log(`[ciclo] ${aplicadas.length} acao(oes): ${aplicadas.map(a => `${a.venue}=${a.tipo}`).join(', ')}`);
+  }
+  return aplicadas;
+}
+
 // --------------- E-mail ---------------
+
+// Roda o ciclo agora, opcionalmente fingindo outra data. E assim que se
+// confere um mes inteiro de cobranca sem esperar um mes. Autenticado e so
+// fora de producao: adiantar o relogio em producao manda e-mail de verdade
+// para cliente de verdade.
+app.post('/api/ciclo/rodar', requireAnalyticsAuth, async (req, res) => {
+  if (IS_PRODUCTION) return res.status(404).json({ error: 'Indisponivel em producao.' });
+  const quando = Number((req.body || {}).em) || Date.now();
+  const aplicadas = await rodarCicloDeCobranca(quando);
+  res.json({ em: new Date(quando).toISOString(), aplicadas });
+});
 
 // Diagnostico de envio. Autenticado: o historico traz destinatarios, e a
 // configuracao diz qual provedor de SMTP esta em uso.
@@ -711,7 +834,15 @@ app.get('/api/pagamento/config', (_req, res) => {
   res.json({
     provider: billing.PROVIDER,
     sandbox: billing.PROVIDER === 'sandbox',
-    precoLabel: 'R$ ' + (billing.PRICE_CENTS / 100).toFixed(2).replace('.', ','),
+    precoLabel: billing.rotuloDeReais(billing.PRICE_CENTS),
+    ciclos: {
+      mensal: { label: billing.rotuloDeReais(billing.PRICE_CENTS), centavos: billing.PRICE_CENTS },
+      anual: {
+        label: billing.rotuloDeReais(billing.PRICE_YEAR_CENTS),
+        centavos: billing.PRICE_YEAR_CENTS,
+        economiaLabel: billing.rotuloDeReais(billing.PRICE_CENTS * 12 - billing.PRICE_YEAR_CENTS),
+      },
+    },
     pix: { disponivel: true },
     // Em sandbox o botao aparece para a jornada ser testavel sem conta no
     // Google; em producao so aparece com gateway configurado, porque um botao
@@ -738,7 +869,7 @@ app.post('/api/venues/:slug/cobranca/cartao', cobrancaLimiter, async (req, res) 
   const bandeira = billing.mercadopago.bandeiraDoGoogle(body.bandeira);
 
   try {
-    const cobranca = await billing.criarCobrancaCartao({ venue, email, token, bandeira });
+    const cobranca = await billing.criarCobrancaCartao({ venue, email, token, bandeira, ciclo: body.ciclo });
 
     if (!cobranca.aprovado) {
       notify.track('cartao_recusado', { venue: venue.slug });
@@ -753,6 +884,7 @@ app.post('/api/venues/:slug/cobranca/cartao', cobrancaLimiter, async (req, res) 
       type: 'payment.confirmed',
       id: cobranca.externalId,
       subscriptionId: cobranca.externalId,
+      ciclo: cobranca.ciclo,
     });
     venue.plan = result.plan;
     venue.pendingCharge = null;
@@ -1442,6 +1574,18 @@ loadPersistedStore()
       console.log(`Unidades carregadas: ${[...venues.keys()].join(', ')}`);
       console.log(`Retencao LGPD: ${TICKET_RETENTION_HOURS}h · fila demo: ${SEED_DEMO ? 'ligada' : 'desligada'}`);
       console.log(`WebSocket available at ws://0.0.0.0:${PORT}/ws`);
+
+      // Ciclo de cobranca. De hora em hora basta: as acoes sao diarias e cada
+      // uma so acontece uma vez por ciclo, entao rodar com folga nao duplica
+      // nada e cobre servidor que ficou fora do ar por algumas horas.
+      const intervaloCiclo = Number(process.env.BILLING_CYCLE_INTERVAL_MINUTES || 60) * 60000;
+      if (process.env.BILLING_CYCLE_JOB !== 'false') {
+        setInterval(() => {
+          rodarCicloDeCobranca().catch(e => console.warn('[ciclo] falhou:', e.message));
+        }, intervaloCiclo).unref();
+        rodarCicloDeCobranca().catch(e => console.warn('[ciclo] falhou:', e.message));
+        console.log(`Ciclo de cobranca a cada ${intervaloCiclo / 60000}min · tolerancia ${billing.GRACE_DAYS}d · aviso ${billing.AVISO_PREVIO_DIAS}d antes`);
+      }
 
       // Confere o SMTP falando com o servidor de verdade, e grita se estiver
       // errado. Falha silenciosa de e-mail e o pior desfecho possivel: o

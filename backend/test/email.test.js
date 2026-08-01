@@ -189,6 +189,8 @@ describe('conteudo dos templates', () => {
       const r = montar({
         name: 'Clinica Teste', trialDays: 14, trialDaysLeft: 3,
         priceLabel: 'R$ 99,00', signupUrl: 'https://exemplo.com/cadastro.html',
+        diasRestantes: 3, diasParaCair: 2, diasDeTolerancia: 3,
+        copiaECola: '00020126580014br.gov.bcb.pix', linkCartao: 'https://exemplo.com/assinar.html?venue=x',
       });
       assert.ok(r.subject && r.subject.length > 5, `${nome} sem assunto`);
       assert.ok(r.body && r.body.length > 20, `${nome} sem corpo`);

@@ -60,6 +60,13 @@ services:
       - SEED_DEMO=${SEED_DEMO:-true}
       - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost}
       - TRIAL_DAYS=${TRIAL_DAYS:-14}
+      - PLAN_PRICE_CENTS=${PLAN_PRICE_CENTS:-9900}
+      # Anual sai por dez meses: sem cartao guardado, cada renovacao mensal e
+      # uma chance de perder o cliente por esquecimento.
+      - PLAN_PRICE_YEAR_CENTS=${PLAN_PRICE_YEAR_CENTS:-99000}
+      - BILLING_GRACE_DAYS=${BILLING_GRACE_DAYS:-3}
+      - BILLING_NOTICE_DAYS=${BILLING_NOTICE_DAYS:-3}
+      - BILLING_CYCLE_INTERVAL_MINUTES=${BILLING_CYCLE_INTERVAL_MINUTES:-60}
       - PAYMENT_PROVIDER=${PAYMENT_PROVIDER:-sandbox}
       - PAYMENT_WEBHOOK_SECRET=${PAYMENT_WEBHOOK_SECRET:-}
       # Mercado Pago: so usados com PAYMENT_PROVIDER=mercadopago

@@ -61,6 +61,66 @@ const TEMPLATES = {
     ].join('\n'),
   }),
 
+  // --- Ciclo de cobranca ---
+  //
+  // O Pix vai DENTRO do e-mail de proposito. Sem cartao guardado, cada
+  // renovacao depende da pessoa agir — e todo passo a mais entre o aviso e o
+  // pagamento derruba a conversao. Mandar "acesse o painel para pagar" e
+  // pedir para ela lembrar duas vezes.
+  renewal_upcoming: (v) => ({
+    subject: `${v.name}: sua mensalidade vence em ${v.diasRestantes || 3} dia(s)`,
+    body: [
+      `Sua assinatura do Fila Virtual vence em ${v.diasRestantes || 3} dia(s).`,
+      ``,
+      `Valor: ${v.priceLabel || ''}`,
+      ``,
+      v.copiaECola ? `Pix copia e cola:` : '',
+      v.copiaECola || '',
+      v.copiaECola ? '' : '',
+      v.linkCartao ? `Se preferir cartão: ${v.linkCartao}` : '',
+      ``,
+      `Depois de pagar, o próximo ciclo entra automaticamente. Nada muda para você.`,
+    ].filter(l => l !== '').join('\n'),
+  }),
+  renewal_due: (v) => ({
+    subject: `${v.name}: sua mensalidade vence hoje`,
+    body: [
+      `Sua assinatura vence hoje. São ${v.priceLabel || ''}.`,
+      ``,
+      v.copiaECola ? `Pix copia e cola:` : '',
+      v.copiaECola || '',
+      v.linkCartao ? `Se preferir cartão: ${v.linkCartao}` : '',
+      ``,
+      `A fila continua funcionando normalmente por mais ${v.diasDeTolerancia || 3} dia(s).`,
+    ].filter(l => l !== '').join('\n'),
+  }),
+  renewal_overdue: (v) => ({
+    subject: `${v.name}: faltam ${v.diasParaCair || 1} dia(s) para a fila voltar ao gratuito`,
+    body: [
+      `O pagamento deste ciclo ainda não entrou.`,
+      ``,
+      `Em ${v.diasParaCair || 1} dia(s) a fila volta ao plano gratuito: limite diário de`,
+      `entradas, um balcão só e com anúncios. Ela não para de funcionar.`,
+      ``,
+      `Valor: ${v.priceLabel || ''}`,
+      v.copiaECola ? `` : '',
+      v.copiaECola || '',
+      v.linkCartao ? `Se preferir cartão: ${v.linkCartao}` : '',
+    ].filter(l => l !== '').join('\n'),
+  }),
+  downgraded: (v) => ({
+    subject: `${v.name}: sua fila voltou para o plano gratuito`,
+    body: [
+      `Como o pagamento não entrou, a fila voltou ao plano gratuito.`,
+      ``,
+      `Ela continua no ar e nada foi apagado — o QR do balcão, o painel e o`,
+      `histórico seguem iguais. O que mudou: limite diário de entradas, um`,
+      `balcão só e anúncios para o seu cliente.`,
+      ``,
+      `Para liberar tudo de novo é só assinar: ${v.linkCartao || ''}`,
+    ].filter(l => l !== '').join('\n'),
+  }),
+
   subscription_canceled: (v) => ({
     subject: `${v.name}: assinatura cancelada`,
     body: [

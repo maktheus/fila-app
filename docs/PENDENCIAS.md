@@ -41,35 +41,45 @@ Procedimento completo em **[EMAIL.md](EMAIL.md)**.
 
 ---
 
-## 2. Ninguém paga o segundo mês
+## 2. ✅ A renovação — construída em 01/08
 
-**Estado:** a primeira cobrança é gerada — no chat (Pix) ou em `assinar.html`
-(Pix ou cartão). A **renovação não existe**. Não há job de ciclo, não há
-cobrança recorrente, não há e-mail de "sua mensalidade venceu".
+**Estado: o ciclo roda sozinho.** Testado com o relógio adiantado: aviso prévio
+3 dias antes (já com o Pix do próximo ciclo dentro do e-mail), aviso no
+vencimento, aviso de atraso e rebaixamento depois da tolerância — cada um uma
+vez só.
 
-**Por que dói:** como não guardamos cartão nem usamos débito automático, o
-cliente só paga de novo se for lembrado. Sem o lembrete, a receita morre no mês
-1 e o `effectivePlan()` derruba a unidade para o gratuito sozinha — o cliente
-descobre pelo produto piorando, o que é a pior forma de descobrir.
+Duas decisões que valem entender:
 
-**Caminhos, do mais simples ao mais completo:**
+**A decisão é uma função pura** (`billing.acaoDoCiclo`). O calendário de um ano
+inteiro roda em milissegundos nos testes, sem esperar um mês passar e sem
+simular temporizador. O job de hora em hora só executa o que ela decide.
 
-1. **Job de ciclo + e-mail** (algumas horas de trabalho). Um `setInterval` que
-   varre as unidades com `currentPeriodEnd` próximo, gera a cobrança do ciclo e
-   dispara o e-mail. Reaproveita tudo que já existe. Depende do item 1.
-2. **Preapproval do Mercado Pago** (assinatura de verdade, com cartão). O MP
-   cobra sozinho todo mês. **Não implementei porque não consegui confirmar a
-   forma exata do endpoint na documentação** — a página da referência devolveu
-   404 nas duas tentativas. Escrever integração de pagamento a partir de
-   memória é como esse tipo de bug entra em produção. Precisa ser confirmado
-   contra a conta real antes de codar.
-3. **Pix Automático.** O rail do Banco Central está no ar desde junho de 2025 e
-   em rollout ao longo de 2026. É a resposta certa a médio prazo para um
-   produto brasileiro de assinatura barata, porque não tem MDR. Vale checar com
-   o MP se a sua conta já tem.
+**O plano não depende do job ter rodado.** `effectivePlan` deriva tudo do
+relógio, tolerância incluída. Se o container ficar parado dois dias, ninguém
+fica premium de graça nem cai por engano; ao voltar, o job só manda os e-mails
+atrasados.
 
-O adaptador em `backend/payments/mercadopago.js` está estruturado para receber
-qualquer um dos três sem mexer no resto.
+O **plano anual** entrou junto: R$ 990 à vista contra R$ 1.188 pagando mês a
+mês. Sem cartão guardado, cada renovação mensal é uma chance de perder o
+cliente por esquecimento — pagar uma vez elimina onze dessas chances, e o
+desconto é o que compra isso.
+
+**Um bug que só apareceu testando:** o job marcava o aviso como enviado sem
+saber se o e-mail tinha sido entregue. Um SMTP fora do ar por uma hora faria o
+cliente ser rebaixado sem **nunca** ter sido avisado — e nós acharíamos que
+avisamos. Agora o aviso só conta se saiu, e a próxima rodada tenta de novo. O
+rebaixamento é a exceção: o estado já mudou, então marca sempre.
+
+**O que ainda falta aqui:**
+
+- **Devolução proporcional no anual.** Pelo CDC, quem cancela um anual no meio
+  tem direito ao proporcional. Hoje não há estorno automático — é operação no
+  painel do provedor. Precisa entrar junto com o cancelamento self-service.
+- **Preapproval do Mercado Pago** (assinatura com cartão, cobrada sozinha).
+  Continua não implementado porque a página da referência devolveu 404 nas duas
+  tentativas, e escrever integração de pagamento a partir de memória é como
+  esse tipo de bug entra em produção.
+- **Pix Automático**, quando a conta tiver.
 
 ---
 
@@ -227,8 +237,9 @@ descobre que ele existe.
 ## Ordem que eu seguiria
 
 1. ~~E-mails (item 1)~~ — feito em 31/07. Falta contratar o SMTP e o DNS.
-2. **Domínio + HTTPS** (item 7) — destrava tudo que é externo.
-3. **Cancelamento** (item 3) — obrigação legal, não escolha.
-4. **Renovação** (item 2) — sem isso não existe receita recorrente.
+2. ~~Renovação (item 2)~~ — feita em 01/08, com plano anual junto.
+3. **Domínio + HTTPS** (item 7) — destrava tudo que é externo.
+4. **Cancelamento** (item 3) — obrigação legal, e agora também precisa do
+   estorno proporcional do anual.
 5. **Recuperação de senha** (item 4).
 6. O resto, conforme aparecer volume.

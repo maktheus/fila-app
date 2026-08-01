@@ -27,8 +27,9 @@ importa:
 
 - ~~Os e-mails não saem~~ — construído em 31/07 (`docs/EMAIL.md`). Falta
   contratar um SMTP e configurar SPF/DKIM/DMARC no domínio.
-- **Ninguém paga o segundo mês** — a renovação não existe.
-- **Não dá para cancelar sozinho** — obrigação do CDC, não escolha de produto.
+- ~~Ninguém paga o segundo mês~~ — ciclo de cobrança construído em 01/08, com
+  plano anual. Falta o estorno proporcional do anual no cancelamento.
+- **Não dá para cancelar sozinho** — obrigação do CDC. É o próximo bloco.
 - **Senha perdida = cliente perdido** — não há recuperação.
 - **Google Pay** depende de dois identificadores que só o suporte do Mercado
   Pago pode dar.
