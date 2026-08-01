@@ -83,22 +83,49 @@ rebaixamento é a exceção: o estado já mudou, então marca sempre.
 
 ---
 
-## 3. Não dá para cancelar sozinho
+## 3. ✅ Cancelamento e exclusão — construídos em 01/08
 
-**Estado:** não existe. Para cancelar, o cliente precisa falar com você.
+**Estado: o cliente cancela sozinho, sem falar com você.** Duas portas: o painel
+do operador, e um **link assinado no rodapé de todo e-mail de cobrança** —
+porque quem perdeu a senha é justamente quem não entra no painel, e sem esse
+caminho cancelar viraria uma conversa sua.
 
-**Por que isso é mais sério que os outros:** é **obrigação legal**. O Código de
-Defesa do Consumidor exige que cancelar seja tão fácil quanto contratar — e
-contratar aqui leva um clique num chat. Um cancelamento que exige e-mail e
-espera é exatamente o que o Decreto 11.034/2022 endereça.
+**Cancelar mantém o premium até o fim do ciclo já pago.** Cortar na hora seria
+ficar com o dinheiro sem entregar o serviço.
 
-Além do risco jurídico, é o item que mais te puxa de volta para dentro do
-processo: cada cancelamento vira uma conversa sua.
+**A tela explica que cancelar não desliga a fila.** Ela continua no ar, no
+gratuito, e nada é apagado. Isso é retenção honesta: informação, não atrito —
+atrito para cancelar é justamente o que o CDC proíbe. Há um campo de motivo,
+opcional, para você saber por que perde cliente.
 
-**O que fazer:** botão no painel do operador → `POST /api/venues/:slug/cancelar`
-→ `subscription.status = 'canceled'`, mantendo o premium até o fim do ciclo já
-pago (`currentPeriodEnd`), com e-mail de confirmação. O `applyEvent` já entende
-`subscription.canceled`; falta a rota e o botão.
+**Estorno do anual é calculado e enfileirado, não executado.** Proporcional aos
+dias não usados, registrado em `GET /api/estornos` para você confirmar no painel
+do provedor. Devolução automática é dinheiro saindo sozinho: um bug ali custa
+caro e é difícil de reverter.
+
+**Exclusão (LGPD art. 18) exige dois passos.** O link do rodapé cancela; não
+apaga. Pedir a exclusão dispara um **segundo e-mail**, com link de propósito
+próprio e validade curta. Se fossem o mesmo link, um e-mail de cobrança
+encaminhado — ou vazado — apagaria o negócio de alguém. Cancelar tem volta;
+exclusão não. Ainda pede o nome do estabelecimento digitado.
+
+### O que os testes pegaram
+
+Meus primeiros testes de segurança foram **inconclusivos, não positivos**:
+`LINK_SECRET` não estava no `docker-compose.yml`, então o container gerou um
+segredo efêmero e os tokens que eu criava por fora eram assinados com outra
+chave. Todo "assinatura inválida" era isso, não a defesa funcionando.
+
+Com o segredo compartilhado, as defesas se confirmaram de verdade: token de
+outra unidade recusado, token de cancelar não apaga, nome errado não confirma.
+
+Também corrigi uma mensagem enganosa: token de outra unidade respondia "link não
+serve para esta ação" — a falha da segunda tentativa, não a real. Mensagem
+errada manda a pessoa procurar o problema no lugar errado.
+
+**O que ainda é seu:** `LINK_SECRET` é obrigatório em produção. Sem ele o
+servidor recusa assinar links e cancelar volta a depender da senha. Gere com
+`openssl rand -hex 32`.
 
 ---
 
@@ -239,7 +266,6 @@ descobre que ele existe.
 1. ~~E-mails (item 1)~~ — feito em 31/07. Falta contratar o SMTP e o DNS.
 2. ~~Renovação (item 2)~~ — feita em 01/08, com plano anual junto.
 3. **Domínio + HTTPS** (item 7) — destrava tudo que é externo.
-4. **Cancelamento** (item 3) — obrigação legal, e agora também precisa do
-   estorno proporcional do anual.
+4. ~~Cancelamento (item 3)~~ — feito em 01/08, com exclusão LGPD e estorno.
 5. **Recuperação de senha** (item 4).
 6. O resto, conforme aparecer volume.

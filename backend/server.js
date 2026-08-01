@@ -9,6 +9,7 @@ const QRCode = require('qrcode');
 const billing = require('./billing');
 const notify = require('./notify');
 const analytics = require('./analytics');
+const tokens = require('./tokens');
 
 const app = express();
 // Atras de nginx/Caddy: sem isto req.ip vira o IP do proxy e o rate limit
@@ -687,6 +688,204 @@ app.post('/api/venues/:slug/cobranca', cobrancaLimiter, async (req, res) => {
   }
 });
 
+// --------------- Cancelamento e exclusao ---------------
+
+// Autoriza pela sessao do operador OU por link assinado. Cancelar tem que ser
+// tao facil quanto contratar, e quem perdeu a senha nao entra no painel — sem
+// o caminho sem senha, cancelar viraria uma conversa com voce.
+function autorizarAcao(req, slug, proposito) {
+  if (isOperatorOf(bearerToken(req), slug)) return { ok: true, via: 'operador' };
+  const t = String(req.query.t || (req.body || {}).t || '');
+  if (!t) return { ok: false, motivo: 'Sem autenticacao.' };
+  const r = tokens.verificarToken(t, proposito);
+  if (!r.ok) return { ok: false, motivo: r.motivo };
+  // O token diz a que unidade ele serve; a URL nao manda nisso.
+  if (r.slug !== slug) return { ok: false, motivo: 'Link nao pertence a esta unidade.' };
+  return { ok: true, via: 'link' };
+}
+
+const cancelamentoLimiter = createRateLimit(60 * 60 * 1000, Number(process.env.RATE_LIMIT_CANCELAMENTO || 20));
+
+// O que a tela de cancelamento precisa mostrar. So o minimo: nada de senha,
+// nada de nome de cliente da fila.
+app.get('/api/venues/:slug/assinatura', cancelamentoLimiter, (req, res) => {
+  const venue = venues.get(String(req.params.slug || ''));
+  if (!venue) return res.status(404).json({ error: 'Unidade nao encontrada.' });
+
+  // Ler a assinatura serve para as duas telas, entao aceita os dois poderes.
+  // Agir e que e separado: o poder que o token carrega volta na resposta para
+  // a tela saber o que oferecer.
+  let auth = autorizarAcao(req, venue.slug, 'cancelar');
+  let poder = 'cancelar';
+  if (!auth.ok) {
+    const primeira = auth;
+    auth = autorizarAcao(req, venue.slug, 'excluir');
+    poder = 'excluir';
+    // A primeira falha e a mais especifica: "link de outra unidade" explica
+    // melhor que "nao serve para esta acao", que e so a segunda tentativa
+    // batendo no proposito. Mensagem errada manda a pessoa procurar o
+    // problema no lugar errado.
+    if (!auth.ok && !/proposito|nao serve/i.test(primeira.motivo)) auth = primeira;
+  }
+  if (!auth.ok) return res.status(401).json({ error: auth.motivo });
+  if (auth.via === 'operador') poder = 'operador';
+
+  const view = billing.subscriptionView(venue);
+  const estorno = billing.calcularEstorno(venue.subscription);
+  res.json({
+    poder,
+    unidade: venue.slug,
+    nome: venue.name,
+    plano: view.plan,
+    status: view.status,
+    ciclo: view.interval,
+    premiumAte: view.currentPeriodEnd,
+    precoLabel: view.priceLabel,
+    limitesDoGratuito: { entradasPorDia: FREE_LIMITS.dailyTickets, balcoes: FREE_LIMITS.counters },
+    estornoPrevisto: estorno.devido ? { label: estorno.label, diasRestantes: estorno.diasRestantes } : null,
+  });
+});
+
+app.post('/api/venues/:slug/cancelar', cancelamentoLimiter, async (req, res) => {
+  const venue = venues.get(String(req.params.slug || ''));
+  if (!venue) return res.status(404).json({ error: 'Unidade nao encontrada.' });
+
+  const auth = autorizarAcao(req, venue.slug, 'cancelar');
+  if (!auth.ok) return res.status(401).json({ error: auth.motivo });
+
+  const r = billing.cancelar(venue);
+  venue.plan = billing.effectivePlan(venue);
+  // O motivo e opcional e serve so para voce entender por que perde clientes.
+  const motivo = String((req.body || {}).motivo || '').trim().slice(0, 200);
+  if (motivo) venue.subscription.motivoDoCancelamento = motivo;
+
+  pushLog(venue, 'Assinatura cancelada');
+  notify.track('assinatura_cancelada', { venue: venue.slug, alvo: motivo || 'sem motivo' });
+  if (r.estorno) {
+    // Registrado, nao executado: devolucao automatica e dinheiro saindo
+    // sozinho. Aparece em /api/estornos para voce confirmar no provedor.
+    notify.track('estorno_pendente', { venue: venue.slug });
+    console.log(`[estorno] ${venue.slug} pediu ${r.estorno.label} (${r.estorno.diasRestantes} dias nao usados)`);
+  }
+  await notify.sendEmail('subscription_canceled', venue, {
+    premiumAte: r.premiumAte ? new Date(r.premiumAte).toLocaleDateString('pt-BR') : '',
+    estornoLabel: r.estorno ? r.estorno.label : '',
+  });
+  broadcast(venue, { action: 'subscription', status: venue.subscription.status });
+  persistStore();
+
+  res.json({
+    ok: true,
+    jaEstava: r.jaEstava,
+    premiumAte: r.premiumAte,
+    plano: venue.plan,
+    estorno: r.estorno ? { label: r.estorno.label, diasRestantes: r.estorno.diasRestantes } : null,
+  });
+});
+
+// Pedir a exclusao manda um SEGUNDO e-mail, com um link de propósito proprio.
+//
+// O link do rodape das cobrancas serve para cancelar, nao para apagar. Se ele
+// servisse, um e-mail encaminhado — ou vazado — apagaria o negocio de alguem.
+// Cancelar tem volta; exclusao nao.
+app.post('/api/venues/:slug/excluir/solicitar', cancelamentoLimiter, async (req, res) => {
+  const venue = venues.get(String(req.params.slug || ''));
+  if (!venue) return res.status(404).json({ error: 'Unidade nao encontrada.' });
+
+  const auth = autorizarAcao(req, venue.slug, 'cancelar');
+  if (!auth.ok) return res.status(401).json({ error: auth.motivo });
+  if (!venue.contactEmail) {
+    return res.status(409).json({ error: 'Esta unidade nao tem e-mail de contato. Use o painel do operador.' });
+  }
+  if (!tokens.configurado()) {
+    return res.status(503).json({ error: 'Links assinados nao estao configurados no servidor.' });
+  }
+
+  const token = tokens.gerarToken({
+    slug: venue.slug,
+    proposito: 'excluir',
+    // Janela curta: exclusao pedida agora se resolve agora.
+    validadeMs: Number(process.env.LINK_EXCLUSAO_TTL_MINUTOS || 60) * 60000,
+  });
+  const link = `${PUBLIC_APP_URL}/cancelar.html?venue=${encodeURIComponent(venue.slug)}&t=${token}`;
+
+  await notify.sendEmail('exclusao_solicitada', venue, { link });
+  notify.track('exclusao_solicitada', { venue: venue.slug });
+  res.json({ ok: true, enviadoPara: venue.contactEmail.replace(/^(.).*(@.*)$/, '$1***$2') });
+});
+
+// Exclusao definitiva (LGPD art. 18). Irreversivel, entao pede o nome da
+// unidade digitado — a confirmacao existe para o clique acidental, nao para
+// dificultar.
+app.post('/api/venues/:slug/excluir', cancelamentoLimiter, async (req, res) => {
+  const venue = venues.get(String(req.params.slug || ''));
+  if (!venue) return res.status(404).json({ error: 'Unidade nao encontrada.' });
+
+  const auth = autorizarAcao(req, venue.slug, 'excluir');
+  if (!auth.ok) return res.status(401).json({ error: auth.motivo });
+
+  const confirmacao = String((req.body || {}).confirmacao || '').trim();
+  if (confirmacao.toLowerCase() !== String(venue.name || '').trim().toLowerCase()) {
+    return res.status(400).json({ error: 'Para confirmar, digite o nome do estabelecimento exatamente como cadastrado.' });
+  }
+
+  if (venue.slug === DEFAULT_SLUG) {
+    return res.status(409).json({ error: 'A unidade principal nao pode ser excluida por aqui.' });
+  }
+
+  const estorno = billing.calcularEstorno(venue.subscription);
+  const contato = venue.contactEmail;
+  const nome = venue.name;
+
+  // O aviso sai ANTES de apagar: depois nao ha para quem mandar.
+  if (contato) {
+    await notify.sendEmail('subscription_canceled', venue, {
+      premiumAte: '', estornoLabel: estorno.devido ? estorno.label : '',
+    });
+  }
+  if (estorno.devido) {
+    console.log(`[estorno] ${venue.slug} excluida com ${estorno.label} a devolver para ${contato}`);
+    notify.track('estorno_pendente', { venue: venue.slug });
+  }
+
+  venues.delete(venue.slug);
+  notify.track('unidade_excluida', { venue: venue.slug });
+  console.log(`[LGPD] unidade ${venue.slug} (${nome}) excluida a pedido do titular`);
+  persistStore();
+
+  res.json({ ok: true, excluida: venue.slug, estornoPendente: estorno.devido ? estorno.label : null });
+});
+
+// Estornos a confirmar no painel do provedor. E a sua lista de tarefas.
+app.get('/api/estornos', requireAnalyticsAuth, (_req, res) => {
+  const pendentes = [];
+  for (const venue of venues.values()) {
+    const e = venue.subscription && venue.subscription.estornoPendente;
+    if (e && !e.pago) {
+      pendentes.push({
+        unidade: venue.slug,
+        nome: venue.name,
+        contato: venue.contactEmail || '',
+        ...e,
+      });
+    }
+  }
+  pendentes.sort((a, b) => a.solicitadoEm - b.solicitadoEm);
+  res.json({ pendentes, total: pendentes.length });
+});
+
+app.post('/api/estornos/:slug/pago', requireAnalyticsAuth, (req, res) => {
+  const venue = venues.get(String(req.params.slug || ''));
+  if (!venue || !venue.subscription || !venue.subscription.estornoPendente) {
+    return res.status(404).json({ error: 'Sem estorno pendente para esta unidade.' });
+  }
+  venue.subscription.estornoPendente.pago = true;
+  venue.subscription.estornoPendente.pagoEm = Date.now();
+  pushLog(venue, 'Estorno marcado como pago');
+  persistStore();
+  res.json({ ok: true });
+});
+
 // --------------- Ciclo de cobranca ---------------
 //
 // Roda de hora em hora e aplica o que `billing.acaoDoCiclo` decidir. Toda a
@@ -732,6 +931,11 @@ async function aplicarCiclo(venue, agora = Date.now()) {
   const extras = {
     priceLabel: view.priceLabel,
     linkCartao: linkDeAssinatura(venue),
+    // Cobranca sem saida visivel e o que faz cancelar virar uma conversa
+    // com voce. O link nasce junto com o e-mail e expira sozinho.
+    linkCancelar: tokens.configurado()
+      ? tokens.linkDeCancelamento(PUBLIC_APP_URL, venue.slug)
+      : '',
     diasDeTolerancia: billing.GRACE_DAYS,
   };
 

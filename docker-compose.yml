@@ -56,6 +56,12 @@ services:
       - ADMIN_TOKEN=${ADMIN_TOKEN:-}
       - OPERATOR_PASSWORD=${OPERATOR_PASSWORD:-}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-8}
+      # Assina os links de cancelamento que vao nos e-mails. OBRIGATORIO em
+      # producao: sem ele o servidor recusa assinar e cancelar volta a
+      # depender da senha do operador.
+      - LINK_SECRET=${LINK_SECRET:-}
+      - LINK_TOKEN_TTL_HOURS=${LINK_TOKEN_TTL_HOURS:-72}
+      - LINK_EXCLUSAO_TTL_MINUTOS=${LINK_EXCLUSAO_TTL_MINUTOS:-60}
       - TICKET_RETENTION_HOURS=${TICKET_RETENTION_HOURS:-12}
       - SEED_DEMO=${SEED_DEMO:-true}
       - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost}

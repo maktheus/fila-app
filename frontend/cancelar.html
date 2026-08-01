@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Cancelar assinatura — Fila Virtual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/mutum-design-system.css">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{background:var(--bg);color:var(--fg-1);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:470px;margin:0 auto;padding:34px 20px 60px}
+  h1{font-family:var(--font-display);font-size:23px;font-weight:600;margin:0 0 6px}
+  .sub{font-size:14.5px;color:var(--fg-2);line-height:1.55;margin:0 0 22px}
+  .cartao{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:14px}
+  .cartao h2{font-family:var(--font-display);font-size:16px;font-weight:600;margin:0 0 10px}
+  .linha{display:flex;justify-content:space-between;gap:12px;font-size:14px;padding:7px 0;border-bottom:1px solid var(--bg-3)}
+  .linha:last-of-type{border-bottom:0}
+  .linha span:first-child{color:var(--fg-3)}
+  .linha span:last-child{font-weight:600;text-align:right}
+  .destaque{background:#E4F0E9;border:1px solid #BEDCCB;border-radius:12px;padding:14px;font-size:14px;line-height:1.55;color:#1F5D3A;margin:16px 0}
+  .destaque strong{display:block;margin-bottom:4px}
+  ul{margin:8px 0 0;padding-left:18px;font-size:13.5px;color:var(--fg-2);line-height:1.6}
+  label{display:block;font-size:13px;font-weight:600;margin:16px 0 6px}
+  select,input[type=text]{width:100%;padding:11px 13px;border:1px solid var(--border-strong);border-radius:10px;font:inherit;font-size:14.5px;color:var(--fg-1);background:var(--bg-2)}
+  .btn{display:block;width:100%;padding:14px;border:0;border-radius:11px;font:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;text-align:center}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn-manter{background:var(--mutum-ink);color:var(--mutum-cream);text-decoration:none}
+  .btn-cancelar{background:var(--surface);color:#8C1C18;border:1px solid #E5B4B1}
+  .btn-cancelar:hover:not(:disabled){background:#FBE3E1}
+  .btn-excluir{background:var(--surface);color:#8C1C18;border:1px solid #E5B4B1;font-size:14px;padding:12px}
+  .perigo{border-color:#E5B4B1}
+  .perigo h2{color:#8C1C18}
+  .nota{font-size:12.5px;color:var(--fg-3);line-height:1.55;margin-top:10px}
+  .aviso{padding:12px 14px;border-radius:11px;font-size:14px;line-height:1.55;margin-top:14px}
+  .aviso.erro{background:#FBE3E1;color:#8C1C18}
+  .aviso.ok{background:#E4F0E9;color:#1F5D3A}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Cancelar assinatura</h1>
+  <p class="sub" id="sub">Carregando…</p>
+
+  <div class="aviso erro hidden" id="erro-topo"></div>
+
+  <div class="hidden" id="conteudo">
+    <div class="cartao">
+      <h2 id="nome-unidade">—</h2>
+      <div class="linha"><span>Plano</span><span id="plano">—</span></div>
+      <div class="linha"><span>Ciclo</span><span id="ciclo">—</span></div>
+      <div class="linha"><span>Premium até</span><span id="ate">—</span></div>
+      <div class="linha hidden" id="linha-estorno"><span>Devolução prevista</span><span id="estorno">—</span></div>
+    </div>
+
+    <div class="destaque">
+      <strong>Cancelar não desliga a sua fila.</strong>
+      Ela continua no ar, no plano gratuito, e nada é apagado — o QR do balcão, o
+      painel e o histórico ficam iguais. O que muda:
+      <ul>
+        <li id="limite-entradas">limite diário de entradas</li>
+        <li id="limite-balcoes">um balcão só</li>
+        <li>volta a exibir anúncios para o seu cliente</li>
+      </ul>
+    </div>
+
+    <div class="cartao">
+      <a class="btn btn-manter" id="btn-manter" href="planos.html">Continuar assinante</a>
+
+      <label for="motivo">Se for cancelar, o que faltou? (opcional)</label>
+      <select id="motivo">
+        <option value="">Prefiro não dizer</option>
+        <option value="caro">Ficou caro para o meu movimento</option>
+        <option value="pouco-uso">Não usei o suficiente</option>
+        <option value="faltou-recurso">Faltou um recurso que eu precisava</option>
+        <option value="dificil">Achei difícil de usar</option>
+        <option value="fechou">O estabelecimento fechou ou mudou</option>
+        <option value="outro">Outro motivo</option>
+      </select>
+
+      <button class="btn btn-cancelar" id="btn-cancelar" type="button">Cancelar assinatura</button>
+      <p class="nota" id="nota-cancelar">Você continua com o premium até a data acima. Depois disso, a fila passa para o gratuito.</p>
+    </div>
+
+    <div class="cartao perigo">
+      <h2>Apagar tudo</h2>
+      <p class="nota" style="margin-top:0">
+        Direito garantido pela LGPD. Isso remove a unidade, a fila, o histórico e o
+        seu e-mail dos nossos servidores. <strong>Não tem volta</strong> — o QR
+        impresso no balcão para de funcionar.
+      </p>
+      <div id="bloco-pedir">
+        <p class="nota">Por segurança, mandamos um link de confirmação para o seu e-mail — o link desta página serve para cancelar, não para apagar.</p>
+        <button class="btn btn-excluir" id="btn-pedir-exclusao" type="button">Quero apagar: mandar link por e-mail</button>
+      </div>
+      <div id="bloco-confirmar" class="hidden">
+        <label for="confirmacao">Para confirmar, digite <em id="nome-esperado">—</em></label>
+        <input id="confirmacao" type="text" autocomplete="off" placeholder="Nome do estabelecimento">
+        <button class="btn btn-excluir" id="btn-excluir" type="button">Apagar unidade e dados agora</button>
+      </div>
+    </div>
+
+    <div class="aviso hidden" id="resultado"></div>
+  </div>
+</div>
+
+<script src="config.js?v=11"></script>
+<script>
+(function () {
+  "use strict";
+  var API = window.FILA_API_BASE || "";
+  var params = new URLSearchParams(location.search);
+  var unidade = params.get("venue") || "";
+  var token = params.get("t") || "";
+  var dados = null;
+
+  function qs(id) { return document.getElementById(id); }
+
+  function mostrarErro(texto) {
+    var el = qs("erro-topo");
+    el.textContent = texto;
+    el.classList.remove("hidden");
+    qs("sub").textContent = "";
+  }
+
+  function resultado(texto, tipo) {
+    var el = qs("resultado");
+    el.textContent = texto;
+    el.className = "aviso " + tipo;
+    el.classList.remove("hidden");
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function comAutenticacao(caminho) {
+    return API + caminho + (token ? (caminho.indexOf("?") >= 0 ? "&" : "?") + "t=" + encodeURIComponent(token) : "");
+  }
+
+  function dataBr(ms) {
+    return ms ? new Date(ms).toLocaleDateString("pt-BR") : "—";
+  }
+
+  async function cancelar() {
+    var botao = qs("btn-cancelar");
+    botao.disabled = true;
+    try {
+      var res = await fetch(comAutenticacao("/api/venues/" + encodeURIComponent(unidade) + "/cancelar"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ t: token, motivo: qs("motivo").value })
+      });
+      var d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Não consegui cancelar.");
+
+      var msg = d.jaEstava
+        ? "Sua assinatura já estava cancelada."
+        : "Pronto, assinatura cancelada. O premium continua até " + dataBr(d.premiumAte) + ".";
+      if (d.estorno) {
+        msg += " Vamos devolver " + d.estorno.label + " referente aos "
+          + d.estorno.diasRestantes + " dias não usados — entraremos em contato pelo mesmo meio do pagamento.";
+      }
+      resultado(msg, "ok");
+      botao.textContent = "Assinatura cancelada";
+      if (window.FilaAnalytics) FilaAnalytics.track("cancelar:confirmado");
+    } catch (e) {
+      resultado(e.message, "erro");
+      botao.disabled = false;
+    }
+  }
+
+  async function excluir() {
+    var confirmacao = qs("confirmacao").value.trim();
+    if (!confirmacao) {
+      resultado("Digite o nome do estabelecimento para confirmar.", "erro");
+      qs("confirmacao").focus();
+      return;
+    }
+    var botao = qs("btn-excluir");
+    botao.disabled = true;
+    try {
+      var res = await fetch(comAutenticacao("/api/venues/" + encodeURIComponent(unidade) + "/excluir"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ t: token, confirmacao: confirmacao })
+      });
+      var d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Não consegui excluir.");
+      resultado("Unidade e dados apagados. Obrigado por ter usado o Fila Virtual.", "ok");
+      qs("conteudo").querySelectorAll("button, select, input").forEach(function (b) { b.disabled = true; });
+      if (window.FilaAnalytics) FilaAnalytics.track("cancelar:excluido");
+    } catch (e) {
+      resultado(e.message, "erro");
+      botao.disabled = false;
+    }
+  }
+
+  (async function iniciar() {
+    if (!unidade) return mostrarErro("Faltou dizer qual unidade. Use o link que veio no e-mail de cobrança.");
+    try {
+      var res = await fetch(comAutenticacao("/api/venues/" + encodeURIComponent(unidade) + "/assinatura"));
+      dados = await res.json();
+      if (!res.ok) {
+        return mostrarErro(dados.error === "link expirado"
+          ? "Este link expirou. Peça um novo no e-mail de cobrança mais recente, ou cancele pelo painel do operador."
+          : (dados.error || "Não consegui carregar a assinatura."));
+      }
+
+      qs("sub").textContent = "Você pode cancelar agora, sem falar com ninguém.";
+      qs("nome-unidade").textContent = dados.nome;
+      qs("nome-esperado").textContent = dados.nome;
+      qs("plano").textContent = dados.plano === "premium" ? "Premium" : "Gratuito";
+      qs("ciclo").textContent = dados.ciclo === "anual" ? "Anual" : "Mensal";
+      qs("ate").textContent = dataBr(dados.premiumAte);
+      qs("limite-entradas").textContent = dados.limitesDoGratuito.entradasPorDia + " entradas por dia";
+      qs("limite-balcoes").textContent = dados.limitesDoGratuito.balcoes === 1
+        ? "um balcão só" : dados.limitesDoGratuito.balcoes + " balcões";
+
+      if (dados.estornoPrevisto) {
+        qs("linha-estorno").classList.remove("hidden");
+        qs("estorno").textContent = dados.estornoPrevisto.label;
+        qs("nota-cancelar").textContent =
+          "Como você está no anual, devolvemos " + dados.estornoPrevisto.label
+          + " referente aos " + dados.estornoPrevisto.diasRestantes + " dias não usados.";
+      }
+      if (dados.status === "canceled") {
+        qs("btn-cancelar").disabled = true;
+        qs("btn-cancelar").textContent = "Assinatura já cancelada";
+      }
+      // Token de exclusao ja veio: mostra a confirmacao direto. Operador
+      // logado tambem pode apagar sem passar pelo e-mail.
+      if (dados.poder === "excluir" || dados.poder === "operador") {
+        qs("bloco-pedir").classList.add("hidden");
+        qs("bloco-confirmar").classList.remove("hidden");
+      }
+
+      qs("conteudo").classList.remove("hidden");
+      if (window.FilaAnalytics) FilaAnalytics.track("cancelar:abriu");
+    } catch (e) {
+      mostrarErro("Não consegui falar com o servidor. Tente de novo em instantes.");
+    }
+  })();
+
+  async function pedirExclusao() {
+    var botao = qs("btn-pedir-exclusao");
+    botao.disabled = true;
+    try {
+      var res = await fetch(comAutenticacao("/api/venues/" + encodeURIComponent(unidade) + "/excluir/solicitar"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ t: token })
+      });
+      var d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Nao consegui enviar o link.");
+      resultado("Mandamos o link de confirmacao para " + d.enviadoPara + ". Ele vale por pouco tempo.", "ok");
+      botao.textContent = "Link enviado";
+    } catch (e) {
+      resultado(e.message, "erro");
+      botao.disabled = false;
+    }
+  }
+
+  qs("btn-cancelar").addEventListener("click", cancelar);
+  qs("btn-pedir-exclusao").addEventListener("click", pedirExclusao);
+  qs("btn-excluir").addEventListener("click", excluir);
+})();
+</script>
+<script src="analytics.js?v=11" defer></script>
+</body>
+</html>

@@ -121,12 +121,40 @@ const TEMPLATES = {
     ].filter(l => l !== '').join('\n'),
   }),
 
+  // Segundo passo da exclusao. O link do rodape das cobrancas cancela; este
+  // apaga. Se fossem o mesmo, um e-mail encaminhado apagaria o negocio de
+  // alguem — cancelar tem volta, exclusao nao.
+  exclusao_solicitada: (v) => ({
+    subject: `${v.name}: confirme a exclusão dos seus dados`,
+    body: [
+      `Recebemos um pedido para apagar a unidade ${v.name} e todos os dados dela.`,
+      ``,
+      `Se foi você, confirme por este link:`,
+      `${v.link || ''}`,
+      ``,
+      `O link vale por pouco tempo e só serve para isso.`,
+      ``,
+      `Isso remove a fila, o histórico e o seu e-mail dos nossos servidores, e o`,
+      `QR impresso no balcão para de funcionar. Não tem volta.`,
+      ``,
+      `Se não foi você, ignore este e-mail: nada será apagado.`,
+    ].join('\n'),
+  }),
+
   subscription_canceled: (v) => ({
     subject: `${v.name}: assinatura cancelada`,
     body: [
-      `Sua assinatura foi cancelada e a fila voltou para o plano gratuito.`,
-      `Nada foi apagado: é só assinar de novo para liberar tudo outra vez.`,
-    ].join('\n'),
+      `Sua assinatura foi cancelada.`,
+      ``,
+      v.premiumAte ? `O premium continua até ${v.premiumAte} — você pagou por esse período.` : '',
+      `Depois disso a fila segue no ar, no plano gratuito. Nada é apagado: o QR do`,
+      `balcão, o painel e o histórico continuam iguais.`,
+      v.estornoLabel ? `` : '',
+      v.estornoLabel ? `Como você estava no plano anual, vamos devolver ${v.estornoLabel}` : '',
+      v.estornoLabel ? `referente ao tempo não usado. Entraremos em contato pelo mesmo meio do pagamento.` : '',
+      ``,
+      `Para voltar, é só assinar de novo — a unidade continua onde estava.`,
+    ].filter(l => l !== '').join('\n'),
   }),
 };
 
@@ -234,12 +262,26 @@ async function entregar(mensagem) {
   return { ok: false, erro: ultimoErro };
 }
 
+// Cobranca sem saida visivel e o que faz cancelar virar uma conversa com o
+// dono do produto. O link vai no rodape de todo e-mail de cobranca.
+const COM_RODAPE_DE_CANCELAMENTO = new Set([
+  'renewal_upcoming', 'renewal_due', 'renewal_overdue',
+  'premium_started', 'subscription_renewed', 'downgraded',
+]);
+
 async function sendEmail(template, venue, extra = {}) {
   const build = TEMPLATES[template];
   if (!build) return null;
 
   const data = { name: venue.name, ...extra };
-  const { subject, body } = build(data);
+  const montado = build(data);
+  const subject = montado.subject;
+  const body = COM_RODAPE_DE_CANCELAMENTO.has(template) && extra.linkCancelar
+    ? `${montado.body}
+
+—
+Para cancelar a qualquer momento: ${extra.linkCancelar}`
+    : montado.body;
   const to = venue.contactEmail || '';
   const record = { template, to, subject, at: Date.now(), venue: venue.slug, entregue: null };
   sent.push(record);

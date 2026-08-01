@@ -147,6 +147,80 @@ function acaoDoCiclo(venue, agora = Date.now()) {
   return null;
 }
 
+// --------------- Cancelamento ---------------
+//
+// Quanto deve ser devolvido a quem cancela no meio do ciclo.
+//
+// No mensal nao ha estorno: o cliente segue premium ate o fim do mes que ele
+// pagou, e o servico e entregue por inteiro. No anual, o valor e grande e o
+// tempo nao usado e longo — o CDC da direito ao proporcional, e nao devolver
+// seria ficar com dinheiro de servico nao prestado.
+//
+// O calculo e por dias porque e o que da para explicar ao cliente sem que ele
+// precise confiar em nos: dias que sobraram dividido por dias contratados.
+function calcularEstorno(sub, agora = Date.now()) {
+  const nada = { devido: false, centavos: 0, diasRestantes: 0 };
+  if (!sub || sub.interval !== 'anual') return { ...nada, motivo: 'ciclo mensal: sem estorno' };
+  if (!sub.currentPeriodStart || !sub.currentPeriodEnd) return { ...nada, motivo: 'sem ciclo em curso' };
+  if (agora >= sub.currentPeriodEnd) return { ...nada, motivo: 'ciclo ja terminou' };
+
+  const totalMs = sub.currentPeriodEnd - sub.currentPeriodStart;
+  const restanteMs = sub.currentPeriodEnd - Math.max(agora, sub.currentPeriodStart);
+  if (totalMs <= 0) return { ...nada, motivo: 'ciclo invalido' };
+
+  const diasRestantes = Math.floor(restanteMs / 86400000);
+  // Arredonda para baixo em centavos: nunca prometer mais do que a conta da.
+  const centavos = Math.floor(PRICE_YEAR_CENTS * (restanteMs / totalMs));
+
+  return {
+    devido: centavos > 0,
+    centavos,
+    label: rotuloDeReais(centavos),
+    diasRestantes,
+    diasContratados: Math.round(totalMs / 86400000),
+    motivo: 'proporcional aos dias nao usados do plano anual',
+  };
+}
+
+/**
+ * Cancela mantendo o premium ate o fim do ciclo ja pago.
+ *
+ * Cortar na hora seria ficar com o dinheiro sem entregar o servico. O
+ * `effectivePlan` ja respeita isso para status 'canceled'.
+ */
+function cancelar(venue, agora = Date.now()) {
+  const sub = ensureSubscription(venue);
+  if (sub.status === 'canceled') {
+    return { jaEstava: true, premiumAte: sub.currentPeriodEnd || null, estorno: null };
+  }
+
+  const estorno = calcularEstorno(sub, agora);
+  sub.status = 'canceled';
+  sub.canceladaEm = agora;
+  // Nao ha proximo ciclo: os avisos de cobranca param aqui.
+  sub.avisos = {};
+  sub.cobrancaDoCiclo = null;
+
+  if (estorno.devido) {
+    // Registrado, nao executado. Devolucao automatica e dinheiro saindo
+    // sozinho: um bug ali custa caro e e dificil de reverter. O operador
+    // confirma no painel do provedor.
+    sub.estornoPendente = {
+      centavos: estorno.centavos,
+      label: estorno.label,
+      diasRestantes: estorno.diasRestantes,
+      solicitadoEm: agora,
+      pago: false,
+    };
+  }
+
+  return {
+    jaEstava: false,
+    premiumAte: sub.currentPeriodEnd || null,
+    estorno: estorno.devido ? estorno : null,
+  };
+}
+
 function marcarAviso(venue, chave, agora = Date.now()) {
   const sub = ensureSubscription(venue);
   if (!sub.avisos) sub.avisos = {};
@@ -411,6 +485,8 @@ module.exports = {
   fimDaTolerancia,
   acaoDoCiclo,
   marcarAviso,
+  calcularEstorno,
+  cancelar,
   PROVIDER,
   startTrial,
   ensureSubscription,
