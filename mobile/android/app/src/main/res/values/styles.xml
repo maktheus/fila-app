@@ -8,4 +8,16 @@
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">#ED2C27</item>
     </style>
+
+    <!--
+      Tema so do arranque. A activity troca para AppTheme no onCreate, antes
+      de desenhar qualquer coisa: sem essa troca, o windowBackground da
+      splash ficaria atras do WebView a vida inteira.
+
+      Android 11 e anteriores: a splash e este windowBackground.
+      Android 12+: os atributos de values-v31 assumem.
+    -->
+    <style name="AppTheme.Splash" parent="AppTheme">
+        <item name="android:windowBackground">@drawable/splash</item>
+    </style>
 </resources>

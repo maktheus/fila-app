@@ -1,0 +1,14 @@
+<resources>
+    <!--
+      SplashScreen API do Android 12+. O sistema desenha a splash sozinho a
+      partir daqui, e ignora o windowBackground.
+
+      Sem windowSplashScreenAnimationDuration: a splash so fica em cena
+      enquanto o app carrega. Prender o usuario por tempo fixo e roubar
+      segundos dele para mostrar a nossa marca.
+    -->
+    <style name="AppTheme.Splash" parent="AppTheme">
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icone</item>
+    </style>
+</resources>

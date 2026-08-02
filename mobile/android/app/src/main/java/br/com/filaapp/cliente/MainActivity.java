@@ -65,6 +65,11 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Sai do tema de splash ANTES de super.onCreate desenhar a janela.
+        // Sem isto, o windowBackground da splash ficaria atras do WebView
+        // durante todo o uso do app, e apareceria em qualquer area que o
+        // conteudo nao cobrisse.
+        setTheme(R.style.AppTheme);
         super.onCreate(savedInstanceState);
         configureWindow();
         createLayout();

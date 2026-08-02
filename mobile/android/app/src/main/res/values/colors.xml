@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="launcher_background">#191919</color>
+    <!--
+      O creme do app, nao o preto do lancador.
+
+      A splash existe para o app "chegar", nao para piscar. Se ela fosse
+      escura como o icone, o usuario veria um flash preto virando creme toda
+      vez que abrisse. Continuidade com a PRIMEIRA TELA vale mais que
+      continuidade com o icone, porque a primeira tela e onde ele fica.
+    -->
+    <color name="splash_background">#F0EFEB</color>
 </resources>

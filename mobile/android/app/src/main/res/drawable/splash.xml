@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Splash para Android 11 e anteriores, que não têm a SplashScreen API.
+  No 12+ o sistema ignora isto e usa os atributos de values-v31.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_background" />
+    <item android:gravity="center">
+        <bitmap android:src="@drawable/splash_icone" android:gravity="center" />
+    </item>
+</layer-list>

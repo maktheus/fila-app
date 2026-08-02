@@ -164,3 +164,31 @@ Três coisas que custaram tempo e vale registrar:
   Confirme a viewport real antes de acusar o layout.
 
 O telão foi capturado em 1280×720 por ser tela de TV, não de celular.
+
+## Splash do app
+
+`res/drawable/splash_icone.xml` e `splash.xml`, com o tema `AppTheme.Splash`.
+
+**Fundo creme (#F0EFEB), não o preto do ícone.** A splash existe para o app
+*chegar*, não para piscar: se ela fosse escura como o lançador, a pessoa veria
+um flash preto virando creme toda vez que abrisse. Continuidade com a primeira
+tela vale mais que continuidade com o ícone, porque a primeira tela é onde ela
+fica.
+
+**Dois caminhos, um resultado.** No Android 12+ o sistema desenha a splash
+sozinho a partir de `values-v31/styles.xml`. Em versões anteriores é o
+`windowBackground` do tema. A activity chama `setTheme(R.style.AppTheme)` antes
+de `super.onCreate` — sem isso, o fundo da splash ficaria atrás do WebView
+durante todo o uso do app.
+
+**Sem `windowSplashScreenAnimationDuration`.** A splash sai de cena assim que o
+app carrega. Prender a pessoa por tempo fixo para exibir a marca é roubar
+segundos dela.
+
+O vetor tem viewport 768 com a arte deslocada 128 em cada eixo: o Android 12+
+mascara o ícone num círculo e mostra só o terço central, então usar o
+`ic_launcher_foreground` direto cortaria as barras laterais da marca.
+
+**Não foi vista rodando.** Não há SDK do Android nesta máquina, então a splash
+real só aparece no primeiro build. `docs/store-assets/06-splash.png` é uma
+renderização dos mesmos caminhos do vetor, não uma captura do app.
