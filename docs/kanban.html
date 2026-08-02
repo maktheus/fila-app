@@ -56,6 +56,8 @@
   .selo{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:99px;margin-top:7px}
   .selo.bloq{background:var(--blush);color:#8C1C18}
   .selo.livre{background:#E4F0E9;color:var(--forest)}
+  .card.travado{border-left-color:#C4423C !important;background:#FFFCFC}
+  .card.travado h3{color:var(--slate)}
   /* Painel de detalhe: gaveta, não modal — dá para ler o card e o quadro juntos */
   .fundo{position:fixed;inset:0;background:rgba(25,25,25,.42);opacity:0;pointer-events:none;transition:opacity .18s;z-index:40}
   .fundo.on{opacity:1;pointer-events:auto}
@@ -448,6 +450,75 @@ const DETALHES = {
   },
 };
 
+// Detalhe dos cartões concluídos. Card entregue também precisa de justificativa:
+// daqui a três meses, "por que isso existe" é a pergunta cara de responder.
+Object.assign(DETALHES, {
+  // ---------- Pré-sprint ----------
+  d1: { bloq:null, porque:'É o produto. Sem app do cliente não há fila virtual — o resto do sistema existe para servir esta tela.', destrava:['Tudo'], refs:['frontend/index.html'] },
+  d2: { bloq:null, porque:'"Passar a vez" é o que diferencia de uma senha de papel: a pessoa pode sair sem perder o lugar. A proximidade evita que vire abuso.', destrava:['Diferencial do produto'], refs:['backend/server.js'] },
+  d3: { bloq:null, porque:'O operador precisa de um lugar para chamar, e a sala de espera de um lugar para olhar. Tempo real por WebSocket, nunca polling.', destrava:['Uso no balcão'], refs:['frontend/operador.html','frontend/telao.html'] },
+  d4: { bloq:null, porque:'É a porta de entrada de quem descobre o produto. Sem ela, o anúncio não teria para onde apontar.', destrava:['Anúncios','SEO'], refs:['frontend/landing.html'] },
+  d5: { bloq:null, porque:'Sem lugar para rodar, nada mais importa. Docker deixa o ambiente igual na sua máquina e na VPS.', destrava:['Todo o resto'], refs:['docker-compose.yml','deploy/vps/'] },
+  d6: { bloq:null, porque:'O app na loja é canal de descoberta. O produto já roda no navegador, então o WebView é embrulho, não dependência.', destrava:['Play Store'], refs:['mobile/android/'] },
+  d7: { bloq:null, porque:'Store em memória perde tudo a cada reinício. Decisão de 30/07: Postgres em vez de Supabase, para não depender de serviço de terceiro no núcleo.', destrava:['Multi-unidade','Persistência real'], refs:['backend/db.js'] },
+
+  // ---------- Sprint 1 · Segurança ----------
+  s1a: { bloq:null, porque:'O painel admin estava na raiz, à vista de qualquer um. Cliente na raiz e painel em rota própria com noindex.', destrava:['Deploy público'], refs:['frontend/index.html','frontend/operador.html'] },
+  s1b: { bloq:null, porque:'O token ficava fixo no config.js, ou seja, público. Qualquer visitante podia chamar o próximo da fila de qualquer estabelecimento.', destrava:['Qualquer deploy real'], refs:['backend/server.js'] },
+  s1c: { bloq:null, porque:'O primeiro nome de quem entra na fila é dado pessoal sob a LGPD. Guardar para sempre seria retenção sem finalidade.', destrava:['Conformidade LGPD'], refs:['backend/server.js'] },
+  s1d: { bloq:null, porque:'As filas de exemplo tinham nome completo — violavam a própria regra que o produto promete ao cliente.', destrava:['Coerência com a política'], refs:['backend/server.js'] },
+  s1e: { bloq:null, porque:'Regra do CLAUDE.md: rodar antes de qualquer deploy que não seja demo. Rodado duas vezes; a segunda achou três coisas.', destrava:['Deploy com segurança conferida'], refs:['docs/PENDENCIAS.md'] },
+  s1f: { bloq:null, porque:'O repositório tinha zero testes. Sem eles, toda mudança em pagamento ou LGPD era aposta.', destrava:['Mudar sem medo'], refs:['backend/test/'] },
+  s1g: { bloq:null, porque:'Teste que não roda sozinho é teste que ninguém roda. O CI bloqueia o merge se algo quebrar.', destrava:['Qualidade que não depende de disciplina'], refs:['.github/workflows/ci.yml'] },
+
+  // ---------- Sprint 2 · Multi-unidade ----------
+  s2a: { bloq:null, porque:'Um estabelecimento só não é negócio. O schema por unidade é o que permite vender para o segundo cliente sem duplicar servidor.', destrava:['Vender para mais de um'], refs:['backend/db.js'] },
+  s2b: { bloq:null, porque:'É o coração do "sem tocar em nada": a pessoa cria a própria fila em um minuto, sem você no meio.', destrava:['Onboarding sem humano'], refs:['frontend/cadastro.html'] },
+  s2c: { bloq:null, porque:'O QR é o produto físico. Sem ele gerado na hora, alguém teria que produzir e mandar — e isso seria você.', destrava:['Uso imediato no balcão'], refs:['frontend/cartaz.html'] },
+  s2d: { bloq:null, porque:'Operador de uma clínica não pode enxergar a fila de outra. Escopo por unidade é isolamento, não organização.', destrava:['Multi-cliente seguro'], refs:['backend/server.js'] },
+  s2e: { bloq:null, porque:'O limite é o que faz o plano pago existir. Sem ele aplicado, o gratuito é o produto inteiro de graça.', destrava:['Motivo para pagar'], refs:['backend/server.js'] },
+  s2f: { bloq:null, porque:'Testar unidade não pega o que quebra entre as partes. Estes testes sobem o servidor de verdade e percorrem a jornada pela API.', destrava:['Confiança na jornada'], refs:['backend/test/api.test.js'] },
+
+  // ---------- Sprint 3 · Monetização ----------
+  s3a: { bloq:null, porque:'Sem cobrança não há negócio. Pix porque não tem MDR, não tem chargeback e não pede cartão.', destrava:['Receita'], refs:['docs/PAGAMENTOS.md'] },
+  s3b: { bloq:null, porque:'O webhook é o que torna a cobrança automática: pagou, ativa; falhou, suspende. Sem ele alguém teria que conferir na mão.', destrava:['Ativação sem humano'], refs:['backend/billing.js'] },
+  s3c: { bloq:null, porque:'A pessoa precisa entender a diferença entre grátis e pago no momento em que o limite a incomoda — dentro do painel.', destrava:['Conversão para pago'], refs:['frontend/planos.html','frontend/operador.html'] },
+  s3d: { bloq:null, porque:'Todo o funil depois do cadastro depende de e-mail. Os textos nasceram aqui; sair de verdade só em 31/07.', destrava:['Comunicação com o cliente'], refs:['backend/notify.js'] },
+  s3e: { bloq:null, porque:'Sem evento não há funil, e sem funil você não sabe onde perde gente.', destrava:['Observabilidade de comportamento'], refs:['docs/MONETIZATION_OBSERVABILITY.md'] },
+
+  // ---------- Sprint 4 · Publicação ----------
+  s4b: { bloq:null, porque:'Obrigatório para a Play Store e para a LGPD. Também é o documento que o cliente lê antes de confiar os dados dos pacientes dele.', destrava:['Play Store','Confiança'], refs:['frontend/privacidade.html','frontend/termos.html'] },
+  s4f: { bloq:null, porque:'Publicar na mão é onde entra erro humano. Tag gera build; PR roda testes e a stack em Docker.', destrava:['Publicar sem medo'], refs:['.github/workflows/'] },
+
+  // ---------- Sprint 5 · Marketing ----------
+  s5b: { bloq:null, porque:'Busca é o canal que não cobra por clique. JSON-LD e Open Graph fazem o link render no Google e no WhatsApp.', destrava:['Tráfego orgânico'], refs:['frontend/landing.html'] },
+  s5f: { bloq:null, porque:'Quem não quer criar a fila sozinho ainda pode deixar contato — e recebe na hora o caminho do autoatendimento.', destrava:['Não perder quem hesita'], refs:['backend/server.js'] },
+
+  // ---------- Sprint 6 · Vendedor automático ----------
+  s6a: { bloq:null, porque:'Descartado em 31/07 quando você decidiu por zero participação humana. Lista de alvos pressupõe alguém ligando.', destrava:['Foco no que é automático'], refs:['docs/MARKETING.md'] },
+  s6b: { bloq:null, porque:'Descartado pelo mesmo motivo. A demo deixou de ser roteiro e virou o produto: o chatbot cria a fila real no meio da conversa.', destrava:['Demo que não precisa de você'], refs:['docs/CHATBOT.md'] },
+  s6d: { bloq:null, porque:'Era a meta do projeto inteiro. Fechada em 01/08: cadastro, QR, cobrança, renovação, cancelamento e recuperação de acesso não passam por você em ponto nenhum.', destrava:['O objetivo do produto'], refs:['docs/PENDENCIAS.md'] },
+  s6v1:{ bloq:null, porque:'Um vendedor que inventa preço destrói confiança mais rápido do que vende. Os guardrails conferem todo número contra o sistema antes de a resposta sair.', destrava:['Vender sem supervisão'], refs:['backend/chat/guardrails.js','docs/CHATBOT.md'] },
+  s6v2:{ bloq:null, porque:'Falar sobre o produto convence menos que mostrar. As ferramentas criam a fila de verdade dentro da conversa.', destrava:['Demo instantânea','Fechamento no chat'], refs:['backend/chat/tools.js'] },
+  s6v3:{ bloq:null, porque:'Chat com custo por token vira despesa que cresce com o tráfego. Local é zero por conversa, e nada sai da máquina.', destrava:['Escalar sem custo variável'], refs:['backend/chat/providers/local.js'] },
+  s6v4:{ bloq:null, porque:'Sem ver o que o modelo fez por dentro, ajustar vira adivinhação. A bateria pega regressão antes do cliente.', destrava:['Ajustar com evidência'], refs:['frontend/laboratorio.html'] },
+  s6v5:{ bloq:null, porque:'Uma definição só para o chat do site e o MCP: comportamento que diverge entre canais é bug esperando acontecer.', destrava:['Canais novos sem reescrever'], refs:['backend/mcp-server.js'] },
+  s6v6:{ bloq:null, porque:'É onde se enxerga o problema que o cliente vê, não o que a gente imagina que ele vê.', destrava:['Consertar o funil com dado'], refs:['frontend/analitico.html'] },
+
+  // ---------- Sprint 7 · Receita sozinha ----------
+  s7a: { bloq:null, porque:'Era uma armadilha: o require existia mas a dependência não estava instalada. Ligar a flag falharia em silêncio, e o cliente sumiria sem ninguém notar.', destrava:['Renovação','Recuperação de acesso','Todo o funil'], refs:['docs/EMAIL.md'] },
+  s7b: { bloq:null, porque:'A primeira cobrança saía e nenhuma outra. Sem lembrete, a receita morria no mês 1 e o cliente descobria pelo produto piorando.', destrava:['Receita recorrente'], refs:['backend/billing.js'] },
+  s7c: { bloq:null, porque:'Sem cartão guardado, cada renovação mensal é uma chance de perder o cliente por esquecimento. Pagar uma vez elimina onze dessas chances.', destrava:['Menos churn passivo','Caixa adiantado'], refs:['docs/PAGAMENTOS.md'] },
+  s7d: { bloq:null, porque:'Cartão libera na hora, sem esperar compensação. O número nunca toca o servidor, o que mantém o projeto fora do escopo pesado de PCI DSS.', destrava:['Conversão mais rápida'], refs:['backend/payments/mercadopago.js'] },
+  s7e: { bloq:null, porque:'Obrigação do CDC: cancelar tem que ser tão fácil quanto contratar. E cada cancelamento que exige contato vira uma conversa sua.', destrava:['Conformidade','Zero participação'], refs:['frontend/cancelar.html'] },
+  s7f: { bloq:null, porque:'Direito do titular pela LGPD. Em dois passos porque exclusão não tem volta: um e-mail de cobrança encaminhado não pode apagar o negócio de alguém.', destrava:['Conformidade LGPD'], refs:['backend/tokens.js'] },
+  s7g: { bloq:null, porque:'Quem paga um ano e sai no mês 3 tem direito ao proporcional. Calculado e enfileirado, não executado — devolução automática é dinheiro saindo sozinho.', destrava:['Vender anual com segurança'], refs:['backend/billing.js'] },
+  s7h: { bloq:null, porque:'A senha aparece uma vez só. Quem fechava a aba antes de anotar perdia o painel, e a única saída era falar com você.', destrava:['Zero participação'], refs:['frontend/acesso.html'] },
+  s7i: { bloq:null, porque:'Volume Docker sem backup é perda de dados esperando acontecer. A verificação por restauração existe porque backup que nunca foi restaurado é esperança, não backup.', destrava:['Sobreviver a acidente'], refs:['deploy/vps/backup.sh'] },
+  s7j: { bloq:null, porque:'Você não tinha onde ver se estava ganhando dinheiro. Um negócio que você não observa é um negócio que você não consegue consertar.', destrava:['Decidir com número'], refs:['frontend/painel.html','docs/OBSERVABILIDADE.md'] },
+  s7k: { bloq:null, porque:'Entraram cartão, links sem senha e exclusão de dados desde o primeiro review. Achar furo agora é barato; achar com cliente pagando, não.', destrava:['Deploy com segurança conferida'], refs:['docs/PENDENCIAS.md'] },
+});
+
 let statusOverride = {};
 try { statusOverride = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) {}
 
@@ -504,20 +575,20 @@ function render() {
     if (!cards.length) list.innerHTML = '<div class="empty">— vazio —</div>';
     for (const c of cards) {
       const card = document.createElement('article');
-      card.className = 'card' + (col.id === 'done' ? ' done' : '');
+      const detCard = DETALHES[c.id];
+      const travado = col.id !== 'done' && detCard && !!detCard.bloq;
+      card.className = 'card' + (col.id === 'done' ? ' done' : '') + (travado ? ' travado' : '');
       card.draggable = true;
       card.dataset.id = c.id;
       card.style.borderLeftColor = AREAS[c.a[0]].color;
       const tags = ['<span class="tag sprint">' + SPRINTS[c.s].label.split(' · ')[0] + '</span>']
         .concat(c.a.map(a => '<span class="tag" style="background:' + AREAS[a].color + '">' + AREAS[a].label + '</span>'));
-      const det = DETALHES[c.id];
-      // O selo so aparece onde ele diz algo: card concluido nao tem bloqueio,
-      // e repetir 'livre' em 49 cartoes viraria ruido.
+      // O selo so aparece onde ele diz algo: card concluido nao tem bloqueio.
       let selo = '';
-      if (det && col.id !== 'done') {
-        selo = det.bloq
-          ? '<div><span class="selo bloq">travado: ' + BLOQUEIOS[det.bloq].label + '</span></div>'
-          : '<div><span class="selo livre">da para fazer agora</span></div>';
+      if (detCard && col.id !== 'done') {
+        selo = detCard.bloq
+          ? '<div><span class="selo bloq">bloqueado · ' + BLOQUEIOS[detCard.bloq].label + '</span></div>'
+          : '<div><span class="selo livre">sem impedimento</span></div>';
       }
       card.innerHTML = '<h3>' + c.t + '</h3><p>' + c.d + '</p>' + selo + '<div class="tags">' + tags.join('') + '</div>';
       card.tabIndex = 0;
