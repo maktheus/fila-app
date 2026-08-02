@@ -517,16 +517,13 @@ if ('serviceWorker' in navigator) {
     '</div>';
   }
 
-  async function startCheckout() {
-    const btn = document.getElementById('upgrade-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Abrindo...'; }
+  function startCheckout() {
     FilaAnalytics.track('checkout:iniciado');
-    const data = await api('POST', '/api/checkout');
-    if (data && data.url) {
-      window.location.href = data.url;
-      return;
-    }
-    if (btn) { btn.disabled = false; btn.textContent = 'Assinar premium'; }
+    // Vai para a tela de assinatura, que é onde vivem Pix, cartão pelo Google
+    // Pay e o plano anual. Antes isto chamava POST /api/checkout e caía no
+    // checkout sandbox antigo — um beco sem saída para quem clicava aqui.
+    const slug = venueSlug || '';
+    window.location.href = 'assinar.html' + (slug ? '?venue=' + encodeURIComponent(slug) : '');
   }
 
   function renderLogin() {

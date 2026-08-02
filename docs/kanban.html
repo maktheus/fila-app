@@ -51,6 +51,31 @@
   .tag.sprint{background:#fff;color:var(--slate);border:1px solid var(--bone)}
   .empty{font-size:12px;color:var(--stone);text-align:center;padding:18px 6px}
   .card.done h3{text-decoration:line-through;text-decoration-thickness:1.5px;color:var(--slate)}
+  .card{position:relative}
+  .card:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .selo{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:99px;margin-top:7px}
+  .selo.bloq{background:var(--blush);color:#8C1C18}
+  .selo.livre{background:#E4F0E9;color:var(--forest)}
+  /* Painel de detalhe: gaveta, não modal — dá para ler o card e o quadro juntos */
+  .fundo{position:fixed;inset:0;background:rgba(25,25,25,.42);opacity:0;pointer-events:none;transition:opacity .18s;z-index:40}
+  .fundo.on{opacity:1;pointer-events:auto}
+  .gaveta{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);background:var(--cream);border-left:1px solid var(--bone);z-index:41;transform:translateX(100%);transition:transform .22s ease;overflow-y:auto;padding:22px 24px 40px}
+  .gaveta.on{transform:none}
+  .gaveta-topo{display:flex;align-items:flex-start;gap:12px;margin-bottom:4px}
+  .gaveta h2{font-family:var(--display);font-size:19px;line-height:1.3;font-weight:600;flex:1}
+  .fechar{border:0;background:transparent;color:var(--stone);font-size:24px;line-height:1;cursor:pointer;padding:0 4px}
+  .fechar:hover{color:var(--ink)}
+  .gaveta .desc{font-size:13.5px;color:var(--slate);line-height:1.55;margin:10px 0 0}
+  .bloco{margin-top:20px}
+  .bloco h3{font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--stone);margin-bottom:7px}
+  .bloco p{font-size:13.5px;line-height:1.6;color:var(--ink)}
+  .bloco ul{margin:0;padding-left:17px;font-size:13.5px;line-height:1.6;color:var(--ink)}
+  .passo{background:#fff;border:1px solid var(--bone);border-left:3px solid var(--forest);border-radius:9px;padding:12px 13px;font-size:13.5px;line-height:1.6}
+  .travado{background:var(--blush);border:1px solid #E5B4B1;border-radius:9px;padding:12px 13px}
+  .travado strong{display:block;font-size:13.5px;color:#8C1C18;margin-bottom:3px}
+  .travado span{font-size:13px;color:var(--slate)}
+  .refs{display:flex;flex-wrap:wrap;gap:6px}
+  .refs code{font-size:11.5px;background:#fff;border:1px solid var(--bone);border-radius:6px;padding:3px 7px;color:var(--slate)}
 </style>
 </head>
 <body>
@@ -70,12 +95,15 @@
 
 <main class="board" id="board"></main>
 
+<div class="fundo" id="fundo"></div>
+<aside class="gaveta" id="gaveta" role="dialog" aria-modal="true" aria-labelledby="gaveta-titulo"></aside>
+
 <script>
 const STORAGE_KEY = 'fila-kanban-v2';
 
 const SPRINTS = {
   S0: { label: 'Feito (pré-sprint)', note: 'Entregue até 30/07: blocos 1–3 do GARIMPO + infra de deploy + Postgres.' },
-  S1: { label: 'Sprint 1 · Segurança', note: 'Entregue em 30/07: login com sessão, expurgo LGPD, cliente na raiz, testes de API e CI no GitHub Actions.' },
+  S1: { label: 'Sprint 1 · Segurança', note: 'Entregue em 30/07: login com sessão, expurgo LGPD, cliente na raiz, testes de API e CI no GitHub Actions. Hoje o repositório tem 211 testes.' },
   S2: { label: 'Sprint 2 · Multi-unidade', note: 'Entregue em 30/07: schema multi-tenant, cadastro self-service com QR gerado na hora e limites do plano free aplicados.' },
   S3: { label: 'Sprint 3 · Monetização', note: 'Entregue em 31/07: trial de 14 dias, checkout, webhook assinado que ativa e suspende o premium sozinho, e-mails e eventos de funil.' },
   S4: { label: 'Sprint 4 · Publicação', note: 'Parcial: privacidade, termos, ficha da loja, assetlinks e pipeline de release prontos. Dependem de você: domínio, keystore, Play Console e o teste fechado de 14 dias.' },
@@ -118,24 +146,24 @@ const CARDS = [
   // ---- Sprint 1 — Segurança & Qualidade ----
   { id:'s1a', s:'S1', st:'done', a:['dev'], t:'Inverter rotas públicas', d:'Cliente vira index.html; painel admin sai da raiz e vai para rota própria não óbvia.' },
   { id:'s1b', s:'S1', st:'done', a:['dev'], t:'Login real do operador', d:'Sessão com expiração no lugar do token fixo em config.js/localStorage.' },
-  { id:'s1c', s:'S1', st:'done', a:['dev','juridico'], t:'Expurgo LGPD automático', d:'Job diário apaga tickets encerrados após retenção configurável; só primeiro nome em todo lugar.' },
+  { id:'s1c', s:'S1', st:'done', a:['dev','juridico'], t:'Expurgo LGPD automático', d:'Expurgo a cada 15 min apaga tickets encerrados após TICKET_RETENTION_HOURS; só primeiro nome em todo lugar.' },
   { id:'s1d', s:'S1', st:'done', a:['dev'], t:'Remover dados seed', d:'Fila inicia vazia em produção; seeds atuais têm nome completo (viola a própria regra LGPD).' },
   { id:'s1e', s:'S1', st:'done', a:['dev'], t:'Rodar /security-review e corrigir', d:'Skill obrigatória do CLAUDE.md antes de deploy real.' },
-  { id:'s1f', s:'S1', st:'done', a:['dev','automacao'], t:'Testes de API no CI', d:'health, tickets, pass, auth, rate-limit — hoje o repo tem zero testes.' },
+  { id:'s1f', s:'S1', st:'done', a:['dev','automacao'], t:'Testes de API no CI', d:'health, tickets, passar a vez, auth e rate limit. O repositório saiu de zero para 211 testes.' },
   { id:'s1g', s:'S1', st:'done', a:['automacao'], t:'CI no GitHub Actions bloqueando merge', d:'Lint + testes rodando em todo PR para main.' },
 
   // ---- Sprint 2 — Multi-unidade ----
   { id:'s2a', s:'S2', st:'done', a:['dev'], t:'Schema multi-tenant no Postgres', d:'Tabela venues; tickets/telão/painel escopados por unidade; migrações versionadas.' },
   { id:'s2b', s:'S2', st:'done', a:['dev'], t:'Cadastro self-service de estabelecimento', d:'Nome, endereço e coordenadas (mapa) → cria a unidade sozinho.' },
-  { id:'s2c', s:'S2', st:'done', a:['dev','automacao'], t:'Geração automática do QR por unidade', d:'PNG/PDF pronto para imprimir no balcão, gerado na hora do cadastro.' },
+  { id:'s2c', s:'S2', st:'done', a:['dev','automacao'], t:'Geração automática do QR por unidade', d:'PNG servido por /api/venues/:slug/qr.png e cartaz A4 em cartaz.html, gerados na hora do cadastro.' },
   { id:'s2d', s:'S2', st:'done', a:['dev'], t:'Painel e telão por unidade', d:'URLs próprias por venue; operador só enxerga a própria fila.' },
   { id:'s2e', s:'S2', st:'done', a:['dev'], t:'Limites do plano free por unidade', d:'50 tickets/dia e 1 balcão no free — hoje o entitlement existe mas não é aplicado.' },
-  { id:'s2f', s:'S2', st:'done', a:['dev'], t:'Testes e2e da jornada completa', d:'Playwright: cliente entra → operador chama → atendimento, nas duas telas.' },
+  { id:'s2f', s:'S2', st:'done', a:['dev'], t:'Testes da jornada na API', d:'node:test cobrindo entrada, chamada, finalização, ausência e passar a vez contra o servidor real. Não é Playwright: não há teste de navegador.' },
 
   // ---- Sprint 3 — Monetização ----
-  { id:'s3a', s:'S3', st:'done', a:['dev','vendas'], t:'Checkout de assinatura Pix', d:'Cakto ou Mercado Pago, R$ 99/unidade/mês, trial de 14 dias.' },
+  { id:'s3a', s:'S3', st:'done', a:['dev','vendas'], t:'Checkout de assinatura Pix', d:'Mercado Pago pela Orders API. R$ 99/mês ou R$ 990/ano, trial de 14 dias sem pedir cartão.' },
   { id:'s3b', s:'S3', st:'done', a:['automacao'], t:'Webhook de pagamento → premium automático', d:'Pagou: ativa. Falhou/cancelou: suspende. Zero intervenção manual.' },
-  { id:'s3c', s:'S3', st:'done', a:['design','dev'], t:'Página de planos + upgrade no painel', d:'Free com ads vs. premium; botão de upgrade dentro do painel do operador.' },
+  { id:'s3c', s:'S3', st:'done', a:['design','dev'], t:'Página de planos + upgrade no painel', d:'planos.html e botão no painel do operador. Corrigido em 01/08: ele levava ao checkout sandbox antigo, agora vai para assinar.html com Pix, cartão e anual.' },
   { id:'s3d', s:'S3', st:'done', a:['automacao'], t:'E-mails transacionais automáticos', d:'Boas-vindas, fim do trial, pagamento falhou, cancelamento.' },
   { id:'s3e', s:'S3', st:'done', a:['marketing','dev'], t:'Eventos de funil implementados', d:'queue_joined, queue_called, premium_started, ad_slot_viewed… (docs/MONETIZATION_OBSERVABILITY.md).' },
   { id:'s3f', s:'S3', st:'todo', a:['vendas'], t:'Comprar a própria assinatura', d:'Validar o fluxo real de ponta a ponta antes de vender. Depende da conta no Mercado Pago.' },
@@ -146,7 +174,7 @@ const CARDS = [
   { id:'s4c', s:'S4', st:'doing', a:['design','marketing'], t:'Ficha da loja (ASO)', d:'Descrições e palavras-chave escritas em docs/PLAY_STORE.md. Faltam ícone 512, gráfico de destaque e screenshots.' },
   { id:'s4d', s:'S4', st:'doing', a:['publicacao'], t:'Build .aab assinado + declarações no Play Console', d:'Workflow de release monta o .aab e a declaração de dados está pronta. Falta gerar a keystore e cadastrar os secrets.' },
   { id:'s4e', s:'S4', st:'backlog', a:['publicacao'], t:'Teste fechado: 12+ testadores por 14 dias', d:'Requisito do Google para contas pessoais novas antes do release aberto.' },
-  { id:'s4f', s:'S4', st:'done', a:['automacao'], t:'Pipeline CI/CD completo', d:'Tag de release → testes → build web + .aab → deploy automático com rollback.' },
+  { id:'s4f', s:'S4', st:'done', a:['automacao'], t:'Pipeline CI/CD', d:'ci.yml roda testes e stack Docker em todo PR; release.yml monta o .aab por tag; deploy-pages.yml publica o front. Sem rollback automático — reverter é refazer a tag.' },
   { id:'s4g', s:'S4', st:'doing', a:['infra'], t:'Uptime Kuma + alertas em produção', d:'Monitores definidos em docs/MONITORAMENTO.md e health agora responde 503 com o banco fora. Falta configurar no servidor.' },
 
   // ---- Sprint 5 — Marketing ----
@@ -204,6 +232,222 @@ const CARDS = [
   { id:'sdg', s:'SD', st:'backlog', a:['marketing'], t:'Case em vídeo do piloto', d:'Depoimento do primeiro cliente com números reais (tempo de espera, ausências, avaliação). Prova social local vale mais que qualquer anúncio.' },
 ];
 
+// --------------- Detalhe de cada atividade ---------------
+//
+// O quadro dizia O QUE falta, nunca POR QUE está parado nem qual é o próximo
+// passo. Card sem isso vira lista de culpa: você olha, não sabe o que fazer,
+// e fecha.
+//
+// `bloq` é o que impede de começar hoje. `null` significa que nada impede —
+// e é o filtro mais útil daqui, porque separa o que depende de você agora do
+// que depende de terceiro.
+
+const BLOQUEIOS = {
+  dominio:    { label: 'Domínio', d: 'Precisa do domínio apontado com HTTPS.' },
+  contaMp:    { label: 'Conta Mercado Pago', d: 'Precisa da conta criada e das credenciais.' },
+  suporteMp:  { label: 'Suporte do MP', d: 'Depende de uma resposta que só o Mercado Pago pode dar.' },
+  playConsole:{ label: 'Play Console', d: 'Precisa da conta de desenvolvedor e da keystore.' },
+  contaAds:   { label: 'Conta Google Ads', d: 'Precisa da conta e de um meio de pagamento.' },
+  clientes:   { label: 'Clientes reais', d: 'Só faz sentido com gente usando.' },
+};
+
+const DETALHES = {
+  // ---------- Em andamento ----------
+  s4a: {
+    bloq: 'dominio',
+    porque: 'Sem assetlinks, o link da fila abre no navegador em vez de abrir o app instalado. O Google usa esse arquivo para provar que o domínio e o app são do mesmo dono.',
+    passo: 'Rodar gerar-assetlinks.ps1 com o domínio e publicar o resultado em /.well-known/assetlinks.json.',
+    destrava: ['Abertura direta no app Android', 'Requisito da Play Store'],
+    refs: ['mobile/android/scripts/gerar-assetlinks.ps1', 'frontend/.well-known/assetlinks.template.json'],
+  },
+  s4c: {
+    bloq: null,
+    porque: 'A ficha é o que decide se quem encontra o app instala. Texto e palavras-chave já estão escritos; o que falta é imagem — e imagem é o que a loja recusa se estiver fora do tamanho.',
+    passo: 'Gerar três peças: ícone 512×512, gráfico de destaque 1024×500 e ao menos 2 screenshots do telefone. Dá para fazer agora, sem depender de nada.',
+    destrava: ['Envio para o Play Console'],
+    refs: ['docs/PLAY_STORE.md'],
+  },
+  s4d: {
+    bloq: 'playConsole',
+    porque: 'O .aab precisa ser assinado com uma chave que só existe uma vez: perder a keystore significa nunca mais atualizar o app publicado.',
+    passo: 'keytool -genkeypair, guardar a keystore em lugar seguro (não no repositório) e cadastrar ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS e ANDROID_KEY_PASSWORD nos secrets do repo.',
+    destrava: ['Teste fechado', 'Release na Play Store'],
+    refs: ['.github/workflows/', 'docs/PLAY_STORE.md'],
+  },
+  s4g: {
+    bloq: null,
+    porque: 'O painel do dono mostra a saúde, mas não te procura. Se o servidor cair, ele não vai conseguir te avisar disso — por definição. Monitor externo é a única coisa que cobre esse caso.',
+    passo: 'docker compose --profile observability up -d e apontar um monitor para /api/health a cada 5 minutos. Ele já responde 503 com o banco fora, então serve como sinal único de vida.',
+    destrava: ['Saber que caiu antes do cliente avisar'],
+    refs: ['docs/MONITORAMENTO.md', 'docs/OBSERVABILIDADE.md'],
+  },
+  s5a: {
+    bloq: null,
+    porque: 'O cartaz do balcão está pronto e é o que mais importa (é ele que gera cliente). Ícone e splash são requisito da loja, não do produto.',
+    passo: 'Ícone 512×512 e splash do app, no design system Mutum. Mesma peça serve para a ficha da loja.',
+    destrava: ['Ficha da loja', 'App com identidade própria'],
+    refs: ['frontend/cartaz.html', 'frontend/assets/mutum-design-system.css'],
+  },
+  s5c: {
+    bloq: null,
+    porque: 'Um dono de clínica entende o produto em 20 segundos vendo, e não lendo. O vídeo é o criativo do anúncio e o conteúdo do perfil ao mesmo tempo.',
+    passo: 'Gravar seguindo o roteiro cena a cena que já está escrito. A versão de 15s é recorte da de 60s, não uma gravação nova.',
+    destrava: ['Campanha Google Ads', 'Conteúdo de lançamento'],
+    refs: ['docs/MARKETING.md'],
+  },
+  s5d: {
+    bloq: null,
+    porque: 'Conteúdo é o canal que não custa por clique. Leva meses para render, e é justamente por isso que começar cedo importa.',
+    passo: 'Criar os perfis e publicar os três conteúdos já escritos. Não precisa de domínio nem de conta paga.',
+    destrava: ['Tráfego orgânico'],
+    refs: ['docs/MARKETING.md'],
+  },
+  s5e: {
+    bloq: 'contaAds',
+    porque: 'É o caminho mais rápido para descobrir se alguém paga. Com o vendedor automático atendendo, o funil roda inteiro sozinho: clique → conversa → fila criada → Pix.',
+    passo: 'Criar a conta, subir a estrutura de campanha já escrita e começar com R$ 20/dia. O anúncio precisa apontar para a landing no domínio, não para localhost.',
+    destrava: ['Primeiros clientes reais'],
+    refs: ['docs/MARKETING.md'],
+  },
+  s8a: {
+    bloq: null,
+    porque: 'É o nó de tudo: webhook do Mercado Pago precisa de URL pública, Google Pay exige HTTPS aprovado, Play Store exige o domínio nos assetlinks, e os links de cancelamento e acesso precisam apontar para um lugar real.',
+    passo: 'Registro A para o IP da VPS (e outro para www), certbot com Let\'s Encrypt, e preencher PUBLIC_APP_URL e CORS_ORIGIN. Você já tem o domínio — falta apontar.',
+    destrava: ['Webhook do Mercado Pago', 'Google Pay', 'Play Store', 'Links de cancelamento e acesso', 'Anúncios'],
+    refs: ['deploy/vps/.env.example', 'nginx/nginx.conf'],
+  },
+
+  // ---------- A fazer ----------
+  s3f: {
+    bloq: 'contaMp',
+    porque: 'Regra do GARIMPO: validar o fluxo real antes de vender. Comprar a própria assinatura é o único jeito de saber se o Pix cai, o webhook chega e o premium libera de verdade.',
+    passo: 'Com a conta do MP configurada, assinar a própria unidade pelo /assinar.html e conferir que o premium ativou sozinho.',
+    destrava: ['Confiança para vender'],
+    refs: ['docs/PAGAMENTOS.md'],
+  },
+  s8b: {
+    bloq: null,
+    porque: 'Sem SMTP nada do que foi construído chega em ninguém: cadastro, cobrança, renovação, cancelamento e recuperação de senha dependem de e-mail. E sem SPF, DKIM e DMARC o e-mail cai em spam, que dá no mesmo.',
+    passo: 'Contratar Resend, Brevo ou SES (faixa gratuita cobre muito mais que os primeiros meses), configurar os três registros DNS e conferir com POST /api/email/teste mandando para um Gmail.',
+    destrava: ['Renovação', 'Recuperação de acesso', 'Todo o funil pós-cadastro'],
+    refs: ['docs/EMAIL.md'],
+  },
+  s8c: {
+    bloq: null,
+    porque: 'Enquanto o provedor for sandbox, ninguém paga de verdade — e o painel do dono mostra receita imaginária. Por isso essa luz fica vermelha em produção.',
+    passo: 'Criar a conta, pegar o access token de produção e a chave secreta do webhook, e cadastrar o webhook apontando para /api/webhooks/mercadopago nos tópicos orders e payment.',
+    destrava: ['Receita real', 'Comprar a própria assinatura', 'Confirmar o gateway do Google Pay'],
+    refs: ['docs/PAGAMENTOS.md'],
+  },
+  s8d: {
+    bloq: 'suporteMp',
+    porque: 'O Google cifra o cartão para um processador específico. Sem o identificador certo, o token que ele gera não é decifrável pelo MP e a cobrança falha no clique. Não achei isso documentado publicamente.',
+    passo: 'Abrir chamado perguntando literalmente: "qual o gateway e o gatewayMerchantId para tokenização do Google Pay Web na minha conta?". Preencher GPAY_GATEWAY e GPAY_GATEWAY_MERCHANT_ID.',
+    destrava: ['Botão do Google Pay aparecer'],
+    refs: ['docs/PAGAMENTOS.md', 'docs/PENDENCIAS.md'],
+  },
+  s8e: {
+    bloq: null,
+    porque: 'Sem LINK_SECRET em produção o servidor recusa assinar links, e cancelar volta a depender da senha — que é justamente o que quem perdeu a senha não tem. E backup na mesma máquina não protege contra a máquina morrer.',
+    passo: 'openssl rand -hex 32 para o LINK_SECRET, e agendar o backup no cron copiando os dumps para fora (a linha do rclone está no fim do script).',
+    destrava: ['Cancelamento sem senha', 'Sobreviver a perder a VPS'],
+    refs: ['deploy/vps/backup.sh', 'backend/tokens.js'],
+  },
+
+  // ---------- Backlog ----------
+  s4e: {
+    bloq: 'playConsole',
+    porque: 'Requisito do Google para contas pessoais novas. São 14 dias corridos com no mínimo 12 testadores — o prazo mais longo do lançamento inteiro, e ele não acelera.',
+    passo: 'Cadastrar os e-mails dos testadores no teste fechado e começar a contagem. Você disse que tem gente para chamar; começar isso cedo economiza duas semanas no fim.',
+    destrava: ['Release aberto na Play Store'],
+    refs: ['docs/PLAY_STORE.md'],
+  },
+  s6c: {
+    bloq: 'dominio',
+    porque: 'Não há piloto acompanhado à mão: o trial de 14 dias já é self-service e o painel avisa quando alguém trava. O que falta é gente chegando.',
+    passo: 'Depende do domínio no ar e dos anúncios rodando. Quando chegarem, o funil em /analitico.html mostra onde eles desistem.',
+    destrava: ['Meta de validação'],
+    refs: ['docs/OBSERVABILIDADE.md'],
+  },
+  s6e: {
+    bloq: 'playConsole',
+    porque: 'A loja é canal de descoberta, não requisito: o app do cliente já roda no navegador sem instalar nada. Dá para vender sem ela.',
+    passo: 'Promover o teste fechado para produção depois dos 14 dias.',
+    destrava: ['Descoberta pela busca da Play Store'],
+    refs: ['docs/PLAY_STORE.md'],
+  },
+  s6f: {
+    bloq: 'clientes',
+    porque: 'Três assinaturas de R$ 99 ativas provam que alguém paga por isso. Antes disso, tudo é hipótese — e escalar hipótese é como se queima dinheiro.',
+    passo: 'Acompanhar em /painel.html. A receita recorrente é o número grande da tela.',
+    destrava: ['Decisão de escalar'],
+    refs: ['frontend/painel.html'],
+  },
+  s8f: {
+    bloq: null,
+    porque: 'O painel mostra o problema, mas não te procura. E-mail parado ou modelo caído rodam em silêncio até você olhar — que é o jeito mais caro de quebrar.',
+    passo: 'Estender o job de ciclo para conferir a saúde e mandar um e-mail quando algo virar vermelho, com trava para não repetir o mesmo alerta.',
+    destrava: ['Descobrir problema antes do cliente'],
+    refs: ['docs/OBSERVABILIDADE.md'],
+  },
+  s8g: {
+    bloq: null,
+    porque: 'O painel mostra o agora, não a curva. Sem série temporal você não sabe se está crescendo, e crescimento é a única pergunta que importa depois dos primeiros clientes.',
+    passo: 'Gravar uma linha por dia com as métricas do billing.metricas() e desenhar a curva no painel.',
+    destrava: ['Saber se está crescendo'],
+    refs: ['backend/billing.js'],
+  },
+  sda: {
+    bloq: 'clientes',
+    porque: 'O canal mais forte que existe aqui: quem espera na fila é dono ou funcionário de outro negócio que também tem fila. Cada fila ativa vira vitrine, de graça, o dia inteiro.',
+    passo: 'Rodapé discreto no plano gratuito com link rastreado. Precisa de filas ativas para valer alguma coisa.',
+    destrava: ['Crescimento sem custo por clique'],
+    refs: ['frontend/index.html'],
+  },
+  sdb: {
+    bloq: 'dominio',
+    porque: 'No Brasil, dono de clínica fecha negócio por WhatsApp, não por e-mail. O vendedor automático já existe: falta o canal.',
+    passo: 'WhatsApp Business + anúncios click-to-WhatsApp, com o mesmo agente respondendo. As ferramentas do chatbot já rodam por MCP, então o canal novo reaproveita tudo.',
+    destrava: ['Canal onde o cliente já está'],
+    refs: ['docs/CHATBOT.md', 'backend/mcp-server.js'],
+  },
+  sdc: {
+    bloq: 'clientes',
+    porque: 'Dono de clínica conhece outros donos de clínica. Indicação é o canal com o menor custo de aquisição que existe.',
+    passo: 'Um mês grátis por indicação que virar assinante, com código rastreado no checkout.',
+    destrava: ['Crescimento por rede'],
+    refs: [],
+  },
+  sdd: {
+    bloq: 'clientes',
+    porque: 'Contadores e agências de marketing médico já atendem dezenas de clínicas cada. Um parceiro pode valer mais que cem anúncios.',
+    passo: 'Oferecer 20% de comissão recorrente. Faz sentido depois de ter caso de sucesso para mostrar.',
+    destrava: ['Distribuição em escala'],
+    refs: [],
+  },
+  sde: {
+    bloq: null,
+    porque: 'Reviews do Google Maps reclamando de espera são a dor comprovada e pública. Uma lista assim é qualificada de nascença.',
+    passo: 'Coletar clínicas de Manaus com reviews sobre espera. Atenção: contato em massa não entra aqui — a lista serve para segmentar anúncio, não para disparar mensagem.',
+    destrava: ['Segmentação melhor dos anúncios'],
+    refs: ['docs/MARKETING.md'],
+  },
+  sdf: {
+    bloq: 'clientes',
+    porque: 'Uma demo de 10 minutos numa sala com 40 gestores de clínica: a plateia inteira entra na fila pelo QR do telão. O produto se explica sozinho.',
+    passo: 'CDL Manaus, sindicatos e grupos de gestores. Melhor com um caso real para citar.',
+    destrava: ['Vários clientes de uma vez'],
+    refs: [],
+  },
+  sdg: {
+    bloq: 'clientes',
+    porque: 'Prova social local vale mais que qualquer anúncio: um dono de clínica em Manaus acredita em outro dono de clínica em Manaus.',
+    passo: 'Depoimento em vídeo do primeiro cliente com números reais — tempo de espera antes e depois, ausências, avaliação.',
+    destrava: ['Credibilidade nos anúncios'],
+    refs: ['docs/MARKETING.md'],
+  },
+};
+
 let statusOverride = {};
 try { statusOverride = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) {}
 
@@ -225,13 +469,27 @@ function render() {
     return b;
   };
   filters.appendChild(mkChip('all', 'Tudo', CARDS.length));
+  const livres = CARDS.filter(c => cardStatus(c) !== 'done' && DETALHES[c.id] && !DETALHES[c.id].bloq);
+  const travados = CARDS.filter(c => cardStatus(c) !== 'done' && DETALHES[c.id] && DETALHES[c.id].bloq);
+  filters.appendChild(mkChip('livre', 'Dá para fazer hoje', livres.length));
+  filters.appendChild(mkChip('travado', 'Travado por terceiro', travados.length));
   for (const [key, s] of Object.entries(SPRINTS)) {
     filters.appendChild(mkChip(key, s.label, CARDS.filter(c => c.s === key).length));
   }
-  document.getElementById('sprint-note').textContent = activeSprint === 'all' ? '' : SPRINTS[activeSprint].note;
+  const NOTAS_EXTRA = {
+    livre: 'Nada impede de começar. Ordenado por sprint, não por prioridade — o domínio é o que mais destrava.',
+    travado: 'Cada um espera algo que não está na sua mão hoje. Abra o card para ver quem é o gargalo.',
+  };
+  document.getElementById('sprint-note').textContent =
+    activeSprint === 'all' ? '' : (NOTAS_EXTRA[activeSprint] || SPRINTS[activeSprint].note);
 
   // board
-  const visible = CARDS.filter(c => activeSprint === 'all' || c.s === activeSprint);
+  const visible = CARDS.filter(c => {
+    if (activeSprint === 'all') return true;
+    if (activeSprint === 'livre') return cardStatus(c) !== 'done' && DETALHES[c.id] && !DETALHES[c.id].bloq;
+    if (activeSprint === 'travado') return cardStatus(c) !== 'done' && DETALHES[c.id] && !!DETALHES[c.id].bloq;
+    return c.s === activeSprint;
+  });
   const board = document.getElementById('board');
   board.innerHTML = '';
   for (const col of COLUMNS) {
@@ -252,7 +510,19 @@ function render() {
       card.style.borderLeftColor = AREAS[c.a[0]].color;
       const tags = ['<span class="tag sprint">' + SPRINTS[c.s].label.split(' · ')[0] + '</span>']
         .concat(c.a.map(a => '<span class="tag" style="background:' + AREAS[a].color + '">' + AREAS[a].label + '</span>'));
-      card.innerHTML = '<h3>' + c.t + '</h3><p>' + c.d + '</p><div class="tags">' + tags.join('') + '</div>';
+      const det = DETALHES[c.id];
+      // O selo so aparece onde ele diz algo: card concluido nao tem bloqueio,
+      // e repetir 'livre' em 49 cartoes viraria ruido.
+      let selo = '';
+      if (det && col.id !== 'done') {
+        selo = det.bloq
+          ? '<div><span class="selo bloq">travado: ' + BLOQUEIOS[det.bloq].label + '</span></div>'
+          : '<div><span class="selo livre">da para fazer agora</span></div>';
+      }
+      card.innerHTML = '<h3>' + c.t + '</h3><p>' + c.d + '</p>' + selo + '<div class="tags">' + tags.join('') + '</div>';
+      card.tabIndex = 0;
+      card.addEventListener('click', () => abrirDetalhe(c.id));
+      card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirDetalhe(c.id); } });
       card.addEventListener('dragstart', e => {
         e.dataTransfer.setData('text/plain', c.id);
         card.classList.add('dragging');
@@ -287,6 +557,88 @@ document.getElementById('reset').onclick = () => {
     render();
   }
 };
+
+// --------------- Gaveta de detalhe ---------------
+//
+// O quadro dizia O QUE falta e nunca POR QUE está parado. Card sem isso vira
+// lista de culpa: você olha, não sabe o que fazer, e fecha.
+//
+// Gaveta em vez de modal centralizado porque dá para ler o detalhe e o quadro
+// ao mesmo tempo — a comparação com os outros cards é metade da decisão.
+
+function esc(v) {
+  const d = document.createElement('div');
+  d.textContent = v == null ? '' : String(v);
+  return d.innerHTML;
+}
+
+function abrirDetalhe(id) {
+  const c = CARDS.find(x => x.id === id);
+  if (!c) return;
+  const det = DETALHES[id];
+  const status = cardStatus(c);
+  const concluido = status === 'done';
+  const col = COLUMNS.find(x => x.id === status);
+
+  const partes = [];
+  partes.push('<div class="gaveta-topo">' +
+    '<h2 id="gaveta-titulo">' + esc(c.t) + '</h2>' +
+    '<button class="fechar" id="fechar-gaveta" aria-label="Fechar">&times;</button></div>');
+
+  partes.push('<div class="tags">' +
+    '<span class="tag sprint">' + esc(SPRINTS[c.s].label) + '</span>' +
+    '<span class="tag" style="background:' + (concluido ? 'var(--forest)' : col.dot) + '">' + esc(col.label) + '</span>' +
+    c.a.map(a => '<span class="tag" style="background:' + AREAS[a].color + '">' + esc(AREAS[a].label) + '</span>').join('') +
+    '</div>');
+
+  partes.push('<p class="desc">' + esc(c.d) + '</p>');
+
+  if (!det) {
+    partes.push('<div class="bloco"><p style="color:var(--stone);font-size:13px">' +
+      (concluido ? 'Entregue. O que ficou está descrito acima.' : 'Sem detalhe registrado ainda.') + '</p></div>');
+  } else {
+    // O bloqueio vem primeiro: é a informação que decide se você continua lendo.
+    if (!concluido) {
+      partes.push('<div class="bloco">' + (det.bloq
+        ? '<div class="travado"><strong>Travado por: ' + esc(BLOQUEIOS[det.bloq].label) + '</strong>' +
+          '<span>' + esc(BLOQUEIOS[det.bloq].d) + '</span></div>'
+        : '<div class="passo" style="border-left-color:var(--forest)"><strong>Nada bloqueia.</strong> Dá para fazer hoje.</div>')
+        + '</div>');
+    }
+
+    if (det.porque) {
+      partes.push('<div class="bloco"><h3>Por que importa</h3><p>' + esc(det.porque) + '</p></div>');
+    }
+    if (det.passo && !concluido) {
+      partes.push('<div class="bloco"><h3>Próximo passo</h3><div class="passo">' + esc(det.passo) + '</div></div>');
+    }
+    if (det.destrava && det.destrava.length) {
+      partes.push('<div class="bloco"><h3>' + (concluido ? 'Destravou' : 'Destrava') + '</h3><ul>' +
+        det.destrava.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>');
+    }
+    if (det.refs && det.refs.length) {
+      partes.push('<div class="bloco"><h3>Onde olhar</h3><div class="refs">' +
+        det.refs.map(r => '<code>' + esc(r) + '</code>').join('') + '</div></div>');
+    }
+  }
+
+  const gaveta = document.getElementById('gaveta');
+  gaveta.innerHTML = partes.join('');
+  gaveta.classList.add('on');
+  document.getElementById('fundo').classList.add('on');
+  document.getElementById('fechar-gaveta').addEventListener('click', fecharDetalhe);
+  // O foco vai para o botão de fechar: quem navega por teclado precisa ter
+  // como sair sem caçar o alvo.
+  document.getElementById('fechar-gaveta').focus();
+}
+
+function fecharDetalhe() {
+  document.getElementById('gaveta').classList.remove('on');
+  document.getElementById('fundo').classList.remove('on');
+}
+
+document.getElementById('fundo').addEventListener('click', fecharDetalhe);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharDetalhe(); });
 
 render();
 </script>
