@@ -181,7 +181,25 @@ linha do `rclone` comentada no fim.
 
 ---
 
-## 6. Google Pay depende de dois identificadores não confirmados
+## 6. ✅ Entrada na fila sem o QR — corrigido em 01/08
+
+**Era possível encher a fila de qualquer cliente pagante, de qualquer lugar do
+mundo.** `POST /tickets` nunca validava o token do QR: bastava saber o slug da
+unidade — que é público, está na URL do próprio QR.
+
+No plano gratuito são 50 entradas por dia. Dava para esgotar a cota de uma
+clínica em minutos, travar o balcão dela com nomes falsos e ainda fazer o
+sistema oferecer upgrade por um limite que o atacante consumiu.
+
+O app do cliente **já mandava** o `qrToken`; só o servidor não conferia. A
+correção foi exigir, com o operador autenticado passando direto — é ele quem
+adiciona alguém que chegou sem celular.
+
+Achado exercitando a jornada real contra o sistema rodando, não lendo código.
+
+---
+
+## 7. Google Pay depende de dois identificadores não confirmados
 
 **Estado:** o cartão está construído e testado. Falta um dado que só o Mercado
 Pago pode dar.
@@ -219,7 +237,7 @@ e passar pela revisão da tela de checkout antes de virar `GPAY_ENVIRONMENT` par
 
 ---
 
-## 7. O vendedor local fecha ~4 de 5
+## 8. O vendedor local fecha ~4 de 5
 
 **Estado:** medido, não estimado. Rodando a jornada completa contra o
 `qwen2.5:7b`, quando a demonstração é criada a venda fecha em cerca de 4 de cada
@@ -257,7 +275,7 @@ passada só; pares como Qwen 0.6B → 8B dão ~1.9×) ou um modelo menor. Nada d
 
 ---
 
-## 8. Nada disso está no ar
+## 9. Nada disso está no ar
 
 O sistema roda inteiro em Docker, com testes e CI verdes, mas em `localhost`.
 
@@ -278,7 +296,7 @@ Para virar produto público falta, na ordem:
 
 ---
 
-## 9. Distribuição não começou
+## 10. Distribuição não começou
 
 A landing tem SEO, Open Graph, JSON-LD e sitemap prontos. O chatbot atende. O
 cartaz de balcão imprime. Mas nenhum canal está **ligado**:

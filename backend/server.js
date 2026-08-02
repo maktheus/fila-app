@@ -1771,9 +1771,26 @@ venueRouter.post('/operator/logout', (req, res) => {
 
 venueRouter.post('/tickets', publicTicketLimiter, (req, res) => {
   const venue = req.venue;
-  const { name, source } = req.body || {};
+  const { name, source, qrToken } = req.body || {};
   const firstName = sanitizeName(name);
   if (!firstName) return res.status(400).json({ error: 'Nome e obrigatorio.' });
+
+  // O QR do balcao e a prova de que a pessoa esta no lugar.
+  //
+  // Sem isto, qualquer um que saiba o slug — que e publico, esta na URL do
+  // QR — enchia a fila de uma clinica do outro lado do mundo. No plano
+  // gratuito sao 50 entradas por dia: dava para esgotar a cota de um cliente
+  // pagante em minutos e travar o balcao dele com nomes falsos.
+  //
+  // O operador autenticado passa direto: e ele quem adiciona alguem que
+  // chegou sem celular.
+  const ehOperador = isOperatorOf(bearerToken(req), venue.slug);
+  if (!ehOperador && (!qrToken || !safeEquals(qrToken, venue.qrToken))) {
+    notify.track('entrada_sem_qr', { venue: venue.slug });
+    return res.status(403).json({
+      error: 'Escaneie o QR code do balcao para entrar na fila.',
+    });
+  }
 
   // Limite diario do plano free.
   if (venue.dailyDate !== today()) {

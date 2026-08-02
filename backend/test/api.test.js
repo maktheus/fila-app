@@ -9,6 +9,8 @@ const { portaLivre } = require('./porta');
 
 const SERVER = path.join(__dirname, '..', 'server.js');
 const PASSWORD = 'senha-de-teste';
+// O QR do balcao e exigido para entrar na fila, como no app real.
+const QR = 'demo-centro';
 
 // Sobe uma instancia isolada do servidor (persistencia em arquivo temporario,
 // sem Postgres) e espera o /api/health responder.
@@ -117,7 +119,7 @@ describe('API da fila', () => {
       const res = await fetch(base + '/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Maria Silva Santos' }),
+        body: JSON.stringify({ name: 'Maria Silva Santos', qrToken: QR }),
       });
       const body = await res.json();
       assert.strictEqual(res.status, 201);
@@ -130,7 +132,7 @@ describe('API da fila', () => {
       const res = await fetch(base + '/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: '   ' }),
+        body: JSON.stringify({ name: '   ', qrToken: QR }),
       });
       assert.strictEqual(res.status, 400);
     });
@@ -139,7 +141,7 @@ describe('API da fila', () => {
       const res = await fetch(base + '/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: '<script>alert(1)</script>' }),
+        body: JSON.stringify({ name: '<script>alert(1)</script>', qrToken: QR }),
       });
       const body = await res.json();
       assert.strictEqual(res.status, 201);
@@ -199,7 +201,7 @@ describe('API da fila', () => {
       await fetch(base + '/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Fernanda' }),
+        body: JSON.stringify({ name: 'Fernanda', qrToken: QR }),
       });
       const res = await fetch(base + '/api/state');
       const state = await res.json();
@@ -222,7 +224,7 @@ describe('API da fila', () => {
       const res = await fetch(base + '/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: nome }),
+        body: JSON.stringify({ name: nome, qrToken: QR }),
       });
       return (await res.json()).ticket;
     }
@@ -361,8 +363,24 @@ describe('multi-unidade', () => {
     await fetch(base + `/api/venues/${a.venue.slug}/tickets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Alice' }),
+      body: JSON.stringify({ name: 'Alice', qrToken: a.venue.qrToken }),
     });
+
+    // O QR de uma unidade nao serve para entrar na fila de outra: e o que
+    // impede alguem que descobriu o slug de encher a fila de um cliente.
+    const cruzado = await fetch(base + `/api/venues/${b.venue.slug}/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Intruso', qrToken: a.venue.qrToken }),
+    });
+    assert.strictEqual(cruzado.status, 403, 'QR de outra unidade entrou na fila');
+
+    const semQr = await fetch(base + `/api/venues/${b.venue.slug}/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Intruso' }),
+    });
+    assert.strictEqual(semQr.status, 403, 'entrou na fila sem escanear o QR');
 
     const estadoA = await (await fetch(base + `/api/venues/${a.venue.slug}/state`)).json();
     const estadoB = await (await fetch(base + `/api/venues/${b.venue.slug}/state`)).json();
@@ -431,25 +449,27 @@ describe('limites do plano free', () => {
     const res = await fetch(base + '/api/venues', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: nome }),
+      body: JSON.stringify({ name: nome, qrToken: QR }),
     });
     return res.json();
   }
 
-  function entrar(slug, nome) {
+  // Cada unidade tem o proprio QR: entrar com o de outra tem que falhar, e e
+  // exatamente isso que protege a fila de quem so descobriu o slug.
+  function entrar(slug, nome, qrToken) {
     return fetch(base + `/api/venues/${slug}/tickets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: nome }),
+      body: JSON.stringify({ name: nome, qrToken }),
     });
   }
 
   test('bloqueia a entrada apos o limite diario com 402', async () => {
     const venue = await novaUnidade('Clinica Limite');
-    assert.strictEqual((await entrar(venue.venue.slug, 'Um')).status, 201);
-    assert.strictEqual((await entrar(venue.venue.slug, 'Dois')).status, 201);
+    assert.strictEqual((await entrar(venue.venue.slug, 'Um', venue.venue.qrToken)).status, 201);
+    assert.strictEqual((await entrar(venue.venue.slug, 'Dois', venue.venue.qrToken)).status, 201);
 
-    const terceira = await entrar(venue.venue.slug, 'Tres');
+    const terceira = await entrar(venue.venue.slug, 'Tres', venue.venue.qrToken);
     const body = await terceira.json();
     assert.strictEqual(terceira.status, 402);
     assert.match(body.error, /plano gratuito/i);
@@ -465,8 +485,8 @@ describe('limites do plano free', () => {
   test('segunda chamada simultanea esbarra no limite de balcoes', async () => {
     const venue = await novaUnidade('Clinica Dois Balcoes');
     const slug = venue.venue.slug;
-    await entrar(slug, 'Ana');
-    await entrar(slug, 'Bia');
+    await entrar(slug, 'Ana', venue.venue.qrToken);
+    await entrar(slug, 'Bia', venue.venue.qrToken);
 
     const login = await fetch(base + `/api/venues/${slug}/operator/login`, {
       method: 'POST',
