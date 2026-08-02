@@ -105,9 +105,9 @@ O formulário do Play Console pergunta item a item. Respostas corretas para este
 
 | Item | Especificação | Status |
 |---|---|---|
-| Ícone | 512×512 PNG, 32 bits | Gerar a partir de `frontend/assets/app-icon.svg` |
-| Gráfico de destaque | 1024×500 PNG | Pendente |
-| Screenshots de celular | 2 a 8, mínimo 320px no lado menor | Capturar: entrada na fila, posição ao vivo, "é a sua vez", painel, telão |
+| Ícone | 512×512 PNG, 32 bits | ✅ `docs/store-assets/icone-512.png` |
+| Gráfico de destaque | 1024×500 PNG | ✅ `docs/store-assets/destaque-1024x500.png` |
+| Screenshots de celular | 2 a 8, mínimo 320px no lado menor | ✅ 4 em 1000×1800: entrar, posição, é a sua vez, painel |
 | Screenshots de tablet | opcional | — |
 
 Para capturar as telas com dados realistas, suba a stack (`docker compose up -d`),
@@ -136,3 +136,31 @@ workflow de release faz isso a partir da tag, então basta criar a tag:
 ```bash
 git tag v1.0.0 && git push origin v1.0.0
 ```
+
+## Como as peças foram geradas
+
+`docs/store-assets/`. Tudo capturado do app rodando de verdade, não de mockup —
+screenshot que não corresponde ao produto é motivo de recusa na revisão.
+
+Renderizado com Chrome headless, porque o `convert` do PATH no Windows é a
+ferramenta de sistema de arquivos, não o ImageMagick:
+
+```bash
+chrome.exe --headless=new --disable-gpu --hide-scrollbars \
+  --force-prefers-reduced-motion --force-device-scale-factor=2 \
+  --window-size=500,900 --virtual-time-budget=9000 \
+  --screenshot=saida.png "http://localhost/?venue=centro"
+```
+
+Três coisas que custaram tempo e vale registrar:
+
+- **`--headless` (antigo) não escreve o arquivo** neste Chrome. Só
+  `--headless=new` funciona.
+- **`--force-prefers-reduced-motion` é obrigatório.** Sem ele a captura pega o
+  meio da animação de entrada e sai translúcida.
+- **Chrome headless tem largura mínima de janela de 500px.** Pedir
+  `--window-size=412` entrega uma viewport de 500 CSS px e recorta a imagem em
+  412 — o que parece exatamente com um bug de responsividade que não existe.
+  Confirme a viewport real antes de acusar o layout.
+
+O telão foi capturado em 1280×720 por ser tela de TV, não de celular.

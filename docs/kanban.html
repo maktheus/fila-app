@@ -173,14 +173,14 @@ const CARDS = [
   // ---- Sprint 4 — Play Store & CI/CD ----
   { id:'s4a', s:'S4', st:'doing', a:['infra'], t:'Assetlinks do app Android', d:'Script e template prontos com o package correto. Falta apontar para o domínio — ver o cartão do Sprint 8.' },
   { id:'s4b', s:'S4', st:'done', a:['juridico'], t:'Política de privacidade + termos publicados', d:'Obrigatório para Play Store e LGPD; páginas públicas linkadas no app.' },
-  { id:'s4c', s:'S4', st:'doing', a:['design','marketing'], t:'Ficha da loja (ASO)', d:'Descrições e palavras-chave escritas em docs/PLAY_STORE.md. Faltam ícone 512, gráfico de destaque e screenshots.' },
+  { id:'s4c', s:'S4', st:'done', a:['design','marketing'], t:'Ficha da loja (ASO)', d:'Textos escritos e as peças geradas em 01/08: ícone 512, gráfico de destaque 1024×500 e 4 screenshots capturados do app rodando, em docs/store-assets/.' },
   { id:'s4d', s:'S4', st:'doing', a:['publicacao'], t:'Build .aab assinado + declarações no Play Console', d:'Workflow de release monta o .aab e a declaração de dados está pronta. Falta gerar a keystore e cadastrar os secrets.' },
   { id:'s4e', s:'S4', st:'backlog', a:['publicacao'], t:'Teste fechado: 12+ testadores por 14 dias', d:'Requisito do Google para contas pessoais novas antes do release aberto.' },
   { id:'s4f', s:'S4', st:'done', a:['automacao'], t:'Pipeline CI/CD', d:'ci.yml roda testes e stack Docker em todo PR; release.yml monta o .aab por tag; deploy-pages.yml publica o front. Sem rollback automático — reverter é refazer a tag.' },
   { id:'s4g', s:'S4', st:'doing', a:['infra'], t:'Uptime Kuma + alertas em produção', d:'Monitores definidos em docs/MONITORAMENTO.md e health agora responde 503 com o banco fora. Falta configurar no servidor.' },
 
   // ---- Sprint 5 — Marketing ----
-  { id:'s5a', s:'S5', st:'doing', a:['design'], t:'Identidade final aplicada', d:'Cartaz A4 do balcão pronto (cartaz.html, com o QR real da unidade). Faltam ícone 512 e splash do app.' },
+  { id:'s5a', s:'S5', st:'doing', a:['design'], t:'Identidade final aplicada', d:'Cartaz A4 e ícone 512 prontos. Falta só a splash do app Android.' },
   { id:'s5b', s:'S5', st:'done', a:['marketing'], t:'SEO da landing', d:'Meta, Open Graph, JSON-LD (SoftwareApplication + FAQ), canonical, sitemap.xml e robots. Falta o domínio para publicar.' },
   { id:'s5c', s:'S5', st:'doing', a:['marketing'], t:'Vídeo demo de 60s', d:'Roteiro cena a cena em docs/MARKETING.md, com versão curta de 15s para anúncio. Falta gravar.' },
   { id:'s5d', s:'S5', st:'doing', a:['marketing'], t:'Perfis + 3 conteúdos de lançamento', d:'Os três conteúdos escritos em docs/MARKETING.md. Falta criar os perfis e publicar.' },
@@ -264,8 +264,8 @@ const DETALHES = {
   },
   s4c: {
     bloq: null,
-    porque: 'A ficha é o que decide se quem encontra o app instala. Texto e palavras-chave já estão escritos; o que falta é imagem — e imagem é o que a loja recusa se estiver fora do tamanho.',
-    passo: 'Gerar três peças: ícone 512×512, gráfico de destaque 1024×500 e ao menos 2 screenshots do telefone. Dá para fazer agora, sem depender de nada.',
+    porque: 'A ficha é o que decide se quem encontra o app instala. Os screenshots vieram do app rodando, não de mockup: screenshot que não corresponde ao produto é motivo de recusa na revisão.',
+    passo: 'Entregue em 01/08. As peças estão em docs/store-assets/.',
     destrava: ['Envio para o Play Console'],
     refs: ['docs/PLAY_STORE.md'],
   },
