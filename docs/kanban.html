@@ -56,7 +56,7 @@
 <body>
 <header>
   <h1>Fila Virtual — do estado atual ao go-live<span class="dot">.</span></h1>
-  <p class="sub">Scrum board: 6 sprints de 2 semanas + trilha contínua de distribuição até o MVP real — multi-unidade com Postgres, assinatura Pix automatizada, Play Store e fluxo de onboarding 100% sem toque humano. Arraste os cards entre colunas; o progresso fica salvo neste navegador.</p>
+  <p class="sub">Oito sprints do estado inicial até uma máquina que roda sozinha: multi-unidade com Postgres, cobrança por Pix e cartão, vendedor automático com modelo local, renovação e cancelamento self-service. <strong>O produto faz o ciclo inteiro sem você</strong> — o que sobra depende de conta externa. Arraste os cards; o progresso fica salvo neste navegador.</p>
   <div class="meta-bar">
     <div class="progress-wrap">
       <div class="progress-label"><span id="prog-text">—</span><span id="prog-pct">—</span></div>
@@ -71,17 +71,19 @@
 <main class="board" id="board"></main>
 
 <script>
-const STORAGE_KEY = 'fila-kanban-v1';
+const STORAGE_KEY = 'fila-kanban-v2';
 
 const SPRINTS = {
   S0: { label: 'Feito (pré-sprint)', note: 'Entregue até 30/07: blocos 1–3 do GARIMPO + infra de deploy + Postgres.' },
-  S1: { label: 'Sprint 1 · 03–14/ago', note: 'Entregue em 30/07: login com sessão, expurgo LGPD, cliente na raiz, 24 testes de API e CI no GitHub Actions.' },
-  S2: { label: 'Sprint 2 · 17–28/ago', note: 'Entregue em 30/07: schema multi-tenant, cadastro self-service com QR gerado na hora, limites do plano free e 37 testes.' },
-  S3: { label: 'Sprint 3 · 31/ago–11/set', note: 'Entregue em 31/07: trial de 14 dias, checkout, webhook assinado que ativa e suspende o premium sozinho, e-mails e eventos de funil. Falta você comprar a própria assinatura no provedor real.' },
-  S4: { label: 'Sprint 4 · 14–25/set', note: 'Parcial (31/07): privacidade, termos, ficha da loja, assetlinks e pipeline de release prontos. Dependem de você: domínio, keystore, conta no Play Console e o teste fechado de 14 dias.' },
-  S5: { label: 'Sprint 5 · 28/set–09/out', note: 'Parcial (31/07): SEO, captura de leads e cartaz do balcão prontos. Conteúdo e campanha escritos em docs/MARKETING.md, faltando gravar e publicar.' },
-  S6: { label: 'Sprint 6 · 12–23/out', note: 'Vendas & go-live — piloto com 3 estabelecimentos e meta de 3 pagantes a R$ 99/mês.' },
-  SD: { label: 'Distribuição · contínuo', note: 'Canais de aquisição permanentes — começam quando o Sprint 3 liberar o checkout e nunca param. O mais forte: o próprio produto na sala de espera.' },
+  S1: { label: 'Sprint 1 · Segurança', note: 'Entregue em 30/07: login com sessão, expurgo LGPD, cliente na raiz, testes de API e CI no GitHub Actions.' },
+  S2: { label: 'Sprint 2 · Multi-unidade', note: 'Entregue em 30/07: schema multi-tenant, cadastro self-service com QR gerado na hora e limites do plano free aplicados.' },
+  S3: { label: 'Sprint 3 · Monetização', note: 'Entregue em 31/07: trial de 14 dias, checkout, webhook assinado que ativa e suspende o premium sozinho, e-mails e eventos de funil.' },
+  S4: { label: 'Sprint 4 · Publicação', note: 'Parcial: privacidade, termos, ficha da loja, assetlinks e pipeline de release prontos. Dependem de você: domínio, keystore, Play Console e o teste fechado de 14 dias.' },
+  S5: { label: 'Sprint 5 · Marketing', note: 'Parcial: SEO, captura de leads e cartaz do balcão prontos. Conteúdo e campanha escritos em docs/MARKETING.md, faltando gravar e publicar.' },
+  S6: { label: 'Sprint 6 · Vendedor automático', note: 'Entregue em 31/07: chatbot com RAG, guardrails em três camadas e ferramentas ligadas à API real — ele cria a fila e fecha a venda dentro da conversa. Roda em modelo local: custo zero por conversa.' },
+  S7: { label: 'Sprint 7 · Receita sozinha', note: 'Entregue em 31/07 e 01/08: os cinco pontos que ainda exigiam você. E-mails saindo de verdade, renovação automática com plano anual, cancelamento self-service com estorno, link mágico de acesso e backup com verificação por restauração.' },
+  S8: { label: 'Sprint 8 · Ligar a máquina', note: 'O que sobrou depende de conta externa ou de decisão sua. O domínio é o nó: ele destrava webhook do Mercado Pago, Google Pay, Play Store e os links de cancelamento apontando para um lugar real.' },
+  SD: { label: 'Distribuição · contínuo', note: 'Canais de aquisição permanentes. O mais forte é o próprio produto na sala de espera: quem espera na fila é o próximo comprador.' },
 };
 
 const AREAS = {
@@ -136,10 +138,10 @@ const CARDS = [
   { id:'s3c', s:'S3', st:'done', a:['design','dev'], t:'Página de planos + upgrade no painel', d:'Free com ads vs. premium; botão de upgrade dentro do painel do operador.' },
   { id:'s3d', s:'S3', st:'done', a:['automacao'], t:'E-mails transacionais automáticos', d:'Boas-vindas, fim do trial, pagamento falhou, cancelamento.' },
   { id:'s3e', s:'S3', st:'done', a:['marketing','dev'], t:'Eventos de funil implementados', d:'queue_joined, queue_called, premium_started, ad_slot_viewed… (docs/MONETIZATION_OBSERVABILITY.md).' },
-  { id:'s3f', s:'S3', st:'backlog', a:['vendas'], t:'Comprar a própria assinatura', d:'Validar o fluxo real de ponta a ponta antes de vender (regra do GARIMPO).' },
+  { id:'s3f', s:'S3', st:'todo', a:['vendas'], t:'Comprar a própria assinatura', d:'Validar o fluxo real de ponta a ponta antes de vender. Depende da conta no Mercado Pago.' },
 
   // ---- Sprint 4 — Play Store & CI/CD ----
-  { id:'s4a', s:'S4', st:'doing', a:['infra'], t:'Domínio próprio + HTTPS + assetlinks', d:'Script gerar-assetlinks.ps1 e template prontos com o package correto. Falta comprar o domínio e publicar o arquivo.' },
+  { id:'s4a', s:'S4', st:'doing', a:['infra'], t:'Assetlinks do app Android', d:'Script e template prontos com o package correto. Falta apontar para o domínio — ver o cartão do Sprint 8.' },
   { id:'s4b', s:'S4', st:'done', a:['juridico'], t:'Política de privacidade + termos publicados', d:'Obrigatório para Play Store e LGPD; páginas públicas linkadas no app.' },
   { id:'s4c', s:'S4', st:'doing', a:['design','marketing'], t:'Ficha da loja (ASO)', d:'Descrições e palavras-chave escritas em docs/PLAY_STORE.md. Faltam ícone 512, gráfico de destaque e screenshots.' },
   { id:'s4d', s:'S4', st:'doing', a:['publicacao'], t:'Build .aab assinado + declarações no Play Console', d:'Workflow de release monta o .aab e a declaração de dados está pronta. Falta gerar a keystore e cadastrar os secrets.' },
@@ -156,12 +158,42 @@ const CARDS = [
   { id:'s5f', s:'S5', st:'done', a:['automacao','marketing'], t:'Captura de leads automatizada', d:'POST /api/leads com validação e rate limit, formulário na landing e e-mail automático oferecendo o autoatendimento.' },
 
   // ---- Sprint 6 — Vendas & Go-live ----
-  { id:'s6a', s:'S6', st:'backlog', a:['vendas'], t:'Lista de 50 estabelecimentos-alvo', d:'Clínicas, laboratórios e serviços de bairro em Manaus, com contato.' },
-  { id:'s6b', s:'S6', st:'backlog', a:['vendas'], t:'Script de venda + demo roteirizada', d:'Pitch de 5 min com QR impresso: o dono entra na fila na frente do vendedor.' },
-  { id:'s6c', s:'S6', st:'backlog', a:['vendas'], t:'Piloto com 3 estabelecimentos', d:'30 dias grátis, check-in semanal, coleta de depoimento.' },
-  { id:'s6d', s:'S6', st:'backlog', a:['automacao'], t:'Onboarding 100% sem toque humano', d:'Assinou → conta criada → QR gerado → kit por e-mail. Ninguém da equipe no meio.' },
+  { id:'s6a', s:'S6', st:'done', a:['vendas','automacao'], t:'Prospecção pelo próprio produto (era: lista de 50 alvos)', d:'Descartado em 31/07: você decidiu zero participação humana. Quem chega vem por anúncio, busca ou pelo QR de outro balcão — e o chatbot atende.' },
+  { id:'s6b', s:'S6', st:'done', a:['vendas','automacao'], t:'Demo dentro da conversa (era: script de venda humano)', d:'Descartado em 31/07. O vendedor automático cria a fila real do estabelecimento no meio do papo: a demo virou o produto, não um roteiro.' },
+  { id:'s6c', s:'S6', st:'backlog', a:['vendas'], t:'Primeiros clientes reais', d:'Sem piloto acompanhado à mão: o trial de 14 dias já é self-service e o funil avisa você quando alguém trava. Depende do domínio e dos anúncios.' },
+  { id:'s6d', s:'S6', st:'done', a:['automacao'], t:'Onboarding 100% sem toque humano', d:'Fechado em 01/08: cadastro self-service, QR na hora, cobrança, renovação, cancelamento e recuperação de acesso — nenhum ponto passa por você.' },
   { id:'s6e', s:'S6', st:'backlog', a:['publicacao'], t:'Release aberto na Play Store', d:'Promover o teste fechado para produção após os 14 dias.' },
   { id:'s6f', s:'S6', st:'backlog', a:['vendas'], t:'Meta de validação: 3 pagantes', d:'3 assinaturas de R$ 99/mês ativas = MVP validado; só então pensar em escalar.' },
+
+  // ---- Sprint 6 — Vendedor automático ----
+  { id:'s6v1', s:'S6', st:'done', a:['dev','vendas','automacao'], t:'Chatbot de vendas com RAG e guardrails', d:'Recuperação léxica sobre o conhecimento do produto + guardrails em três camadas. Ele nunca inventa preço: todo número da resposta é conferido contra o sistema antes de sair.' },
+  { id:'s6v2', s:'S6', st:'done', a:['dev','automacao'], t:'Ferramentas ligadas à API real', d:'O vendedor cria a fila de demonstração, consulta planos e gera o Pix dentro da conversa. Não é folheto: é o produto funcionando na frente da pessoa.' },
+  { id:'s6v3', s:'S6', st:'done', a:['infra','automacao'], t:'Modelo local: custo zero por conversa', d:'Adaptador compatível com OpenAI (Ollama, llama.cpp, LM Studio, vLLM). Latência de 5,5s para 1,1s só mantendo o modelo residente — o gargalo era recarregar 4,7GB, não o modelo.' },
+  { id:'s6v4', s:'S6', st:'done', a:['dev'], t:'Laboratório do vendedor', d:'laboratorio.html: bancada que mostra o que foi recuperado, quais ferramentas rodaram e o que os guardrails barraram. Bateria de 6 casos adversariais num clique.' },
+  { id:'s6v5', s:'S6', st:'done', a:['dev','automacao'], t:'Servidor MCP com as mesmas ferramentas', d:'Uma definição só alimenta o chat do site e o MCP, para o comportamento não divergir entre os canais.' },
+  { id:'s6v6', s:'S6', st:'done', a:['marketing','dev'], t:'Observabilidade de comportamento', d:'analitico.html com funil por sessão, detecção de rage-click e abandono de formulário. É onde se enxerga o problema que o cliente vê, não o que a gente imagina.' },
+
+  // ---- Sprint 7 — Receita sozinha ----
+  { id:'s7a', s:'S7', st:'done', a:['automacao'], t:'E-mails saindo de verdade', d:'Era uma armadilha: o require do nodemailer existia mas a dependência não estava instalada — ligar a flag falharia em silêncio. Agora com pool, retentativa e verificação que grita na subida se estiver quebrado.' },
+  { id:'s7b', s:'S7', st:'done', a:['automacao','vendas'], t:'Renovação automática do ciclo', d:'Aviso 3 dias antes com o Pix dentro do e-mail, aviso no vencimento, aviso de atraso e rebaixamento após 3 dias de tolerância. Sem isso ninguém pagava o segundo mês.' },
+  { id:'s7c', s:'S7', st:'done', a:['vendas'], t:'Plano anual (R$ 990, dez meses)', d:'Sem cartão guardado, cada renovação mensal é uma chance de perder o cliente por esquecimento. Pagar uma vez elimina onze dessas chances.' },
+  { id:'s7d', s:'S7', st:'done', a:['dev','vendas'], t:'Cartão pelo Google Pay', d:'Token do Google direto para a Orders API do Mercado Pago; o número do cartão nunca toca o servidor. Libera o premium na hora. Falta o MP informar o identificador de gateway.' },
+  { id:'s7e', s:'S7', st:'done', a:['dev','juridico'], t:'Cancelamento self-service', d:'Obrigação do CDC. Painel do operador e link assinado no rodapé de todo e-mail de cobrança — quem perdeu a senha é justamente quem não entra no painel.' },
+  { id:'s7f', s:'S7', st:'done', a:['juridico','dev'], t:'Exclusão de dados (LGPD art. 18)', d:'Em dois passos: o link do rodapé cancela, pedir exclusão dispara um segundo e-mail. Se fossem o mesmo link, um e-mail encaminhado apagaria o negócio de alguém.' },
+  { id:'s7g', s:'S7', st:'done', a:['vendas','juridico'], t:'Estorno proporcional do anual', d:'Calculado e enfileirado para você confirmar no provedor — devolução automática é dinheiro saindo sozinho.' },
+  { id:'s7h', s:'S7', st:'done', a:['dev','automacao'], t:'Link mágico de acesso ao painel', d:'A senha aparece uma vez só; quem fecha a aba antes de anotar perdia o painel. Link de uso único que entra direto, sem senha nova para esquecer de novo.' },
+  { id:'s7i', s:'S7', st:'done', a:['infra'], t:'Backup do Postgres com verificação', d:'O script restaura o dump num banco descartável e confere que as unidades voltaram. Backup que nunca foi restaurado não é backup, é esperança.' },
+  { id:'s7j', s:'S7', st:'done', a:['dev','vendas'], t:'Painel do dono: receita e saúde', d:'painel.html responde numa leitura se a máquina está fazendo dinheiro e se está inteira. Avisos por e-mail quando alguém assina, renova, cancela ou cai.' },
+  { id:'s7k', s:'S7', st:'done', a:['dev'], t:'Segundo /security-review', d:'Três achados corrigidos: token de acesso em texto no log do nginx, vazamento por tempo no pedido de acesso e exclusão LGPD deixando os eventos de comportamento para trás.' },
+
+  // ---- Sprint 8 — Ligar a máquina ----
+  { id:'s8a', s:'S8', st:'doing', a:['infra'], t:'Domínio com HTTPS na VPS', d:'O nó de tudo: destrava webhook do Mercado Pago, Google Pay, Play Store e os links de cancelamento apontando para um lugar real. Você já tem o domínio.' },
+  { id:'s8b', s:'S8', st:'todo', a:['infra','automacao'], t:'Contratar SMTP + SPF, DKIM e DMARC', d:'Sem isso nada do que foi construído chega em ninguém. Domínio novo disparando sem autenticação cai em spam, e o efeito é o mesmo de não enviar.' },
+  { id:'s8c', s:'S8', st:'todo', a:['vendas'], t:'Conta no Mercado Pago + credenciais', d:'Access token e segredo do webhook. Enquanto for sandbox, o painel mostra receita imaginária — e por isso a luz fica vermelha em produção.' },
+  { id:'s8d', s:'S8', st:'todo', a:['vendas','dev'], t:'Confirmar o gateway do Google Pay com o MP', d:'Pergunte ao suporte qual o gateway e o gatewayMerchantId para tokenização web. Sem eles o botão não aparece — de propósito, porque botão que quebra custa mais que botão ausente.' },
+  { id:'s8e', s:'S8', st:'todo', a:['infra'], t:'LINK_SECRET e backup fora da máquina', d:'openssl rand -hex 32. E copiar os dumps para outro provedor: backup na mesma VPS não protege contra a VPS morrer.' },
+  { id:'s8f', s:'S8', st:'backlog', a:['dev','infra'], t:'Alerta que te procura', d:'Hoje o painel mostra, mas não avisa. Um monitor externo em /api/health cobre o caso mais grave; e-mail parado ou modelo caído só aparecem se você olhar.' },
+  { id:'s8g', s:'S8', st:'backlog', a:['dev','vendas'], t:'Histórico de receita', d:'O painel mostra o agora, não a curva. Sem série temporal não dá para ver se está crescendo.' },
 
   { id:'sda', s:'SD', st:'backlog', a:['dev','marketing'], t:'Loop viral na tela do cliente', d:'No plano free, rodapé "Fila Virtual — leve para o seu negócio" com link rastreado: quem espera na fila é o próximo comprador. O canal nº 1 cresce sozinho com cada fila ativa.' },
   { id:'sdb', s:'SD', st:'backlog', a:['marketing','automacao'], t:'Canal WhatsApp completo', d:'WhatsApp Business + anúncios click-to-WhatsApp + bot que responde com uma fila demo ao vivo. No Brasil, dono de clínica fecha negócio pelo WhatsApp, não por e-mail.' },
