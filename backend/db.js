@@ -283,8 +283,15 @@ async function ping() {
   return Date.now() - started;
 }
 
+// Consulta livre para modulos com schema proprio (ex.: prospeccao). Recusa
+// quando nao ha Postgres: quem chama decide o que responder ao cliente.
+function query(sql, params = []) {
+  if (!process.env.DATABASE_URL) throw new Error('Postgres nao configurado.');
+  return getPool().query(sql, params);
+}
+
 module.exports = {
   ensureSchema, loadVenues, saveVenues, ping,
   insertEvents, countEventsByName, sessionsByNameAndSurface, recentErrors, purgeEvents,
-  purgeEventsByVenue,
+  purgeEventsByVenue, query,
 };

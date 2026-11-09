@@ -1506,6 +1506,10 @@ function requireAnalyticsAuth(req, res, next) {
   return res.status(401).json({ error: 'Operador nao autenticado.' });
 }
 
+// Prospeccao: uso do dono do sistema, mesma autenticacao das metricas.
+// Sem DATABASE_URL, o roteador responde 503.
+app.use('/api/prospeccao', requireAnalyticsAuth, require('./prospeccao/rotas').criarRouter());
+
 function contagensEmMemoria(desde) {
   const porChave = new Map();
   for (const evento of eventosMemoria) {
