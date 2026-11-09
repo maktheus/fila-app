@@ -69,11 +69,6 @@
         <span class="ciclo-valor" id="valor-mensal">—</span>
         <span class="ciclo-nota">por mês</span>
       </button>
-      <button type="button" class="ciclo" data-ciclo="anual" role="radio" aria-checked="false">
-        <span class="ciclo-nome">Anual <em id="economia"></em></span>
-        <span class="ciclo-valor" id="valor-anual">—</span>
-        <span class="ciclo-nota">à vista, 12 meses</span>
-      </button>
     </div>
 
     <div class="preco"><strong id="preco">—</strong><span id="preco-nota">por mês, por unidade</span></div>
@@ -123,7 +118,8 @@
   var ciclo = "mensal";
 
   function trocarCiclo(novo) {
-    ciclo = novo === "anual" ? "anual" : "mensal";
+    // Anual deixou de ser vendido: o modelo e por resultado, sempre mensal.
+    ciclo = "mensal";
     var dados = config.googlePay;
     document.querySelectorAll(".ciclo").forEach(function (b) {
       var ativo = b.dataset.ciclo === ciclo;
@@ -132,8 +128,7 @@
     });
     var c = config.ciclos[ciclo];
     document.getElementById("preco").textContent = c.label;
-    document.getElementById("preco-nota").textContent =
-      ciclo === "anual" ? "por ano, por unidade" : "por mês, por unidade";
+    document.getElementById("preco-nota").textContent = "mínimo por mês, por unidade, mais por atendimento concluído";
     if (dados) dados.precoCentavos = c.centavos;
     // O botão do Google Pay carrega o valor no momento do clique, então trocar
     // o ciclo depois de ele existir continua funcionando.
@@ -300,8 +295,6 @@
     try {
       config = await (await fetch(API + "/api/pagamento/config")).json();
       document.getElementById("valor-mensal").textContent = config.ciclos.mensal.label;
-      document.getElementById("valor-anual").textContent = config.ciclos.anual.label;
-      document.getElementById("economia").textContent = "economize " + config.ciclos.anual.economiaLabel;
       trocarCiclo("mensal");
       document.getElementById("sub").textContent =
         "Unidade " + unidade + ". Entradas ilimitadas, todos os balcões e sem anúncios.";

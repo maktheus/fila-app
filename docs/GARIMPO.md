@@ -71,6 +71,11 @@ Sequência: landing + app cliente como estático → backend no Render/VPS → d
 
 ## Plano de receita (meta R$ 5.000/mês, B2B por unidade)
 
+> **Modelo em vigor desde 2026-11-09:** cobrança por **atendimento concluído**,
+> com mínimo de R$ 29 e teto de R$ 249 por mês. Assinaturas antigas seguem no
+> preço fixo até o fim do ciclo já pago. Ver **[OUTCOME.md](OUTCOME.md)**.
+> A tabela abaixo é o modelo anterior, mantido para comparação.
+
 | Preço/unidade/mês | Unidades p/ meta | Leitura |
 |---|---|---|
 | R$ 49 | 102 | Barato demais — suporte come a margem |

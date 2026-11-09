@@ -7,6 +7,7 @@ const { WebSocketServer } = require('ws');
 const cors = require('cors');
 const QRCode = require('qrcode');
 const billing = require('./billing');
+const outcome = require('./outcome');
 const notify = require('./notify');
 const analytics = require('./analytics');
 const tokens = require('./tokens');
@@ -1017,9 +1018,40 @@ function linkDeAssinatura(venue) {
   return `${PUBLIC_APP_URL}/assinar.html?venue=${encodeURIComponent(venue.slug)}`;
 }
 
+// Pix da fatura por uso. Mesmo contrato de cobrancaDoProximoCiclo, mas o valor
+// e o devido da janela, nao o preco fixo. Sem e-mail de contato, nao gera.
+async function cobrancaDaFatura(venue, fatura, { final = false } = {}) {
+  if (!venue.contactEmail) return null;
+  try {
+    const cobranca = await billing.criarFaturaPix({
+      venue,
+      email: venue.contactEmail,
+      valorCentavos: fatura.devidoCentavos,
+      competencia: new Date(fatura.janela.fim).toISOString().slice(0, 7),
+    });
+    venue.subscription.cobrancaDoCiclo = {
+      externalId: cobranca.externalId,
+      criadaEm: Date.now(),
+      copiaECola: cobranca.copiaECola,
+      fimFaturado: fatura.janela.fim,
+      valorCentavos: fatura.devidoCentavos,
+      final,
+    };
+    return cobranca;
+  } catch (error) {
+    console.warn(`[ciclo] nao consegui gerar a fatura de ${venue.slug}: ${error.message}`);
+    return null;
+  }
+}
+
 async function aplicarCiclo(venue, agora = Date.now()) {
   const acao = billing.acaoDoCiclo(venue, agora);
   if (!acao) return null;
+
+  // Assinatura antiga vira "resultado" antes do vencimento: o ciclo ja pago
+  // segue no preco fixo, e o proximo se cobra pelo uso.
+  if (acao.tipo === 'previo' || acao.tipo === 'vencimento') billing.migrarParaResultado(venue);
+  const resultado = billing.modeloDe(venue.subscription) === billing.MODELO_RESULTADO;
 
   const view = billing.subscriptionView(venue);
   const guardada = venue.subscription.cobrancaDoCiclo;
@@ -1037,10 +1069,39 @@ async function aplicarCiclo(venue, agora = Date.now()) {
   let entrega = null;
 
   if (acao.tipo === 'previo') {
-    const cobranca = await cobrancaDoProximoCiclo(venue);
-    if (cobranca) extras.copiaECola = cobranca.copiaECola;
+    if (resultado) {
+      // Sem Pix fixo: o valor depende do uso do ciclo, e a fatura sai no vencimento.
+      extras.priceLabel = `a partir de ${view.resultado.minimoLabel}, mais ${view.resultado.porAtendimentoLabel} por atendimento concluido`;
+    } else {
+      const cobranca = await cobrancaDoProximoCiclo(venue);
+      if (cobranca) extras.copiaECola = cobranca.copiaECola;
+    }
     extras.diasRestantes = acao.diasRestantes;
     entrega = await notify.sendEmail('renewal_upcoming', venue, extras);
+  } else if (acao.tipo === 'vencimento' && resultado) {
+    const fatura = billing.faturaDoVencimento(venue);
+    if (fatura.devidoCentavos === 0) {
+      // Fatura final de quem cancelou: nada a cobrar, e nao ha janela nova.
+      if (acao.final) {
+        billing.marcarAviso(venue, acao.chave, agora);
+        return { ...acao, entregue: null, semCobranca: true };
+      }
+      // Nada a cobrar nesta janela (uso zero, ou coberto pelo adiantamento):
+      // abre a proxima sem Pix. Nao marca aviso: a janela nova ja zera tudo.
+      billing.avancarJanela(venue.subscription, { fimFaturado: fatura.janela.fim, agora });
+      notify.track('ciclo:avancou_sem_cobranca', { venue: venue.slug });
+      pushLog(venue, 'Ciclo avançou sem cobrança (sem uso a cobrar)');
+      return { ...acao, entregue: null, semCobranca: true };
+    }
+    const cobranca = await cobrancaDaFatura(venue, fatura, { final: !!acao.final });
+    if (!cobranca) {
+      // Sem Pix nao ha o que mandar: nao marca o aviso, a proxima rodada tenta.
+      entrega = { entregue: false };
+    } else {
+      extras.copiaECola = cobranca.copiaECola;
+      extras.priceLabel = `${billing.rotuloDeReais(fatura.devidoCentavos)} (${fatura.atendimentos} atendimentos concluidos no ciclo)`;
+      entrega = await notify.sendEmail('renewal_due', venue, extras);
+    }
   } else if (acao.tipo === 'vencimento') {
     // Reaproveita o Pix ja emitido no aviso previo: gerar outro faria a pessoa
     // ficar com dois codigos e sem saber qual vale.
@@ -1133,14 +1194,16 @@ app.get('/api/pagamento/config', (_req, res) => {
   res.json({
     provider: billing.PROVIDER,
     sandbox: billing.PROVIDER === 'sandbox',
-    precoLabel: billing.rotuloDeReais(billing.PRICE_CENTS),
+    // Modelo por resultado: entrada = minimo mensal; o resto vem por atendimento.
+    modelo: billing.MODELO_RESULTADO,
+    precoLabel: billing.rotuloDeReais(billing.valorCheckoutResultado()),
+    resultado: {
+      minimoLabel: billing.rotuloDeReais(outcome.politicaDoEnv().minimoCentavos),
+      porAtendimentoLabel: billing.rotuloDeReais(outcome.politicaDoEnv().porAtendimentoCentavos),
+      tetoLabel: billing.rotuloDeReais(outcome.politicaDoEnv().tetoCentavos),
+    },
     ciclos: {
-      mensal: { label: billing.rotuloDeReais(billing.PRICE_CENTS), centavos: billing.PRICE_CENTS },
-      anual: {
-        label: billing.rotuloDeReais(billing.PRICE_YEAR_CENTS),
-        centavos: billing.PRICE_YEAR_CENTS,
-        economiaLabel: billing.rotuloDeReais(billing.PRICE_CENTS * 12 - billing.PRICE_YEAR_CENTS),
-      },
+      mensal: { label: billing.rotuloDeReais(billing.valorCheckoutResultado()), centavos: billing.valorCheckoutResultado() },
     },
     pix: { disponivel: true },
     // Em sandbox o botao aparece para a jornada ser testavel sem conta no
@@ -1328,7 +1391,7 @@ function fatosDoPlano() {
   const venue = venues.get(DEFAULT_SLUG);
   const assinatura = billing.subscriptionView(venue);
   return {
-    precoMensal: billing.PRICE_CENTS / 100,
+    precoMensal: billing.valorCheckoutResultado() / 100,
     precoLabel: assinatura.priceLabel,
     diasDeTeste: billing.TRIAL_DAYS,
     limiteDiario: FREE_LIMITS.dailyTickets,
@@ -1442,6 +1505,10 @@ function requireAnalyticsAuth(req, res, next) {
   if (!IS_PRODUCTION && !venues.get(DEFAULT_SLUG).passwordHash && !process.env.ADMIN_TOKEN) return next();
   return res.status(401).json({ error: 'Operador nao autenticado.' });
 }
+
+// Prospeccao: uso do dono do sistema, mesma autenticacao das metricas.
+// Sem DATABASE_URL, o roteador responde 503.
+app.use('/api/prospeccao', requireAnalyticsAuth, require('./prospeccao/rotas').criarRouter());
 
 function contagensEmMemoria(desde) {
   const porChave = new Map();
@@ -1812,6 +1879,9 @@ venueRouter.post('/tickets/:id/finish', requireOperator, (req, res) => {
   t.status = 'served';
   t.closedAt = Date.now();
   venue.servedToday++;
+  // Base da fatura por resultado. Guardado na assinatura, nao no ticket: o
+  // ticket expira em 12h, e a cobranca do mes precisa de todos.
+  billing.registrarAtendimento(venue, t.closedAt);
   broadcast(venue, { action: 'finished', ticketId: id });
   res.json({ ticket: t });
 });

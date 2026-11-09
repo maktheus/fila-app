@@ -4,6 +4,12 @@
 const crypto = require('crypto');
 const mercadopago = require('./payments/mercadopago');
 const sandbox = require('./payments/sandbox');
+const outcome = require('./outcome');
+
+// Modelo de cobranca. "resultado" = por atendimento concluido (ver
+// docs/OUTCOME.md). Assinaturas antigas, sem o campo, seguem "fixo" ate o fim
+// do ciclo ja pago e migram sozinhas (migrarParaResultado).
+const MODELO_RESULTADO = 'resultado';
 
 const TRIAL_DAYS = Number(process.env.TRIAL_DAYS || 14);
 const PRICE_CENTS = Number(process.env.PLAN_PRICE_CENTS || 9900);
@@ -59,8 +65,98 @@ function startTrial(venue) {
     currentPeriodEnd: null,
     externalId: null,
     lastEventAt: null,
+    modelo: MODELO_RESULTADO,
+    // Momentos (ms) de cada atendimento concluido. E a base da fatura: o ticket
+    // expira em 12h por LGPD, mas a cobranca do mes precisa de todos.
+    atendimentos: [],
+    // Ate onde o uso ja foi cobrado ou coberto por pagamento fixo.
+    faturadoAte: null,
+    // Minimo pago na primeira assinatura, descontado da primeira fatura.
+    pagoAntecipado: 0,
   };
   return venue.subscription;
+}
+
+function politicaResultado() {
+  return outcome.politicaDoEnv();
+}
+
+// Assinatura sem o campo `modelo` e legado: pagava preco fixo.
+function modeloDe(sub) {
+  return sub && sub.modelo === MODELO_RESULTADO ? MODELO_RESULTADO : 'fixo';
+}
+
+// O que o cliente paga para entrar: o minimo. A fatura por uso chega no fim.
+function valorCheckoutResultado() {
+  return politicaResultado().minimoCentavos;
+}
+
+// Registra um atendimento concluido. Chamado quando o ticket vira 'served'.
+function registrarAtendimento(venue, agora = Date.now()) {
+  const sub = ensureSubscription(venue);
+  if (!Array.isArray(sub.atendimentos)) sub.atendimentos = [];
+  sub.atendimentos.push(agora);
+}
+
+// Janela que a proxima fatura cobre: do ultimo ponto ja quitado ate o fim do
+// acesso atual. Usos entre um fim e outro nunca ficam de fora nem em dobro.
+function janelaDeCobranca(sub) {
+  return {
+    inicio: sub.faturadoAte != null ? sub.faturadoAte : (sub.currentPeriodStart || 0),
+    fim: sub.currentPeriodEnd || 0,
+  };
+}
+
+// Fatura do vencimento: quanto o uso da janela custa e quanto ainda e devido
+// depois do adiantamento do primeiro mes. Funcao pura sobre o estado.
+function faturaDoVencimento(venue) {
+  const sub = ensureSubscription(venue);
+  const janela = janelaDeCobranca(sub);
+  // Janela vazia (ja quitada ou migracao no fim do ciclo pago): nada a faturar.
+  // O minimo so vale para uma janela de verdade, mesmo sem nenhum uso.
+  const vazia = janela.fim <= janela.inicio;
+  const atendimentos = vazia ? 0 : outcome.contarMomentos(sub.atendimentos, janela);
+  const fatura = vazia
+    ? { atendimentos: 0, minimoCentavos: 0, variavelCentavos: 0, tetoAplicado: false, totalCentavos: 0 }
+    : outcome.calcularFatura(atendimentos, politicaResultado());
+  const pago = Math.max(0, Number(sub.pagoAntecipado) || 0);
+  return {
+    ...fatura,
+    janela,
+    pagoAntecipadoCentavos: Math.min(pago, fatura.totalCentavos),
+    devidoCentavos: Math.max(0, fatura.totalCentavos - pago),
+  };
+}
+
+// Assinatura antiga migra para "resultado" no aviso previo. A janela ja paga
+// pelo preco fixo termina aqui: o uso a partir de agora e o que se cobra.
+// Retorna true se migrou.
+function migrarParaResultado(venue) {
+  const sub = ensureSubscription(venue);
+  if (modeloDe(sub) === MODELO_RESULTADO) return false;
+  if (sub.status !== 'active' && sub.status !== 'past_due') return false;
+  if (!sub.currentPeriodEnd) return false;
+  sub.modelo = MODELO_RESULTADO;
+  sub.faturadoAte = sub.currentPeriodEnd;
+  sub.pagoAntecipado = 0;
+  if (!Array.isArray(sub.atendimentos)) sub.atendimentos = [];
+  return true;
+}
+
+// Abre a proxima janela de acesso. `fimFaturado` e o fim da janela que acabou
+// de ser quitada. Se o pagamento chegou atrasado, a janela nova comeca agora,
+// e o uso entre um e outro segue na proxima fatura.
+function avancarJanela(sub, { fimFaturado, agora = Date.now() }) {
+  sub.faturadoAte = fimFaturado;
+  const inicio = sub.currentPeriodEnd && sub.currentPeriodEnd > agora ? sub.currentPeriodEnd : agora;
+  sub.currentPeriodStart = inicio;
+  sub.currentPeriodEnd = somarMeses(inicio, 1);
+  sub.avisos = {};
+  sub.cobrancaDoCiclo = null;
+  sub.pagoAntecipado = 0;
+  if (Array.isArray(sub.atendimentos)) {
+    sub.atendimentos = sub.atendimentos.filter(m => m >= fimFaturado);
+  }
 }
 
 function ensureSubscription(venue) {
@@ -111,6 +207,18 @@ function effectivePlan(venue) {
 // reenvia nada, e renovar limpa tudo naturalmente.
 function acaoDoCiclo(venue, agora = Date.now()) {
   const sub = ensureSubscription(venue);
+
+  // Cancelada por resultado: o acesso segue ate o fim do ciclo, e o uso dessa
+  // janela ainda precisa ser cobrado uma vez, no vencimento. Sem isto, quem
+  // cancela consome o ultimo mes de graca.
+  if (sub.status === 'canceled') {
+    if (modeloDe(sub) !== MODELO_RESULTADO || !sub.currentPeriodEnd) return null;
+    const fimC = sub.currentPeriodEnd;
+    const feito = (sub.avisos || {}).final;
+    if (feito || agora < fimC - 86400000 || agora >= fimC) return null;
+    return { tipo: 'vencimento', chave: 'final', final: true };
+  }
+
   if (sub.status !== 'active' && sub.status !== 'past_due') return null;
   if (!sub.currentPeriodEnd) return null;
 
@@ -235,14 +343,32 @@ function trialDaysLeft(venue) {
 
 function subscriptionView(venue) {
   const sub = ensureSubscription(venue);
+  const pol = politicaResultado();
+  const janela = janelaDeCobranca(sub);
+  const usoNoPeriodo = outcome.contarMomentos(sub.atendimentos, janela);
+  const previsao = outcome.calcularFatura(usoNoPeriodo, pol);
+  const resultado = modeloDe(sub) === MODELO_RESULTADO;
   return {
     status: sub.status,
     plan: effectivePlan(venue),
+    modelo: resultado ? MODELO_RESULTADO : 'fixo',
     trialEndsAt: sub.trialEndsAt || null,
     trialDaysLeft: trialDaysLeft(venue),
     currentPeriodEnd: sub.currentPeriodEnd || null,
-    priceCents: PRICE_CENTS,
-    priceLabel: rotuloDeReais(PRICE_CENTS),
+    // Por resultado, o preco de entrada e o minimo; o resto vem por atendimento.
+    priceCents: resultado ? pol.minimoCentavos : PRICE_CENTS,
+    priceLabel: rotuloDeReais(resultado ? pol.minimoCentavos : PRICE_CENTS),
+    resultado: {
+      minimoCentavos: pol.minimoCentavos,
+      minimoLabel: rotuloDeReais(pol.minimoCentavos),
+      porAtendimentoCentavos: pol.porAtendimentoCentavos,
+      porAtendimentoLabel: rotuloDeReais(pol.porAtendimentoCentavos),
+      tetoCentavos: pol.tetoCentavos,
+      tetoLabel: rotuloDeReais(pol.tetoCentavos),
+      usoNoPeriodo,
+      previsaoCentavos: previsao.totalCentavos,
+      previsaoLabel: rotuloDeReais(previsao.totalCentavos),
+    },
     interval: sub.interval || 'mensal',
     currentPeriodStart: sub.currentPeriodStart || null,
     graceDays: GRACE_DAYS,
@@ -266,7 +392,7 @@ function checkoutUrl(venue, appUrl) {
   if (PROVIDER !== 'sandbox' && CHECKOUT_BASE_URL) {
     const url = new URL(CHECKOUT_BASE_URL);
     url.searchParams.set('reference', reference);
-    url.searchParams.set('amount', String(PRICE_CENTS));
+    url.searchParams.set('amount', String(valorCheckoutResultado()));
     return { url: url.toString(), sandbox: false };
   }
   return {
@@ -316,7 +442,18 @@ function verifyWebhook({ rawBody, headers, query, isProduction }) {
 // A diferenca importa: aceitar "anual" de fora e seguro porque o nome e
 // validado contra uma tabela fechada e o valor sai dela. Aceitar um valor de
 // fora nunca e seguro, e continua nao acontecendo em lugar nenhum.
+// Entrada (checkout). Nao aceita valor: sai de valorDeEntrada, no servidor.
 async function criarCobrancaPix({ venue, email, ciclo, competencia }) {
+  return emitirPix({ venue, email, ciclo, competencia, valorCentavos: undefined });
+}
+
+// Fatura do vencimento. O valor vem do uso calculado pelo servidor, e so o
+// codigo do servidor chama esta funcao. Nenhuma rota passa o corpo adiante.
+async function criarFaturaPix({ venue, email, valorCentavos, competencia }) {
+  return emitirPix({ venue, email, ciclo: 'mensal', competencia, valorCentavos: inteiroPositivo(valorCentavos) });
+}
+
+async function emitirPix({ venue, email, ciclo, competencia, valorCentavos }) {
   const destino = String(email || venue.contactEmail || '').trim();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(destino)) {
     throw new Error('E-mail invalido para a cobranca.');
@@ -328,7 +465,9 @@ async function criarCobrancaPix({ venue, email, ciclo, competencia }) {
   }
 
   const nome = cicloValido(ciclo);
-  const centavos = precoDoCiclo(nome);
+  const centavos = valorCentavos != null
+    ? inteiroPositivo(valorCentavos)
+    : valorDeEntrada(venue, nome);
 
   const cobranca = await adaptador.criarCobrancaPix({
     referencia: venue.slug,
@@ -352,7 +491,12 @@ async function criarCobrancaPix({ venue, email, ciclo, competencia }) {
 // O `totalPrice` que a bandeja do Google Pay mostra e exibicao do lado do
 // cliente. Quem cobra e este servidor, com PRICE_CENTS. Se alguem editar o
 // valor no navegador, a bandeja mostra outro numero e a cobranca sai igual.
+// Cartao: entrada apenas. O valor sai de valorDeEntrada, nunca do corpo.
 async function criarCobrancaCartao({ venue, email, token, bandeira, parcelas, ciclo, competencia }) {
+  return emitirCartao({ venue, email, token, bandeira, parcelas, ciclo, competencia, valorCentavos: undefined });
+}
+
+async function emitirCartao({ venue, email, token, bandeira, parcelas, ciclo, competencia, valorCentavos }) {
   const destino = String(email || venue.contactEmail || '').trim();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(destino)) {
     throw new Error('E-mail invalido para a cobranca.');
@@ -365,7 +509,9 @@ async function criarCobrancaCartao({ venue, email, token, bandeira, parcelas, ci
   }
 
   const nome = cicloValido(ciclo);
-  const centavos = precoDoCiclo(nome);
+  const centavos = valorCentavos != null
+    ? inteiroPositivo(valorCentavos)
+    : valorDeEntrada(venue, nome);
 
   const cobranca = await adaptador.criarCobrancaCartao({
     referencia: venue.slug,
@@ -404,11 +550,27 @@ function googlePayConfig() {
     gatewayMerchantId,
     bandeiras: (process.env.GPAY_CARD_NETWORKS || 'MASTERCARD,VISA,AMEX,ELO')
       .split(',').map(s => s.trim()).filter(Boolean),
-    precoCentavos: PRICE_CENTS,
-    precoLabel: 'R$ ' + (PRICE_CENTS / 100).toFixed(2).replace('.', ','),
+    precoCentavos: valorCheckoutResultado(),
+    precoLabel: rotuloDeReais(valorCheckoutResultado()),
     moeda: 'BRL',
     pais: 'BR',
   };
+}
+
+function inteiroPositivo(valor) {
+  const n = Number(valor);
+  if (!Number.isInteger(n) || n <= 0) throw new Error('Valor de cobranca invalido.');
+  return n;
+}
+
+// Valor de uma cobranca de entrada (checkout). Por resultado, e o minimo;
+// no legado, o preco fixo do ciclo.
+function valorDeEntrada(venue, nome) {
+  const sub = venue && venue.subscription;
+  const ativa = !!sub && (sub.status === 'active' || sub.status === 'past_due');
+  // Quem nao esta ativo entra no modelo novo, mesmo que tenha sido legado.
+  if (modeloDe(sub) === MODELO_RESULTADO || !ativa) return valorCheckoutResultado();
+  return precoDoCiclo(nome);
 }
 
 function alreadyProcessed(eventId) {
@@ -426,6 +588,36 @@ const PAID = new Set(['payment.confirmed', 'subscription.paid', 'subscription.re
 const FAILED = new Set(['payment.failed', 'subscription.past_due', 'invoice.failed']);
 const CANCELED = new Set(['subscription.canceled', 'subscription.expired']);
 
+// Pagamento no modelo por resultado. Dois casos:
+//  - ativa: quitou a fatura da janela que venceu. Abre a proxima janela.
+//  - nao ativa: primeira assinatura. O minimo entra como adiantamento da
+//    primeira fatura, e a janela comeca agora.
+function aplicarPagamentoResultado(venue, sub) {
+  const agora = Date.now();
+  const ativa = sub.status === 'active' || sub.status === 'past_due';
+
+  if (ativa) {
+    const fimFaturado = sub.cobrancaDoCiclo && sub.cobrancaDoCiclo.fimFaturado != null
+      ? sub.cobrancaDoCiclo.fimFaturado
+      : sub.currentPeriodEnd;
+    sub.status = 'active';
+    avancarJanela(sub, { fimFaturado, agora });
+    return { plan: 'premium', email: 'subscription_renewed', ciclo: 'mensal' };
+  }
+
+  sub.modelo = MODELO_RESULTADO;
+  sub.status = 'active';
+  sub.interval = 'mensal';
+  sub.faturadoAte = agora;
+  sub.currentPeriodStart = agora;
+  sub.currentPeriodEnd = somarMeses(agora, 1);
+  sub.pagoAntecipado = valorCheckoutResultado();
+  sub.avisos = {};
+  sub.cobrancaDoCiclo = null;
+  if (!Array.isArray(sub.atendimentos)) sub.atendimentos = [];
+  return { plan: 'premium', email: 'premium_started', ciclo: 'mensal' };
+}
+
 // Traduz o evento do provedor para o estado da assinatura da unidade.
 // Retorna o nome do e-mail transacional a disparar, ou null.
 function applyEvent(venue, event) {
@@ -435,7 +627,18 @@ function applyEvent(venue, event) {
   if (event.subscriptionId) sub.externalId = String(event.subscriptionId);
 
   if (PAID.has(type)) {
-    const renovacao = sub.status === 'active' || sub.status === 'past_due';
+    // Pagamento da fatura final de quem cancelou: nao abre janela nova.
+    if (sub.status === 'canceled' && modeloDe(sub) === MODELO_RESULTADO) {
+      sub.cobrancaDoCiclo = null;
+      return { plan: effectivePlan(venue), email: null };
+    }
+    const ativa = sub.status === 'active' || sub.status === 'past_due';
+    // Pagamento de cadastro ou de fatura por resultado.
+    if (modeloDe(sub) === MODELO_RESULTADO || !ativa) {
+      return aplicarPagamentoResultado(venue, sub);
+    }
+
+    const renovacao = ativa;
     const ciclo = cicloValido(event.ciclo || sub.interval || 'mensal');
     const agora = Date.now();
 
@@ -472,6 +675,14 @@ function applyEvent(venue, event) {
 }
 
 module.exports = {
+  MODELO_RESULTADO,
+  modeloDe,
+  registrarAtendimento,
+  faturaDoVencimento,
+  migrarParaResultado,
+  avancarJanela,
+  janelaDeCobranca,
+  valorCheckoutResultado,
   TRIAL_DAYS,
   PRICE_CENTS,
   PRICE_YEAR_CENTS,
@@ -500,6 +711,7 @@ module.exports = {
   alreadyProcessed,
   applyEvent,
   criarCobrancaPix,
+  criarFaturaPix,
   criarCobrancaCartao,
   googlePayConfig,
   mercadopago,

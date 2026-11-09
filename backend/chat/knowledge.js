@@ -15,7 +15,7 @@ const TRECHOS = [
   {
     id: 'planos',
     titulo: 'Planos e preço',
-    texto: `Todo estabelecimento novo começa com 14 dias de teste, com tudo liberado e sem pedir cartão. Depois existem dois planos. O gratuito mantém a fila funcionando com limite diário de entradas, um balcão e anúncios. O premium custa R$ 99 por mês por unidade de atendimento: entradas ilimitadas, todos os balcões, sem anúncios, pagamento por Pix e sem fidelidade.`,
+    texto: `Todo estabelecimento novo começa com 14 dias de teste, com tudo liberado e sem pedir cartão. Depois existem dois planos. O gratuito mantém a fila funcionando com limite diário de entradas, um balcão e anúncios. O premium cobra pelo resultado: um mínimo de R$ 29 por mês por unidade, mais R$ 0,12 por atendimento concluído, com teto de R$ 249 por mês. Entradas ilimitadas, todos os balcões, sem anúncios, pagamento por Pix e sem fidelidade. Quem não atende ninguém no mês paga só o mínimo.`,
   },
   {
     id: 'instalacao',

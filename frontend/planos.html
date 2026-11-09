@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Planos e preços — Fila Virtual</title>
-<meta name="description" content="Fila virtual por QR code para clínicas e serviços: comece grátis e assine por R$ 99 ao mês por unidade, sem fidelidade.">
+<meta name="description" content="Fila virtual por QR code para clínicas e serviços: comece grátis. Você paga um mínimo de R$ 29 ao mês por unidade e R$ 0,12 por atendimento concluído, com teto de R$ 249. Sem fidelidade.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -69,13 +69,14 @@
     <article class="plan featured">
       <h2>Premium</h2>
       <p class="who">Para quem atende todo dia</p>
-      <div class="price" id="price">R$ 99 <small>/mês por unidade</small></div>
+      <div class="price" id="price">R$ 29 <small>/mês de mínimo por unidade</small></div>
       <ul>
         <li><i></i>Tudo do plano gratuito</li>
         <li><i></i>Entradas ilimitadas por dia</li>
         <li><i></i>Todos os balcões liberados</li>
         <li><i></i>Telão da sala de espera sem anúncios</li>
-        <li><i></i>Pix recorrente, sem fidelidade</li>
+        <li><i></i>R$ 0,12 por atendimento concluído, com teto de R$ 249 por mês</li>
+        <li><i></i>Pix, sem fidelidade</li>
         <li><i></i>14 dias grátis para experimentar</li>
       </ul>
       <a class="cta" href="cadastro.html">Começar o teste grátis</a>
@@ -92,6 +93,10 @@
     <div>
       <h3>O que acontece quando o teste acaba?</h3>
       <p>A fila continua funcionando, só que no plano gratuito: até 50 entradas por dia e um balcão. Nada é apagado e você pode assinar quando quiser.</p>
+    </div>
+    <div>
+      <h3>Como é cobrado?</h3>
+      <p>Você paga um mínimo de R$ 29 por mês, que cobre a fila no ar. Cada atendimento concluído soma R$ 0,12, e o total não passa de R$ 249 por mês. Quem não atende ninguém no mês paga só o mínimo. A cobrança do mês é emitida no vencimento, por Pix.</p>
     </div>
     <div>
       <h3>Como cancelo?</h3>
@@ -116,7 +121,7 @@
   fetch(API_BASE + prefix + "/config").then(function(r) { return r.json(); }).then(function(config) {
     var sub = config.monetization && config.monetization.subscription;
     if (sub && sub.priceLabel) {
-      document.getElementById("price").innerHTML = sub.priceLabel + ' <small>/mês por unidade</small>';
+      document.getElementById("price").innerHTML = sub.priceLabel + ' <small>/mês de mínimo por unidade</small>';
     }
   }).catch(function() {});
 })();

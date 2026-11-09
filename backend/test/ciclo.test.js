@@ -176,15 +176,19 @@ describe('pagamento e ciclos', () => {
     assert.ok(venue.subscription.currentPeriodEnd > Date.now() + 27 * DIA);
   });
 
-  test('anual da doze meses, nao um', () => {
+  test('novo assinante entra no modelo por resultado, mensal, mesmo que peca anual', () => {
+    // O anual deixou de ser vendido: quem cadastra agora entra por resultado.
     const venue = assinaturaAtiva(billing, { inicio: Date.now(), fim: Date.now() });
     venue.subscription.status = 'trialing';
+    venue.subscription.modelo = undefined;
 
     billing.applyEvent(venue, { type: 'payment.confirmed', id: 'p1', ciclo: 'anual' });
 
-    assert.strictEqual(venue.subscription.interval, 'anual');
-    const meses = (venue.subscription.currentPeriodEnd - venue.subscription.currentPeriodStart) / DIA;
-    assert.ok(meses > 360 && meses < 370, `esperava ~365 dias, deu ${meses.toFixed(0)}`);
+    assert.strictEqual(venue.subscription.modelo, 'resultado');
+    assert.strictEqual(venue.subscription.interval, 'mensal');
+    const dias = (venue.subscription.currentPeriodEnd - venue.subscription.currentPeriodStart) / DIA;
+    assert.ok(dias > 27 && dias < 32, `esperava ~30 dias, deu ${dias.toFixed(0)}`);
+    assert.strictEqual(venue.subscription.pagoAntecipado, 2900);
   });
 
   test('a renovacao mantem o ciclo que a pessoa contratou', () => {
