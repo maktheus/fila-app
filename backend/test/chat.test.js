@@ -313,7 +313,9 @@ describe('ferramentas contra a API', () => {
     const recarregado = require('../chat/tools');
     const r = await recarregado.executar('consultar_planos', {});
     assert.ok(!r.erro, r.erro);
-    assert.ok(r.preco_mensal_por_unidade.includes('99'));
+    // O valor vem do modelo por resultado: minimo mais o preco por atendimento.
+    assert.ok(r.preco_mensal_por_unidade.includes('29,00'), r.preco_mensal_por_unidade);
+    assert.ok(r.preco_mensal_por_unidade.includes('0,12'), r.preco_mensal_por_unidade);
     assert.strictEqual(r.plano_premium.entradas_por_dia, 'ilimitadas');
   });
 

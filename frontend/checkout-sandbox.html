@@ -36,7 +36,7 @@
   <h1>Assinatura Fila Virtual</h1>
   <p>Esta tela substitui o checkout do provedor enquanto a conta de pagamento não está conectada. Nenhuma cobrança é feita.</p>
 
-  <div class="amount" id="amount">R$ 99,00 <span>/mês por unidade</span></div>
+  <div class="amount" id="amount">R$ 29,00 <span>mínimo por mês, por unidade</span></div>
   <dl>
     <dt>Unidade</dt><dd id="venue">—</dd>
     <dt>Forma</dt><dd>Pix recorrente</dd>
@@ -61,7 +61,7 @@
     var sub = config.monetization && config.monetization.subscription;
     if (sub && sub.priceLabel) {
       document.getElementById("amount").innerHTML =
-        sub.priceLabel + ' <span>/mês por unidade</span>';
+        sub.priceLabel + ' <span>mínimo por mês, por unidade</span>';
     }
   }).catch(function() {});
 

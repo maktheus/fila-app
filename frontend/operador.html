@@ -507,7 +507,9 @@ if ('serviceWorker' in navigator) {
     } else {
       classe = 'limited';
       texto = 'Hoje: <strong>' + usados + ' de ' + (limits.dailyTickets || '∞') + '</strong> entradas · ' +
-        (limits.counters || '∞') + ' balcão. ' + (sub.priceLabel ? 'Premium por ' + sub.priceLabel + '/mês.' : '');
+        (limits.counters || '∞') + ' balcão. ' + (sub.resultado
+          ? 'Premium: mínimo de ' + sub.priceLabel + '/mês, mais ' + sub.resultado.porAtendimentoLabel + ' por atendimento concluído.'
+          : (sub.priceLabel ? 'Premium por ' + sub.priceLabel + '/mês.' : ''));
     }
 
     return '<div class="plan-bar ' + classe + '">' +

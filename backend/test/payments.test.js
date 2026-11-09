@@ -212,8 +212,7 @@ describe('assinatura do webhook do Mercado Pago', () => {
 });
 
 describe('o valor da cobranca nao e negociavel', () => {
-  test('billing cobra PRICE_CENTS, ignorando o que vier junto', async () => {
-    process.env.PLAN_PRICE_CENTS = '9900';
+  test('billing cobra o minimo na entrada, ignorando o que vier junto', async () => {
     process.env.PAYMENT_PROVIDER = 'sandbox';
     delete require.cache[require.resolve('../billing')];
     delete require.cache[require.resolve('../payments/sandbox')];
@@ -229,8 +228,9 @@ describe('o valor da cobranca nao e negociavel', () => {
       total_amount: '0.01',
     });
 
-    assert.strictEqual(cobranca.valorCentavos, 9900);
-    assert.strictEqual(cobranca.valorLabel, 'R$ 99,00');
+    // Entrada por resultado: o minimo mensal. O valor e do servidor.
+    assert.strictEqual(cobranca.valorCentavos, 2900);
+    assert.strictEqual(cobranca.valorLabel, 'R$ 29,00');
   });
 
   test('e-mail invalido derruba a cobranca antes de falar com o provedor', async () => {
@@ -330,8 +330,7 @@ describe('cobranca no cartao', () => {
     assert.strictEqual(mp.bandeiraDoGoogle(undefined), null);
   });
 
-  test('billing cobra PRICE_CENTS no cartao, ignorando o que vier junto', async () => {
-    process.env.PLAN_PRICE_CENTS = '9900';
+  test('billing cobra o minimo no cartao, ignorando o que vier junto', async () => {
     process.env.PAYMENT_PROVIDER = 'sandbox';
     delete require.cache[require.resolve('../billing')];
     delete require.cache[require.resolve('../payments/sandbox')];
@@ -347,8 +346,8 @@ describe('cobranca no cartao', () => {
       total_amount: '0.01',
       amount: 1,
     });
-    assert.strictEqual(cobranca.valorCentavos, 9900);
-    assert.strictEqual(cobranca.valorLabel, 'R$ 99,00');
+    assert.strictEqual(cobranca.valorCentavos, 2900);
+    assert.strictEqual(cobranca.valorLabel, 'R$ 29,00');
     assert.strictEqual(cobranca.aprovado, true);
   });
 

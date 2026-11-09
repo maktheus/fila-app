@@ -45,6 +45,19 @@ function contarAtendimentos(tickets, { inicio, fim }) {
   return n;
 }
 
+// Conta atendimentos a partir de uma lista de timestamps (ms) guardada na
+// assinatura. E a fonte da fatura: os tickets expiram em 12 horas (LGPD), mas
+// a cobranca do mes precisa de todos. Intervalo semiaberto [inicio, fim), para
+// que um atendimento caia em exatamente uma janela de cobranca.
+function contarMomentos(momentos, { inicio, fim }) {
+  if (!Array.isArray(momentos)) return 0;
+  let n = 0;
+  for (const m of momentos) {
+    if (typeof m === 'number' && m >= inicio && m < fim) n++;
+  }
+  return n;
+}
+
 // Fatura do periodo. O total e o maior entre o minimo e a parte variavel,
 // limitado pelo teto. Nunca negativo, nunca acima do teto.
 function calcularFatura(atendimentos, politica) {
@@ -77,6 +90,7 @@ module.exports = {
   STATUS_COBRAVEL,
   politicaDoEnv,
   contarAtendimentos,
+  contarMomentos,
   calcularFatura,
   previsao,
 };

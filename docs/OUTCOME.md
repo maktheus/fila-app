@@ -1,9 +1,9 @@
 # Modelo de negócio: outcome as a service
 
-**Status:** proposta com a precificação implementada e testada em
-`backend/outcome.js`. A cobrança real **ainda não usa** esse modelo: a
-assinatura fixa de R$ 99/mês continua no ar até você aprovar a troca (ver
-"Decisões que são suas").
+**Status:** **implementado e em produção no código.** Cadastros novos entram
+por resultado. Assinaturas antigas (preço fixo de R$ 99) seguem no preço fixo
+até o fim do ciclo já pago e migram sozinhas no vencimento. Os valores foram
+aprovados em 2026-11-09 (mínimo, preço por atendimento e teto abaixo).
 
 ## A mudança em uma frase
 
@@ -115,32 +115,45 @@ só é conhecido **no fim do período**. Isso muda três coisas:
 - **Preço pode ser mal calibrado.** Os valores são palpite até termos dados. Por
   isso são variáveis de ambiente, e não constantes no código.
 
-## O que já está pronto
+## Como a cobrança funciona agora
 
-- `backend/outcome.js`: regra de precificação, contagem de atendimentos,
-  previsão. Funções puras, sem I/O.
-- `backend/test/outcome.test.js`: 16 testes, cobrindo mínimo, variável, teto,
-  monotonia (mais atendimento nunca custa menos), exclusão de quem faltou e
-  validação de entrada.
+- **Base da fatura:** cada atendimento concluído grava um timestamp em
+  `subscription.atendimentos`. Não depende do ticket, que expira em 12 horas
+  (LGPD). A lista é podada depois que a fatura é quitada.
+- **Janela:** a fatura do vencimento cobre o uso desde `faturadoAte` até o fim
+  do acesso atual. Uma janela é semiaberta, então um atendimento cai em
+  exatamente uma fatura.
+- **Entrada:** o primeiro pagamento é o mínimo, e ele é descontado da primeira
+  fatura. Se o uso ficar abaixo do mínimo, a janela avança sem Pix.
+- **Vencimento:** se houver valor devido, sai um Pix com o valor do uso. Ao
+  pagar, `faturadoAte` avança para o fim faturado e a janela seguinte abre. Uso
+  na tolerância de atraso vai para a fatura seguinte, sem perda nem dobra.
+- **Aviso prévio:** não há Pix fixo. O e-mail mostra o valor mínimo e o preço
+  por atendimento.
+- **Migração de legado:** no aviso prévio do vencimento, a assinatura antiga vira
+  `resultado` com `faturadoAte` no fim do ciclo já pago. Esse ciclo fica no preço
+  fixo; o seguinte é cobrado pelo uso.
+- **Cancelamento:** o acesso segue até o fim do ciclo. No dia do vencimento sai
+  uma fatura final, uma única vez, sem abrir janela nova. Se ela não for paga, a
+  pendência fica registrada; o sistema não persegue cobrança de quem cancelou.
+- **Anual:** deixou de ser vendido. Quem já tinha anual mantém o ciclo até o
+  fim, no preço fixo, como antes.
 
-## O que ainda não está pronto (e por que não foi feito agora)
+## O que ainda não existe
 
-- **Trocar a cobrança ao vivo.** Mexe em dinheiro real de clientes. Precisa da
-  sua aprovação dos valores e de uma decisão sobre o plano atual.
-- **Job de fechamento e aviso com valor variável.** Depende da decisão acima.
-- **Tela de previsão no painel.** Depende da decisão acima.
-- **Página pública de preços** (`frontend/planos.html`) e o checkout. Ainda
-  mostram R$ 99. Não trocar antes de decidir.
+- **Cobrança recorrente automática.** Cada fatura é um Pix novo. Depende de
+  preapproval do Mercado Pago ou de Pix Automático (ver `docs/PENDENCIAS.md`).
+- **Previsão no painel durante o mês.** O cálculo existe (`subscriptionView`,
+  campo `resultado.previsaoCentavos`), mas a tela do operador ainda não mostra a
+  barra de consumo.
+- **Cobrança de fatura final não paga.** Fica como pendência; não há
+  perseguição automática.
 
-## Decisões que são suas
+## Decisões tomadas
 
-1. **Aprovar os valores iniciais** (R$ 29 de mínimo, R$ 0,12 por atendimento,
-   teto de R$ 249) ou ajustar. Eles são configuráveis, então a troca não exige
-   código.
-2. **Manter ou não o plano gratuito** com 50 entradas por dia. Ele funciona como
-   aquisição; a proposta é mantê-lo.
-3. **Migração de quem já paga R$ 99.** Opções: manter o preço fixo até o fim do
-   ciclo e migrar no próximo, ou oferecer a troca antecipada com o mínimo como
-   piso garantido.
-4. **Quando trocar o preço público.** Só depois de ter ao menos algumas unidades
-   com dado real de movimento.
+1. **Valores:** mínimo R$ 29, R$ 0,12 por atendimento concluído, teto R$ 249.
+   Configuráveis por env (`OUTCOME_*`).
+2. **Migração:** quem paga R$ 99 mantém o ciclo já pago e migra no vencimento
+   seguinte.
+3. **Momento:** trocado agora, após aprovação.
+4. **Plano gratuito:** mantido (50 entradas por dia, um balcão).

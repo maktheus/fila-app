@@ -135,7 +135,9 @@ const HANDLERS = {
     const m = config.monetization || {};
     const assinatura = m.subscription || {};
     return {
-      preco_mensal_por_unidade: assinatura.priceLabel || 'R$ 99,00',
+      preco_mensal_por_unidade: assinatura.resultado
+        ? `mínimo de ${assinatura.resultado.minimoLabel} por mês, mais ${assinatura.resultado.porAtendimentoLabel} por atendimento concluído, com teto de ${assinatura.resultado.tetoLabel}`
+        : (assinatura.priceLabel || 'R$ 99,00'),
       dias_de_teste: assinatura.trialDaysLeft > 0 ? assinatura.trialDaysLeft : 14,
       plano_gratuito: {
         entradas_por_dia: (m.limits && m.limits.dailyTickets) || 50,
